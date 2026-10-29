@@ -1,10 +1,9 @@
-# Coding Challenges, Build your own rate limiter.
-# Source: https://codingchallenges.fyi/challenges/challenge-rate-limiter
-# Written in our own words. The source page is linked, not copied.
-# Every predict and trace key is proven by content/proofs/challenge-rate-limiter.mjs, which simulates each timeline.
+# Coding Challenges, Build your own rate limiter. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-rate-limiter . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-rate-limiter
@@ -14,10 +13,9 @@ project:
   status: generated
   figure:
     kind: bucket
-  summary: >-
-    A small HTTP service with a limited and an unlimited endpoint, protected in turn by a token bucket, a fixed window
-    counter, a sliding window log and a sliding window counter, and finally by a limit shared between several servers
-    through Redis.
+  summary: A small HTTP service with a limited and an unlimited endpoint, protected in turn by a token bucket, a fixed
+    window counter, a sliding window log and a sliding window counter, and finally by a limit shared between several
+    servers through Redis.
   requirements:
     - Serve two endpoints, /limited and /unlimited, where only /limited is rate limited
     - Limit each client IP address with a token bucket of 10 tokens refilled at 1 token per second
@@ -25,30 +23,15 @@ project:
     - Replace the token bucket with a fixed window counter whose windows are aligned to the clock
     - Implement a sliding window log and a sliding window counter, each with tests you design
     - Share one limit between two servers on different ports through a store such as Redis
-  restate_rubric:
-    - id: r1
-      point: "The service limits how many requests each client can make to one endpoint and leaves the other endpoint unlimited"
-    - id: r2
-      point: "It implements several algorithms: a token bucket, a fixed window counter, a sliding window log and a sliding window counter"
-    - id: r3
-      point: "A rejected request gets the status 429 Too Many Requests"
-    - id: r4
-      point: "In the end several servers enforce one shared limit by keeping the counts in a shared store such as Redis"
-  reflection_prompt: >-
-    In your own words, which of your limiters would you put in front of a real API, what does it cost in memory and
-    in fairness at window boundaries, and what would you change to run it on many servers?
   primer:
-    what: >-
-      A rate limiter sits in front of an API and decides, for each incoming request, whether the client has asked too
+    what: A rate limiter sits in front of an API and decides, for each incoming request, whether the client has asked too
       often recently. If it has, the request is turned away with a status meaning too many requests, and the work
-      behind the endpoint never runs. You will build one in four different ways and then make several servers share
-      a single limit.
-    why: >-
-      Without a limit, one buggy script, one heavy user or one attacker can flood a service and slow it down for
+      behind the endpoint never runs. You will build one in four different ways and then make several servers share a
+      single limit.
+    why: Without a limit, one buggy script, one heavy user or one attacker can flood a service and slow it down for
       everyone. A limiter keeps each client to a fair share and lets the service survive sudden spikes.
-    example: >-
-      Picture a bucket for one client that holds at most 2 tokens and gains 1 token every second. The client sends 3
-      requests at the same instant. The first two each take a token and are served, and the third finds the bucket
+    example: Picture a bucket for one client that holds at most 2 tokens and gains 1 token every second. The client sends
+      3 requests at the same instant. The first two each take a token and are served, and the third finds the bucket
       empty and is rejected. A second later one token has appeared, so the client's next request is served again.
     words:
       - term: rate limiter
@@ -63,381 +46,257 @@ project:
         meaning: The HTTP status a server sends when it refuses a request because the client is over its limit.
       - term: shared store
         meaning: A database such as Redis that several servers read and update, so they all see the same counts.
-
+  restate_rubric:
+    - id: r1
+      point: The service limits how many requests each client can make to one endpoint and leaves the other endpoint
+        unlimited
+    - id: r2
+      point: "It implements several algorithms: a token bucket, a fixed window counter, a sliding window log and a sliding
+        window counter"
+    - id: r3
+      point: A rejected request gets the status 429 Too Many Requests
+    - id: r4
+      point: In the end several servers enforce one shared limit by keeping the counts in a shared store such as Redis
+  reflection_prompt: In your own words, which of your limiters would you put in front of a real API, what does it cost
+    in memory and in fairness at window boundaries, and what would you change to run it on many servers?
+  done_when: Each of the four algorithms protects /limited while /unlimited stays open, rejected requests get 429, the
+    sliding window log has tests that control the clock, two servers enforce one shared limit through the store with
+    expiring keys, and your notes compare the four algorithms on burst behaviour, memory and accuracy, in your own
+    words.
+  open_checks:
+    - Where your HTTP library exposes the client address, and what it reports when the server runs behind a proxy.
+    - Whether your store can set an expiry in the same atomic step as the first increment, or whether a key can be
+      left without one.
+    - "What your limiter should do when the shared store is unreachable: allow traffic or reject it."
+    - Which clock your windows use, and what happens to them if the server clock jumps.
+learning_map:
+  - concept: token-bucket
+    where: Your first limiter gives each client a bucket of 10 tokens that refills at 1 token per second. The capacity
+      sets the largest burst and the refill rate sets the long-run average.
+    explain_back:
+      prompt: A public API promises clients "bursts of up to 20 requests, and 5 per second on average". Explain how a token
+        bucket keeps both promises, and what a client sees if it sends 40 requests in one second after being quiet for
+        a minute.
+      rubric:
+        - id: e1
+          point: The capacity of 20 tokens sets the largest burst a client can send at once
+        - id: e2
+          point: The refill rate of 5 tokens per second sets the long-run average
+        - id: e3
+          point: Tokens beyond the capacity are thrown away, so a quiet minute saves up at most one full bucket
+        - id: e4
+          point: Of the 40 requests, about 20 are served from the full bucket, plus any refilled during that second, and the
+            rest are rejected until tokens refill
+  - concept: fixed-window-counter
+    where: Your second limiter counts each client's requests in windows aligned to the clock, and the count starts over at
+      every boundary.
+    explain_back:
+      prompt: A login endpoint allows 5 attempts per minute, using fixed windows that start on each whole minute. Explain
+        how an attacker can make 10 attempts in two seconds, and why this design is still popular.
+      rubric:
+        - id: e1
+          point: The count starts over at each window boundary, whatever happened just before it
+        - id: e2
+          point: Five attempts just before the boundary and five just after all pass, so twice the limit gets through in a
+            moment
+        - id: e3
+          point: It stays popular because it needs only one small counter per client and window, which is cheap and simple
+  - concept: sliding-window-log
+    where: Your third limiter keeps the time of each accepted request and counts only the ones inside the last window.
+    explain_back:
+      prompt: Explain how a sliding window log guarantees that no one-minute stretch ever holds more than the limit, and
+        what it costs when a busy client sends thousands of requests a minute.
+      rubric:
+        - id: e1
+          point: It stores a timestamp for each accepted request
+        - id: e2
+          point: Before each decision it drops the timestamps older than the window and counts the rest, so the limit holds
+            wherever the minute starts and there is no boundary burst
+        - id: e3
+          point: Memory and work grow with the limit and the traffic, because every accepted request keeps an entry until it
+            ages out
+        - id: e4
+          point: Rejected requests must not be logged, or a client that keeps retrying stays blocked for good
+  - concept: sliding-window-counter
+    where: "Your fourth limiter estimates the last window from just two counts: the current fixed window and the previous
+      one."
+    explain_back:
+      prompt: A sliding window counter keeps only two counts per client. Explain how it estimates the requests in the last
+        minute, why the estimate is good enough in practice, and when it is wrong.
+      rubric:
+        - id: e1
+          point: The estimate is the current window's count plus the previous window's count, weighted by how much of the
+            previous window still overlaps the last minute
+        - id: e2
+          point: It assumes the previous window's requests were spread evenly across it
+        - id: e3
+          point: With constant memory per client it smooths out most of the boundary burst
+        - id: e4
+          point: It is wrong when the previous window's traffic was bunched at one end
+  - concept: client-identity
+    where: Your limiter keys each bucket on the client's IP address. The choice of key decides who shares a limit.
+    explain_back:
+      prompt: Your limiter keys on the client's IP address. Explain two ways this limits the wrong people or fails to stop
+        an abuser, and what a better key is for an API with accounts.
+      rubric:
+        - id: e1
+          point: Many people behind one office network, mobile carrier or proxy share an IP address and use up each other's
+            limit
+        - id: e2
+          point: An abuser can spread requests across many addresses, or fake a forwarding header if the server trusts it
+            blindly
+        - id: e3
+          point: Behind a load balancer the server sees the balancer's address unless it reads the forwarded client address from
+            a proxy it trusts
+        - id: e4
+          point: For an API with accounts, key on the API key or user, and keep IP limits for anonymous traffic
+  - concept: rate-limit-responses
+    where: Only /limited is limited. A rejected request gets 429 Too Many Requests, and a good limiter tells the client
+      when to try again.
+    explain_back:
+      prompt: A client keeps retrying the moment it is rate limited, and makes the overload worse. Explain what the server
+        should send back, and what a well-behaved client does with it.
+      rubric:
+        - id: e1
+          point: The status is 429 Too Many Requests, not a normal success or a server error
+        - id: e2
+          point: A Retry-After header tells the client how long to wait, in seconds or as a date
+        - id: e3
+          point: A well-behaved client waits, and backs off with growing, randomised delays instead of retrying at once
+        - id: e4
+          point: The limiter rejects before the expensive work behind the endpoint runs
+  - concept: concurrent-connections
+    where: Many requests are handled at the same time, so two of them can read the same bucket and both take its last token.
+    explain_back:
+      prompt: Two requests from the same client arrive at the same moment, and the bucket holds one token. Explain how both
+        can be accepted, and how to prevent it.
+      rubric:
+        - id: e1
+          point: Each request reads a count of 1, decides to accept, and writes 0
+        - id: e2
+          point: Reading, checking and writing are separate steps, so the two interleave and one update is lost
+        - id: e3
+          point: Make the read, check and write one indivisible step, with a lock per bucket or an atomic operation
+  - concept: distributed-counters
+    where: In the last milestone two servers share one limit by keeping their counts in a shared store.
+    explain_back:
+      prompt: You run the API on three servers behind a load balancer, each with its own in-memory limit of 100 requests a
+        minute. Explain what limit a client really gets, and how a shared store fixes it without losing updates.
+      rubric:
+        - id: e1
+          point: Each server counts on its own, so a client can get up to 300 a minute, depending on how the balancer spreads
+            its requests
+        - id: e2
+          point: Moving the counts into one store that every server uses gives a single limit
+        - id: e3
+          point: Each update must be an atomic increment that returns the new value, not a read followed by a write, so two
+            servers cannot both take the last slot
+        - id: e4
+          point: The store adds a network trip and becomes a dependency, so you must decide whether to allow or block traffic
+            when it is down
+  - concept: key-expiry
+    where: Counts are stored under one key per client and window, and every key needs an expiry so old windows disappear.
+    explain_back:
+      prompt: Your shared store gains a new key for every client every minute. Explain why each key must expire, how long it
+        should live for a sliding window counter, and what happens if you forget.
+      rubric:
+        - id: e1
+          point: Without expiry the keys pile up for ever and the store's memory grows without limit
+        - id: e2
+          point: Set the expiry when the key is first created, so the store removes it by itself
+        - id: e3
+          point: A sliding window counter still reads the previous window, so each key must live for at least two windows
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Endpoints and the token bucket
-    summary: Serve a limited and an unlimited endpoint, and protect the limited one with a token bucket per IP address.
-    concepts: [rest-api-design, token-bucket, concurrent-connections]
+    summary: Serve a limited and an unlimited endpoint, then protect the limited one with a token bucket per client.
     steps:
-      - title: Two endpoints and a first bucket
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A client's bucket holds at most 3 tokens and starts full. The client sends 5 requests at the same instant,
-            so no token is added in between. How many of the 5 requests are served?
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              Each served request spends one token. The first three requests take the three tokens, and the fourth and
-              fifth find the bucket empty, so 3 are served and 2 are rejected. Proof script output: 3.
-        build:
-          prompt: >-
-            Write a small HTTP server on 127.0.0.1 port 8080 with two endpoints, /limited and /unlimited, each
-            returning a short text of your choice. Check both with curl before adding any limiting.
+      - title: Two endpoints
+        minutes: 30
+        build: Write a small HTTP server on 127.0.0.1 port 8080 with two endpoints, /limited and /unlimited, each returning a
+          short text of your choice.
+        outcome: curl gets 200 and the expected text from both /limited and /unlimited.
+        concepts:
+          - rate-limit-responses
         hints:
-          hint: Count tokens, not requests. What happens to a request once there is nothing left in the bucket?
-          example: >-
-            A vending machine stocked with 4 drinks serves the first 4 people in a queue of 6, and the last 2 walk
-            away empty-handed until it is restocked.
-
-      - title: Refill over time
-        minutes: 20
-        think:
-          kind: trace
-          prompt: >-
-            The bucket for one IP address holds at most 10 tokens and starts full at time 0. One token is added at
-            each whole second after that, at 1 second, 2 seconds, 3 seconds and so on, and a token added to a full
-            bucket is thrown away. The client sends 13 requests at time 0, then 3 requests at 2.5 seconds. How many of
-            the 13 are accepted, and how many of the 3?
-          key:
-            match: numbers_all
-            expected: [10, 2]
-            derivation: >-
-              At time 0 the 10 tokens serve the first 10 requests and the other 3 are rejected, leaving the bucket
-              empty. Tokens are added at 1 second and at 2 seconds, so at 2.5 seconds the bucket holds 2 tokens: two of
-              the three requests are accepted and the third is rejected. Proof script output: [10, 2].
-        build:
-          prompt: >-
-            Give each client IP address its own bucket of 10 tokens, refilled at 1 token per second, with tokens
-            beyond 10 thrown away. You can refill with a timer, or work out the tokens earned from the time since the
-            last refill whenever a request arrives.
+          hint: Get both endpoints answering before you add any limiting.
+      - title: A token bucket per client
+        minutes: 60
+        build: Give each client IP address its own bucket of 10 tokens, refilled at 1 token per second and never above 10.
+          Each request to /limited takes one token.
+        outcome: 15 quick calls to /limited serve the first 10 and reject the rest; after waiting 3 seconds, the next 3 calls
+          are served.
+        concepts:
+          - token-bucket
+          - client-identity
         hints:
-          hint: Write down how many tokens are in the bucket just after time 0, and then after each whole second up to 2.5.
-          example: >-
-            A phone that earns one free message credit per hour, up to a cap, has used every credit by noon. At half
-            past two it has earned credits at one and at two o'clock, and no more.
-
-      - title: Reject with 429
-        minutes: 20
-        think:
-          kind: spot_bug
-          prompt: >-
-            This handler is meant to give each IP address a bucket of 10 tokens refilled at 1 token per second, and to
-            tell clients clearly when they are over the limit. Find the two problems.
-          snippet: |-
-            if ip not in buckets:
-                buckets[ip] = Bucket(tokens = 10, last_refill = now())
-            bucket = buckets[ip]
-            elapsed = now() - bucket.last_refill
-            bucket.tokens = bucket.tokens + elapsed * 1
-            bucket.last_refill = now()
-            if bucket.tokens >= 1:
-                bucket.tokens = bucket.tokens - 1
-                reply(200, "ok")
-            else:
-                reply(200, "slow down")
-          rubric:
-            - id: p1
-              point: "The refill is never capped at 10, so a client that stays quiet for minutes saves up hundreds of tokens and can send a huge burst"
-            - id: p2
-              point: "The fix for the refill is to keep the smaller of the new token count and the capacity of 10"
-            - id: p3
-              point: "A rejected request is answered with status 200, so clients cannot tell it was refused; it should be 429 Too Many Requests"
-        build:
-          prompt: >-
-            Answer rejected requests to /limited with 429 Too Many Requests and leave /unlimited alone. Requests are
-            handled at the same time, so protect each bucket while a token is taken. Then load test with Postman or a
-            loop of curl calls, about 10 clients at once: the first burst should pass, after which roughly nine out of
-            ten requests should be rejected.
+          hint: You can refill with a timer, or work out the tokens earned from the time since the last request. Which needs
+            less work per client?
+          example: "A phone plan that earns one free message per hour, up to a cap, never needs a clock running per customer: it
+            works out the credit when the customer next sends a message."
+      - title: Reject with 429 and test under load
+        minutes: 45
+        build: Answer rejected requests with 429 Too Many Requests, and optionally a Retry-After header. Protect each bucket
+          so concurrent requests cannot both take its last token. Load test with about 10 clients at once.
+        outcome: Under load, /limited answers 429 after the first burst while /unlimited always answers 200, and a concurrent
+          test never serves more requests than the bucket allows.
+        concepts:
+          - rate-limit-responses
+          - concurrent-connections
         hints:
-          hint: Ask what the token count looks like after an hour of silence, and what a client program sees in the status line.
-          example: >-
-            A cinema that gives one free ticket per day of membership, with no upper limit, lets a member who skipped a
-            year bring a whole crowd in one evening.
-    teach_back:
-      prompt: >-
-        One client hammers /limited while another calls /unlimited. Explain how your server decides what each request
-        gets back, and what the hammering client sees over its first burst and the seconds after it.
-      rubric:
-        - id: t1
-          concept: rest-api-design
-          point: "Requests to /unlimited are never checked, and a request to /limited that is over the limit gets 429 Too Many Requests instead of the normal reply"
-        - id: t2
-          concept: token-bucket
-          point: "Each IP address has its own bucket of at most 10 tokens, so a burst of up to 10 passes, and after that only about one request per second is accepted"
-        - id: t3
-          concept: token-bucket
-          point: "Tokens beyond the capacity are thrown away, so a quiet client can never save up more than one full bucket"
-        - id: t4
-          concept: concurrent-connections
-          point: "Many requests are handled at the same time, so taking a token is protected, for example with a lock, or two requests could both take the last token"
-
-  # ------------------------------------------------------------------------------------------
-  - title: Fixed windows and the sliding log
-    summary: Count requests in clock-aligned windows, see the burst a boundary allows, and fix it with a log of request times.
-    concepts: [fixed-window-counter, sliding-window-log, key-value-store]
+          hint: Send many requests at exactly the same moment to a nearly empty bucket, and count how many were served.
+  - title: Windows and logs
+    summary: Count in fixed windows, see the boundary burst, then fix it with a log of request times and a weighted counter.
     steps:
-      - title: Windows aligned to the clock
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A fixed window limiter allows 3 requests per window of 10 seconds. Windows start at 0, 10, 20 seconds and
-            so on, so a request at exactly 10 seconds belongs to the window that starts at 10. Rejected requests are
-            not counted. One client sends requests at 2, 5, 8, 9, 10 and 11 seconds. How many of the six are accepted?
-          key:
-            match: number_exact
-            expected: 5
-            derivation: >-
-              The requests at 2, 5 and 8 fill the window from 0 to 10, so the one at 9 is rejected. The request at
-              exactly 10 opens the next window with a fresh count, so 10 and 11 are accepted. That is 3 plus 2, so 5
-              accepted. Proof script output: 5.
-        build:
-          prompt: >-
-            Replace the token bucket with a fixed window counter: each request belongs to the window that starts at
-            its timestamp rounded down to a whole window, so with 60-second windows a request at 10:15:42 counts in the
-            window that starts at 10:15:00. Keep one counter per client and window, and reject requests over the
-            threshold with 429.
+      - title: Fixed window counter
+        minutes: 45
+        build: "Replace the bucket with a fixed window counter: 60-second windows aligned to the clock, a threshold of 60
+          requests, one counter per client and window."
+        outcome: A burst sent just before a minute boundary and another just after are both served, showing up to twice the
+          limit in a few seconds.
+        concepts:
+          - fixed-window-counter
         hints:
-          hint: Sort the six times into windows first, then count inside each window on its own.
-          example: >-
-            A gym that allows 3 visits per calendar week turns away a fourth visit on Saturday, but the same member can
-            come in again first thing on Monday, because the count starts over.
-
-      - title: The boundary burst
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A fixed window limiter allows 5 requests per 60-second window, and windows start on each whole minute, so
-            second 60 opens a new window. A client sends 5 requests at second 58 and 5 more at second 61. How many of
-            the 10 requests are accepted in total? Answer with the single total.
-          key:
-            match: number_exact
-            expected: 10
-            derivation: >-
-              The 5 requests at second 58 fall in the window from 0 to 60, which allows exactly 5. The 5 requests at
-              second 61 fall in the new window from 60 to 120, which starts with a count of 0. All 10 are accepted, so
-              twice the limit passes within 3 seconds. Proof script output: 10.
-        build:
-          prompt: >-
-            Test the fixed window with a 60-second window and a threshold of 60, using Postman or a curl loop with about
-            10 clients at once. Expect a run of successes just after each window starts, followed by rejections until
-            the next window.
+          hint: Round each request's timestamp down to the start of its window, and use that as part of the counter's key.
+      - title: Sliding window log
+        minutes: 45
+        build: Keep the time of each accepted request per client, drop times older than the window, and accept only while
+          fewer than the limit remain. Write tests that set the clock rather than read it.
+        outcome: The same boundary burst never gets more than the limit served in any 60 seconds, and a test with a client
+          that keeps retrying after rejection passes.
+        concepts:
+          - sliding-window-log
         hints:
-          hint: Decide which window each group of requests lands in, and what each window's count was when the group arrived.
-          example: >-
-            A shop that allows 3 returns per calendar month will take 3 on the evening of the 31st and 3 more on the
-            morning of the 1st.
-
-      - title: Keep a log of request times
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A sliding window log allows 3 requests in any 10 seconds. Before each request it removes log entries that
-            are 10 or more seconds old, so an entry from exactly 10 seconds ago no longer counts. It accepts the
-            request if fewer than 3 entries remain, and only accepted requests are added to the log. One client sends
-            requests at 0, 4, 8, 10, 12 and 14 seconds. At what time is a request rejected?
-          key:
-            match: number_exact
-            expected: 12
-            derivation: >-
-              0, 4 and 8 are accepted and the log holds those three. At 10 the entry from 0 is exactly 10 seconds old
-              and is removed, leaving 4 and 8, so 10 is accepted. At 12 the log holds 4, 8 and 10, all younger than 10
-              seconds, so the request at 12 is rejected and not logged. At 14 the entry from 4 has expired, leaving 8
-              and 10, so 14 is accepted. Only the request at 12 is rejected. Proof script output: 12.
-        build:
-          prompt: >-
-            Implement a sliding window log: keep the time of each accepted request per client, drop times older than
-            the window, and accept a new request only if the remaining count is under the limit.
-        hints:
-          hint: Write the log out after every request, removing old entries first and adding the new time only if it was accepted.
-          example: >-
-            A library lets you borrow 3 books in any 14 days. Each time you ask, the librarian crosses out loans older
-            than 14 days and counts the rest.
-
-      - title: Test the log
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This log is meant to accept up to limit requests in any window, and to keep only recent times in memory.
-            Find the two problems.
-          snippet: |-
-            log = logs[ip]
-            log.append(now)
-            recent = [t for t in log if t > now - window]
-            if length(recent) > limit:
-                reply(429)
-            else:
-                reply(200)
-          rubric:
-            - id: p1
-              point: "The time is added before the check, so rejected requests are logged too and a client that keeps retrying stays blocked for ever"
-            - id: p2
-              point: "Old times are filtered into a copy but never removed from the stored log, so the log grows with every request and never shrinks"
-            - id: p3
-              point: "The fix is to drop old times from the stored log first, check that fewer than limit remain, and add the time only when the request is accepted"
-        build:
-          prompt: >-
-            Write tests for the log before or alongside the code. Let the tests set the current time instead of reading
-            the real clock, and cover a request exactly one window after an older one, a request that should be
-            rejected, and a client that keeps retrying after a rejection.
-        hints:
-          hint: Follow a client that sends one request per second for a minute against a small limit, and look at the log at the end.
-          example: >-
-            A guest book that also records the visitors who were turned away at the door will soon say the house is
-            always full.
-    teach_back:
-      prompt: >-
-        Compare the fixed window counter with the sliding window log: what each remembers for a client, what a client
-        can get away with near a window boundary, and what each costs when one client floods the service.
-      rubric:
-        - id: t1
-          concept: fixed-window-counter
-          point: "The fixed window starts over at boundaries aligned to the clock, so a client can send a full limit just before a boundary and another just after, up to twice the limit in a short time"
-        - id: t2
-          concept: sliding-window-log
-          point: "The log keeps the time of each accepted request and counts only the ones inside the last window, so no stretch of one window length ever holds more than the limit"
-        - id: t3
-          concept: key-value-store
-          point: "The fixed window keeps one small counter under a key for each client and window, while the log keeps a list of times per client that grows with the limit, which costs memory and time under a flood"
-
-  # ------------------------------------------------------------------------------------------
-  - title: Sliding counters and many servers
-    summary: Estimate the last window from two counters, then share the counts between servers through Redis without losing updates.
-    concepts: [sliding-window-counter, distributed-counters, key-value-store]
-    steps:
-      - title: Weight the previous window
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A sliding window counter uses 60-second windows and a limit of 10. The previous window, from 0 to 60
-            seconds, counted 8 requests. The current window started at 60 seconds and has counted 3 so far. A new
-            request arrives at 75 seconds. What is the estimated count for the last 60 seconds just before this
-            request? Answer with the single estimate.
-          key:
-            match: number_exact
-            expected: 9
-            derivation: >-
-              The last 60 seconds run from 15 to 75. The current window covers 60 to 75, and the previous window still
-              overlaps from 15 to 60, which is 45 of its 60 seconds, three quarters. The estimate is the current 3 plus
-              three quarters of 8, which is 6, so 9. Proof script output: 9.
-        build:
-          prompt: >-
-            Implement a sliding window counter: keep the counts of the current and the previous fixed window per
-            client, and estimate the last window as the current count plus the previous count weighted by how much of
-            the previous window still overlaps. Write a test that checks the estimate at a known point in a window.
+          hint: Write the log out after each request, removing old entries first and adding the new time only if it was
+            accepted.
+      - title: Sliding window counter
+        minutes: 45
+        build: Keep the counts of the current and the previous window per client, and estimate the last window by weighting
+          the previous count by its overlap.
+        outcome: A test at a known point in a window checks the estimate, and the boundary burst is mostly smoothed out.
+        concepts:
+          - sliding-window-counter
         hints:
           hint: Draw the last 60 seconds as a span ending now, and ask what share of the previous window falls inside it.
-          example: >-
-            If a train carriage holds the last third of yesterday's passengers and all of today's so far, you would
-            count today's riders in full and only a third of yesterday's.
-
-      - title: Smoothing the boundary
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A sliding window counter uses 10-second windows and a limit of 10. The previous window, from 0 to 10
-            seconds, counted 10 requests and the current window has counted 0. At 12 seconds the client sends 5
-            requests at once. A request is accepted when the estimate just before it is below 10, and each accepted
-            request adds one to the current count. How many of the 5 does it accept, and how many would a plain fixed
-            window with the same limit accept?
-          key:
-            match: numbers_all
-            expected: [2, 5]
-            derivation: >-
-              At 12 seconds the previous window still overlaps 8 of its 10 seconds, so it adds 8 to the estimate. The
-              first request sees 8 and is accepted, the second sees 9 and is accepted, and the third sees 10 and is
-              rejected, as are the last two. The plain fixed window only counts the current window, which is empty,
-              so it accepts all 5. Proof script output: [2, 5].
-        build:
-          prompt: >-
-            Replay the boundary burst from the fixed window milestone against your sliding window counter and check
-            that the client no longer gets twice the limit in a few seconds.
+  - title: Many servers, one limit
+    summary: Move the counts into a shared store with atomic updates and expiring keys, then run two servers on one limit.
+    steps:
+      - title: Counts in a shared store
+        minutes: 60
+        build: Move the counters into Redis or another shared store. Update them with an atomic increment, under keys made of
+          the client and the window start, each with an expiry.
+        outcome: The store shows one key per client and window, the keys disappear after two windows, and the counts survive a
+          restart of your server.
+        concepts:
+          - distributed-counters
+          - key-expiry
         hints:
-          hint: Work out the previous window's weighted share once, then add the current count as it grows by one per accepted request.
-          example: >-
-            A teacher who limits each pupil to 10 questions an hour, and remembers most of the questions asked at the
-            end of the last hour, will not take another 10 at the start of the new one.
-
-      - title: Two servers, one count
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Servers A and B share one count in a store, and the limit is 3. The count for a client is already 2. Each
-            server handles a request from that client by reading the count, accepting if it is below 3, and then
-            writing the count it read plus one. The steps interleave in this order: A reads, B reads, A checks and
-            writes, B checks and writes. How many of the two requests are accepted, and what count is stored at the
-            end?
-          key:
-            match: numbers_all
-            expected: [2, 3]
-            derivation: >-
-              Both servers read 2. A sees 2 is below 3, accepts, and writes 3. B still holds the 2 it read, so it also
-              accepts and writes 3. Both requests are accepted although only one slot was left, and the store says 3
-              when 4 requests have really been served: one update is lost. An atomic increment would have returned 3
-              to one server and 4 to the other, which would reject. Proof script output: [2, 3].
-        build:
-          prompt: >-
-            Move the counters into Redis, or another shared store, and update them with an atomic increment rather
-            than a read followed by a write. Run two copies of your server on different ports against the same store.
+          hint: Ask whose requests end up in the same key, and what removes a key once its window is long past.
+      - title: Two servers, one limit
+        minutes: 45
+        build: Run two copies of your server on ports 8080 and 8081 against the same store, with a limit of 60 requests per
+          minute.
+        outcome: After 60 quick requests to the server on 8080, a curl call to the server on 8081 answers 429.
+        concepts:
+          - distributed-counters
         hints:
-          hint: Keep track of the value each server holds in its own memory, separately from the value in the store.
-          example: >-
-            Two cashiers both glance at a shelf label saying one item left, both sell it, and both write zero on the
-            label, so the shop has sold an item it did not have.
-
-      - title: Keys that last
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            Two servers run this code against one Redis to enforce a limit of 60 requests per minute for each client.
-            It stops the race between servers, but there are two problems. Find them.
-          snippet: |-
-            window_start = floor(now() / 60) * 60
-            key = "count:" + window_start
-            count = store.increment(key)
-            if count > limit:
-                reply(429)
-            else:
-                reply(200)
-          rubric:
-            - id: p1
-              point: "The key holds only the window start, not the client, so all clients share one count and one busy client blocks everyone"
-            - id: p2
-              point: "The keys never expire, so the store gains a new key every minute for ever"
-            - id: p3
-              point: "Put the client IP address in the key and give each key an expiry, long enough to still read the previous window"
-        build:
-          prompt: >-
-            Store the counts under keys made of the client and the window start, with an expiry. Then limit clients to
-            60 requests per minute, send 60 requests to one server within a couple of seconds, and call the other
-            server with curl: it should answer 429.
-        hints:
-          hint: Ask whose requests end up in the same key, and what removes a key once its minute is long past.
-          example: >-
-            A cloakroom that hangs every guest's coat on one hook, and never clears hooks from past evenings, soon has
-            neither space nor any idea whose coat is whose.
-    teach_back:
-      prompt: >-
-        Two servers sit behind one address and share one limit. Explain how a request is checked from the moment it
-        arrives until it gets its reply, and why the way the count is updated matters.
-      rubric:
-        - id: t1
-          concept: sliding-window-counter
-          point: "The server estimates the last window as the current window's count plus the previous window's count weighted by how much of it still overlaps"
-        - id: t2
-          concept: distributed-counters
-          point: "The counts live in a shared store, and an atomic increment does the read and the write as one step, so two servers cannot both take the last slot"
-        - id: t3
-          concept: key-value-store
-          point: "Counts are kept under keys made of the client and the window start, with an expiry so old windows are removed"
+          hint: If the second server still serves the request, check whether both servers are really writing to the same keys.

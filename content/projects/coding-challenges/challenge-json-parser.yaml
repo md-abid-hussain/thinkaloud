@@ -1,9 +1,9 @@
-# Coding Challenges, Build your own JSON parser.
-# Source: https://codingchallenges.fyi/challenges/challenge-json-parser
-# Written in our own words. Every predict and trace key is proven by content/proofs/challenge-json-parser.mjs.
+# Coding Challenges, Build your own JSON parser. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-json-parser . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-json-parser
@@ -13,44 +13,31 @@ project:
   status: generated
   figure:
     kind: tokens
-  summary: >-
-    A command-line tool that reads a file and decides whether it holds valid JSON. It splits the text into tokens,
-    checks them against the JSON grammar with a recursive descent parser, prints a verdict and exits with status 0
-    for valid input and 1 for invalid input.
+  summary: A command-line tool that reads a file and decides whether it holds valid JSON. It splits the text into
+    tokens, checks them against the JSON grammar with a recursive descent parser, prints a verdict and exits with
+    status 0 for valid input and 1 for invalid input.
   requirements:
     - Read a file named on the command line and decide whether it holds valid JSON
     - Print a message and exit with status 0 for valid input and 1 for invalid input
     - Split the text into tokens first, then check the tokens against the JSON grammar
     - Support objects, arrays, strings, numbers, true, false and null, nested inside each other
     - Pass the test folders that come with the challenge, then the json.org checker suite
-  restate_rubric:
-    - id: r1
-      point: "The tool reads a file and decides whether its text is valid JSON"
-    - id: r2
-      point: "It prints a message and exits with status 0 when the input is valid and 1 when it is not"
-    - id: r3
-      point: "It first splits the text into tokens and then checks them against the grammar, covering every kind of value and nesting"
-  reflection_prompt: >-
-    In your own words, how do the lexer and the parser share the work in your design, and what would you change to
-    turn the validator into a parser that builds the data in memory?
   primer:
-    what: >-
-      JSON is a plain-text format for data. Objects sit in curly braces and hold pairs of a key and a value, arrays
+    what: JSON is a plain-text format for data. Objects sit in curly braces and hold pairs of a key and a value, arrays
       sit in square brackets and hold lists of values, and the simple values are strings in double quotes, numbers,
       true, false and null. You will build a tool that reads a file and says whether it is valid JSON, exiting with
       status 0 when it is and 1 when it is not.
-    why: >-
-      Web APIs and many configuration files speak JSON, and a parser is how a program decides whether to trust that
-      text. Building one teaches the two-stage shape used by compilers and interpreters: a lexer, then a parser.
-    example: >-
-      Take the text made of an opening square bracket, the number 42, a comma, a space, the word true and a closing
-      square bracket. The lexer skips the space and hands over five tokens: open bracket, the number 42, comma, true
-      and close bracket. A string in double quotes becomes a single token however many letters or spaces it holds.
-      The parser then checks the order of the tokens: an array opens, its values are separated by commas, and it
-      closes. They are in order here, so the tool prints that the file is valid and exits with status 0.
+    why: "Web APIs and many configuration files speak JSON, and a parser is how a program decides whether to trust that
+      text. Building one teaches the two-stage shape used by compilers and interpreters: a lexer, then a parser."
+    example: "Take the text made of an opening square bracket, the number 42, a comma, a space, the word true and a
+      closing square bracket. The lexer skips the space and hands over five tokens: open bracket, the number 42,
+      comma, true and close bracket. A string in double quotes becomes a single token however many letters or spaces
+      it holds. The parser then checks the order of the tokens: an array opens, its values are separated by commas,
+      and it closes. They are in order here, so the tool prints that the file is valid and exits with status 0."
     words:
       - term: token
-        meaning: One meaningful piece of the text, such as a brace, a colon, a comma, a whole string, a number or the word null.
+        meaning: One meaningful piece of the text, such as a brace, a colon, a comma, a whole string, a number or the word
+          null.
       - term: lexer
         meaning: The first stage, which reads characters, groups them into tokens and skips the whitespace between them.
       - term: parser
@@ -58,316 +45,283 @@ project:
       - term: grammar
         meaning: The rules for what may follow what, for example that a key in an object is always followed by a colon.
       - term: recursive descent
-        meaning: A way of writing a parser with one function per grammar rule, where a rule that contains others calls their functions.
+        meaning: A way of writing a parser with one function per grammar rule, where a rule that contains others calls their
+          functions.
       - term: exit status
-        meaning: The number a program hands back when it ends. Zero means success, and anything else means something went wrong.
-
-milestones:
-  # ------------------------------------------------------------------------------------------
-  - title: Tokens and the simplest objects
-    summary: Lex the text into tokens, accept objects of string keys and values, and report the verdict as an exit status.
-    concepts: [lexical-analysis, json-grammar, cli-subcommands]
-    steps:
-      - title: Tokens first
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            Your lexer reads the text {"name": "Ada Lovelace", "city": "London"}. How many tokens does it hand to the
-            parser?
-          key:
-            match: number_exact
-            expected: 9
-            derivation: >-
-              The tokens are the opening brace, the string name, a colon, the string Ada Lovelace, a comma, the string
-              city, a colon, the string London and the closing brace. Whitespace between tokens is skipped, and the
-              space inside Ada Lovelace belongs to the string, so it does not split it: 9 tokens. Proof script output:
-              9.
-        build:
-          prompt: >-
-            Write a lexer that turns the text into tokens, skipping spaces, tabs and newlines between them, and a
-            parser that accepts an empty object. Your tool should report the valid file in tests/step1 as valid with
-            exit status 0 and the invalid file there as invalid with exit status 1. Check that an empty file is
-            rejected too.
-        hints:
-          hint: Count the pieces the parser cares about. Each brace, colon and comma is one, and so is each quoted string as a whole.
-          example: >-
-            In a transcript, a sentence inside quotation marks counts as one quotation, however many words and spaces
-            it contains.
-
-      - title: String keys and values
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Number the tokens of {"key": "value",} from 1, starting with the opening brace. The lexer accepts every one
-            of them. Which token number is the first one the parser rejects?
-          key:
-            match: number_exact
-            expected: 6
-            derivation: >-
-              The tokens are 1 opening brace, 2 the string key, 3 colon, 4 the string value, 5 comma and 6 closing
-              brace. A comma inside an object is allowed, but it promises another key. The parser only finds the
-              promise broken at token 6, a closing brace where a string key must be. Proof script output: 6.
-        build:
-          prompt: >-
-            Extend the parser to objects whose keys and values are strings, with pairs separated by commas. Run it on
-            tests/step2: the valid files must pass and the invalid ones, such as an object with a comma just before
-            the closing brace, must be rejected.
-        hints:
-          hint: A comma on its own is fine. Ask what the parser expects to see right after one, and when it can tell that it is missing.
-          example: >-
-            Someone reading a list aloud says apples, pears, and then stops. You only know an item is missing when the
-            silence comes, not when you hear the word and.
-
-      - title: Verdict and exit status
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This main program is meant to tell a script whether a file is valid JSON. It has two problems. Find them.
-          snippet: |-
-            tokens = lex(read_all(path))
-            result = parse_value(tokens)
-            if result is not an error:
-                print("valid JSON")
-            else:
-                print("invalid JSON")
-            exit(0)
-          rubric:
-            - id: p1
-              point: "It always exits with status 0, so a script cannot tell an invalid file from a valid one; invalid input must exit with status 1"
-            - id: p2
-              point: "It never checks that the parser used up every token, so text with something after the first value, such as two objects in a row, is called valid"
-            - id: p3
-              point: "After the top-level value the next token must be the end of the input, otherwise the file is invalid"
-        build:
-          prompt: >-
-            Print a clear message for both outcomes and exit with status 0 for valid input and 1 for invalid input.
-            Make sure leftover text after the first complete value, and a file that cannot be opened, both end in
-            status 1.
-        hints:
-          hint: Read the last line, then ask what happens to any tokens that come after the first complete value.
-          example: >-
-            A ticket inspector who checks the first passenger and then waves the whole train through has not really
-            checked the train.
-    teach_back:
-      prompt: >-
-        Explain how your tool goes from the characters in a file to its verdict, and how a script that runs it learns
-        that verdict.
+        meaning: The number a program hands back when it ends. Zero means success, and anything else means something went
+          wrong.
+  restate_rubric:
+    - id: r1
+      point: The tool reads a file and decides whether its text is valid JSON
+    - id: r2
+      point: It prints a message and exits with status 0 when the input is valid and 1 when it is not
+    - id: r3
+      point: It first splits the text into tokens and then checks them against the grammar, covering every kind of value and
+        nesting
+  reflection_prompt: In your own words, how do the lexer and the parser share the work in your design, and what would
+    you change to turn the validator into a parser that builds the data in memory?
+  reference_tool: RFC 8259 is the rulebook. The challenge's test folders, the json.org JSON_checker suite and, as a
+    stretch, JSONTestSuite supply labelled inputs to compare against.
+  done_when: Every file in the challenge's step folders and the json.org suite gives the expected verdict through the
+    exit status, apart from choices you made on purpose and recorded; deeply nested input never crashes the tool;
+    errors point at the right line and column; and your notes explain the lexer and parser split, number precision and
+    your strictness choices in your own words.
+  open_checks:
+    - How the challenge names its test files, and therefore how your check works out the expected verdict.
+    - Which json.org fail files conflict with RFC 8259, for example a bare string at the top level, which RFC 8259
+      allows.
+    - How deep your language lets a program call itself before the stack runs out on your machine.
+    - Whether the json.org checker itself accepts any input the grammar forbids; do not treat its behaviour as the
+      rulebook.
+learning_map:
+  - concept: lexical-analysis
+    where: "Your tool first turns the file into tokens: braces, brackets, colons, commas, whole strings, numbers and the
+      words true, false and null, with whitespace dropped."
+    explain_back:
+      prompt: A teammate wants to check JSON by splitting the text on spaces and looking at each piece. Explain why that
+        fails, and what a lexer does instead.
       rubric:
-        - id: t1
-          concept: lexical-analysis
-          point: "A lexer first groups the characters into tokens such as braces, colons, commas and whole strings, and skips the whitespace between them"
-        - id: t2
-          concept: json-grammar
-          point: "An object is an opening brace, then either a closing brace or key and value pairs, each a quoted key, a colon and a value, separated by commas with no comma before the closing brace"
-        - id: t3
-          concept: json-grammar
-          point: "After the one top-level value the input must end, so any leftover tokens make the file invalid"
-        - id: t4
-          concept: cli-subcommands
-          point: "It prints a message and exits with status 0 for valid input and 1 for invalid input, and the exit status is what a script checks"
-
-  # ------------------------------------------------------------------------------------------
+        - id: e1
+          point: A string can contain spaces, commas and braces, and tokens such as a comma and a closing bracket can touch with
+            no space between them, so splitting on spaces cuts in the wrong places
+        - id: e2
+          point: A lexer reads the characters once, left to right, and groups them into tokens with a kind, such as string,
+            number or left brace, skipping the whitespace between them
+        - id: e3
+          point: The lexer only checks that each piece is a valid token, and leaves the order of the tokens to the parser
+  - concept: json-grammar
+    where: "The grammar is the rulebook your parser enforces: what a value can be, how objects and arrays are built, and
+      the strict rules such as double-quoted keys and no trailing commas."
+    explain_back:
+      prompt: A configuration file copied from a JavaScript project has unquoted keys, a comma after the last item and a
+        comment, and your validator rejects it. Explain which JSON rules it breaks, and why JSON is that strict.
+      rubric:
+        - id: e1
+          point: JSON keys must be strings in double quotes, so unquoted keys are not allowed
+        - id: e2
+          point: There is no comma after the last member or element, and JSON has no comments at all
+        - id: e3
+          point: JSON is a data interchange format, not JavaScript; keeping the grammar small and strict means every parser can
+            agree on what a document means
+  - concept: recursive-descent-parsing
+    where: Your parser has one routine per grammar rule, and the routine for a value calls the routines for objects and
+      arrays, which call the value routine again for what they contain.
+    explain_back:
+      prompt: Explain how a parser with one routine per grammar rule handles an array that contains objects that contain
+        arrays, and how it decides which routine to call at each point.
+      rubric:
+        - id: e1
+          point: Each grammar rule, such as value, object and array, is one routine, and a rule that contains other rules calls
+            their routines
+        - id: e2
+          point: The nesting in the input becomes nesting of calls, so the call stack remembers where the parser is in every
+            enclosing object and array
+        - id: e3
+          point: "It looks at the next token to choose: a left brace means object, a left square bracket means array, a string
+            token means string, and so on"
+  - concept: string-escapes
+    where: Your string lexer has to accept escapes such as a backslash before a double quote and the backslash-u form, and
+      reject raw control characters and unknown escapes.
+    explain_back:
+      prompt: A JSON document holds an emoji written as two backslash-u escapes in a row. Explain why it takes two escapes,
+        what a parser should do with them, and what should happen if only the first one were there.
+      rubric:
+        - id: e1
+          point: "A backslash-u escape names one 16-bit UTF-16 unit, so a character above U+FFFF, such as most emoji, is written
+            as a surrogate pair: a high surrogate followed by a low surrogate"
+        - id: e2
+          point: A parser that builds text must join the two halves into one code point
+        - id: e3
+          point: A lone surrogate is not a real character; parsers disagree about it, so a strict parser rejects it or the
+            choice must be deliberate and documented
+  - concept: floating-point-numbers
+    where: Your lexer enforces the JSON number spelling exactly, and any program that reads the numbers has to store them
+      in some machine type with limited precision.
+    explain_back:
+      prompt: An API sends a 19-digit order ID as a JSON number, and a client that reads numbers as double-precision floats
+        looks up the wrong order. Explain what went wrong, and how the API could avoid it.
+      rubric:
+        - id: e1
+          point: Double-precision floats hold about 15 to 17 significant digits, and whole numbers are exact only up to 2 to the
+            power 53
+        - id: e2
+          point: A 19-digit integer is beyond that, so reading it as a double rounds it to a nearby value and its last digits
+            change
+        - id: e3
+          point: The JSON text itself is fine; the problem is the reader's type, so APIs send such IDs as strings, or both sides
+            use a type with enough precision
+  - concept: nesting-depth-limits
+    where: Every level of nesting in the file is another level of calls in your parser, so a small file with very deep
+      nesting can exhaust the stack.
+    explain_back:
+      prompt: A 100 KB request body made of tens of thousands of opening square brackets crashes your service every time.
+        Explain why such a small input can crash it, and two ways a parser can defend itself.
+      rubric:
+        - id: e1
+          point: A recursive parser makes one nested call per level, each call keeps a frame on the call stack, and the stack is
+            small and fixed, so very deep nesting overflows it
+        - id: e2
+          point: File size does not protect you, because depth costs stack, not bytes
+        - id: e3
+          point: Set a depth limit and reject deeper input with a clear error, or replace recursion with an explicit stack in
+            ordinary memory, which can also be capped
+  - concept: parse-error-reporting
+    where: When a file is invalid, your tool should say where the problem is, by line and column, what it expected and
+      what it found.
+    explain_back:
+      prompt: Your tool rejects a 2,000-line configuration file. Explain what a useful error message contains, and where in
+        the file it should point.
+      rubric:
+        - id: e1
+          point: The position of the problem as a line and column a person can find in an editor
+        - id: e2
+          point: What the parser expected at that point and what it actually found, for example a colon expected after a key but
+            a comma found
+        - id: e3
+          point: It points at the first token that broke the rules, not where the program happened to notice, and for an
+            unclosed bracket it also names the bracket that was never closed
+  - concept: strict-vs-lenient-parsing
+    where: "You decide what your validator does at the edges: trailing commas, comments, duplicate keys and very large
+      numbers, and you record each choice."
+    explain_back:
+      prompt: A gateway checks the first role key in a JSON request, and the service behind it uses the last one. Explain
+        how an attacker can exploit that, and what this teaches about lenient parsing.
+      rubric:
+        - id: e1
+          point: The grammar allows the same key twice, and parsers disagree about which value wins
+        - id: e2
+          point: A request with role user and then role admin passes the gateway's check and runs as admin in the service
+        - id: e3
+          point: When two systems parse the same input differently they no longer agree on what it means, so parsers should be
+            strict by default and make every open choice deliberate and documented
+  - concept: conformance-test-suite
+    where: You run the challenge's test folders and the json.org suite over your tool and compare each verdict with the
+      expected one.
+    explain_back:
+      prompt: All your own test files pass, but the json.org suite finds mismatches. Explain what a conformance suite
+        catches that your own tests miss, and what to do when you disagree with one of its verdicts.
+      rubric:
+        - id: e1
+          point: Your own tests cover only the cases you thought of, while a conformance suite is written by others to probe the
+            corners of the specification
+        - id: e2
+          point: An accepted invalid file is as much a failure as a rejected valid one
+        - id: e3
+          point: Suites can be outdated or wrong, so settle each disagreement against the specification and record the choice
+            and the reason instead of hiding it
+  - concept: cli-subcommands
+    where: Your tool reports its verdict through its exit status, 0 for valid and 1 for invalid, so scripts and build
+      pipelines can use it.
+    explain_back:
+      prompt: A build pipeline runs your validator on every configuration file before deploying. Explain why the exit status
+        matters more than the message it prints, and what each status should mean.
+      rubric:
+        - id: e1
+          point: Scripts and pipelines read the exit status, not the text, to decide whether to continue
+        - id: e2
+          point: Status 0 means the file is valid and a non-zero status, 1 here, means it is invalid or could not be read
+        - id: e3
+          point: Messages go to people, ideally on standard error for problems, while the status is the contract with other
+            programs
+milestones:
+  - title: Tokens and the simplest object
+    summary: Split the text into tokens, accept the empty object, report the verdict through the exit status, then add
+      string keys and values.
+    steps:
+      - title: Lexer, parser and verdict
+        minutes: 45
+        build: Write a lexer that turns the file into tokens and skips whitespace, and a parser that accepts an empty object.
+          Print a verdict and exit with status 0 for valid input and 1 for invalid input.
+        outcome: The valid file in tests/step1 exits with status 0, the invalid one exits with status 1, and an empty file
+          also exits with status 1.
+        concepts:
+          - lexical-analysis
+          - json-grammar
+          - cli-subcommands
+        hints:
+          hint: Decide what the lexer hands over for each piece of text, and what the parser expects first.
+          example: A bank teller reads a cheque by first picking out the date, the amount and the signature as separate pieces,
+            and only then checks that they are in the right places.
+      - title: String keys and values
+        minutes: 45
+        build: Extend the parser to objects whose keys and values are strings, with members separated by commas. Make the
+          string lexer handle the escapes JSON allows, including backslash-u, and reject raw control characters.
+        outcome: Every file in tests/step2 gives the verdict its name says, a string with an escaped double quote and a
+          backslash-u escape is accepted, and a string holding a raw tab is rejected.
+        concepts:
+          - lexical-analysis
+          - string-escapes
+          - json-grammar
+        hints:
+          hint: Inside a string, what can follow a backslash, and when does the string really end?
   - title: Every kind of value, nested
-    summary: Add numbers, keywords, arrays and nested objects, with one parsing function per rule of the grammar.
-    concepts: [lexical-analysis, recursive-descent-parsing, json-grammar]
+    summary: Numbers, true, false and null, then arrays and objects inside each other, then input nested far deeper than
+      any real file.
     steps:
       - title: Numbers and keywords
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your lexer follows the JSON number rule and knows the words true, false and null. How many tokens does it
-            produce for {"t": -1.5e3, "ok": false, "v": null}?
-          key:
-            match: number_exact
-            expected: 13
-            derivation: >-
-              The minus sign, the digits, the fraction and the exponent all belong to one number token, and false and
-              null are one token each. So each of the three pairs is a key, a colon and a value, which is 3 tokens per
-              pair and 9 in all, plus 2 commas and the 2 braces: 13. Proof script output: 13.
-        build:
-          prompt: >-
-            Add strings, numbers, true, false and null as values in an object. Run the parser on tests/step3: the
-            valid file passes and the invalid one is rejected. Work out why the invalid one is invalid before you
-            change any code.
+        minutes: 60
+        build: Accept numbers, true, false and null as values, following the JSON number spelling exactly.
+        outcome: Every file in tests/step3 gives the verdict its name says; small inputs of your own with a leading zero, a
+          lone minus sign, a dot with no digits after it, a plus sign and an exponent with no digits are all rejected;
+          and 0, minus zero and 1.5e-3 are accepted.
+        concepts:
+          - json-grammar
+          - floating-point-numbers
         hints:
-          hint: Ask where one token ends and the next begins. Does a minus sign stand on its own, or is it part of something?
-          example: >-
-            A phone number written with a plus sign, a country code and spaces is still one phone number, not several.
-
-      - title: Strict about spelling
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            These two lexer functions accept text that is not valid JSON. Find the two problems and say how to fix
-            them.
-          snippet: |-
-            lex_word(text, i):
-                word = the letters starting at i
-                if lowercase(word) is "true": return TRUE
-                if lowercase(word) is "false": return FALSE
-                if lowercase(word) is "null": return NULL
-                fail("unexpected word")
-
-            lex_number(text, i):
-                piece = the run of characters starting at i that are digits, "-", "+", ".", "e" or "E"
-                return NUMBER(piece)
-          rubric:
-            - id: p1
-              point: "Lower-casing the word lets True, FALSE or Null through, but JSON keywords are lower case only, so the word must match exactly"
-            - id: p2
-              point: "The number lexer takes any run of those characters, so pieces such as 1-2, 012 or 1.e5 become numbers"
-            - id: p3
-              point: "The fix is to follow the number rule in order: an optional minus, a single zero or digits that do not start with zero, then an optional fraction and an optional exponent, each with at least one digit"
-        build:
-          prompt: >-
-            Follow the JSON number rule exactly and match the keywords exactly. Write tiny invalid inputs of your own
-            for each way a number can be wrong, such as a leading zero, a lone minus sign, a dot with no digits after
-            it and an exponent with no digits, and check that each is rejected.
-        hints:
-          hint: For each function, ask what it accepts that the JSON rules do not. Think about capital letters, and about the order of the characters inside a number.
-          example: A lock that opens for any key of roughly the right shape is not much of a lock.
-
+          hint: Write the number rule out in words, part by part, before you change the lexer.
       - title: Arrays and nesting
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Your parser has one function for values, one for objects and one for arrays, and the value function calls
-            the other two. It reads {"a": [1, [2]]}. At the deepest point, how many object and array calls are active
-            at the same time?
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              The object call starts at the opening brace. Its value is an array, so an array call starts inside it.
-              That array's second item is another array, so a third call starts while the other two are still waiting
-              for their closing bracket and brace. The number 2 is a plain value and opens nothing, so the deepest
-              point is 3 calls. Proof script output: 3.
-        build:
-          prompt: >-
-            Let values be objects and arrays too, including empty ones, by having the value rule call the object and
-            array rules. Run the parser on tests/step4 and check every file gives the verdict its name says.
+        minutes: 45
+        build: Let values be objects and arrays too, including empty ones, by having the value rule call the object and array
+          rules.
+        outcome: Every file in tests/step4 gives the verdict its name says, including an empty array inside an empty object
+          and an object inside an array.
+        concepts:
+          - recursive-descent-parsing
+          - json-grammar
         hints:
-          hint: A new call starts at each opening brace or bracket, and it only returns at the matching closing one.
-          example: >-
-            To reach the smallest of a set of nesting dolls you open every doll around it, and they all stay open
-            until you put the small one back.
-    teach_back:
-      prompt: >-
-        Explain how your parser handles a value that can be of any kind, including objects and arrays nested inside
-        each other.
-      rubric:
-        - id: t1
-          concept: lexical-analysis
-          point: "The lexer reads a whole number, with its minus sign, fraction and exponent, and the keywords true, false and null as single tokens, and rejects anything that does not match those rules exactly"
-        - id: t2
-          concept: recursive-descent-parsing
-          point: "There is one function per grammar rule, and the value function looks at the next token to choose: a brace means an object, a bracket means an array, otherwise a string, number or keyword"
-        - id: t3
-          concept: recursive-descent-parsing
-          point: "Nesting in the input becomes nesting of calls, because the object and array functions call the value function for each item, and it can call them again"
-        - id: t4
-          concept: json-grammar
-          point: "Objects and arrays can hold any kind of value, including empty objects and arrays, so the same rules apply at every level"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Which token tells the value rule that an object or an array is starting?
+          example: "Russian nesting dolls: opening one may reveal another, and you only finish with a doll once everything
+            inside it is closed again."
+      - title: Deep nesting
+        minutes: 30
+        build: Generate a file of a hundred thousand opening square brackets followed by the same number of closing ones, and
+          make your tool handle it without crashing, either with a depth limit or an explicit stack.
+        outcome: The deep file ends with a clear verdict and status, never a crash, and your notes record the depth limit you
+          chose or why you need none.
+        concepts:
+          - nesting-depth-limits
+        hints:
+          hint: How deep can your program call itself before it runs out of stack, and how would you find out?
   - title: Errors and conformance
-    summary: Give errors that point at the right place, and test the parser against shared suites of valid and invalid files.
-    concepts: [conformance-test-suite, lexical-analysis, recursive-descent-parsing]
+    summary: Run every test automatically, make errors point at the problem, and check yourself against the json.org suite.
     steps:
-      - title: Tests that can fail
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A broken parser reports every file as valid. It is run on a test folder holding 3 valid files and 5
-            invalid files. How many files does it get wrong?
-          key:
-            match: number_exact
-            expected: 5
-            derivation: >-
-              The 3 valid files get the right verdict by luck. Each of the 5 invalid files should be rejected but is
-              accepted, so all 5 are wrong. A suite of valid files alone would never catch this parser. Proof script
-              output: 5.
-        build:
-          prompt: >-
-            Write a script that runs your tool on every file in tests/step1 to tests/step4, works out the expected
-            verdict from each file name, compares it with the exit status, and lists every mismatch. Run it after
-            every change.
+      - title: Run the tests automatically
+        minutes: 30
+        build: Write a check that runs your tool on every file in tests/step1 to tests/step4, works out the expected verdict
+          from each file name, compares it with the exit status and lists every mismatch.
+        outcome: One command runs every test file and reports zero mismatches.
+        concepts:
+          - conformance-test-suite
         hints:
-          hint: A test only catches this parser if it expects the answer invalid.
-          example: A smoke alarm that never goes off passes every test that is held on a day without a fire.
-
+          hint: Make the check fail loudly, so you notice the day a change breaks an old file.
       - title: Errors that point at the problem
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Your lexer records the line each token starts on, and an error message names the line of the token the
-            parser rejects. Which line number does the message give for this file?
-          snippet: |-
-            {
-              "a": 1,
-            }
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              The comma at the end of line 2 is allowed, since a comma inside an object is legal until we see what
-              follows it. The next token is the closing brace on line 3, where a quoted key is required, so that is
-              the token the parser rejects and line 3 is reported. Proof script output: 3.
-        build:
-          prompt: >-
-            Make every error message name the line and column of the token that broke the rules, and say what was
-            expected and what was found. Write invalid files of your own and check that each message points at the
-            right place.
+        minutes: 45
+        build: Make every error message give the line and column of the token that broke the rules, and say what was expected
+          and what was found.
+        outcome: For five invalid files of your own, such as a missing colon, a trailing comma and an unclosed bracket, each
+          message points at the right line and column.
+        concepts:
+          - parse-error-reporting
         hints:
-          hint: The comma is not wrong until something follows it. Where does that something sit?
-          example: >-
-            A road sign that says turn left ahead is not wrong where it stands. You only find the problem at the
-            junction, when there is a wall on the left.
-
-      - title: The json.org suite
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            You run the json.org checker suite. Two files in its fail set trouble you: one holds only a quoted string,
-            with no object or array around it, and one is twenty arrays nested inside each other. Under RFC 8259 both
-            are valid JSON. Why might a suite list them as failures, and what should your parser and test runner do?
-          rubric:
-            - id: p1
-              point: "The suite was written for an older rule in which the outermost value had to be an object or an array, while RFC 8259 allows any value at the top"
-            - id: p2
-              point: "The deep file tests a nesting limit that the original checker chose, not a rule of the grammar, which sets no limit"
-            - id: p3
-              point: "Choose which rule your parser follows, write the choice down, and mark those files as known differences in the runner instead of hiding them"
-        build:
-          prompt: >-
-            Get the test suite from the JSON_checker page on json.org and run your tool on every pass file and every
-            fail file. Fix the real bugs it finds, and for any file where you follow a different rule on purpose,
-            record why.
+          hint: Record the position when the lexer creates each token, not when the parser complains.
+      - title: The json.org suite and your choices
+        minutes: 60
+        build: Download the test suite from the JSON_checker page on json.org and run your tool on every pass file and every
+          fail file. Decide your policy for duplicate keys and very large numbers.
+        outcome: All pass files are accepted and all fail files are rejected, except any you accept on purpose, and your notes
+          give the reason for each such choice and for your duplicate-key and number policies.
+        concepts:
+          - conformance-test-suite
+          - strict-vs-lenient-parsing
         hints:
-          hint: Specifications change over time, and a test suite is a snapshot of one moment.
-          example: >-
-            An old driving theory test can mark an answer wrong that today's rules of the road allow, so you need to
-            know which edition you are being tested on.
-    teach_back:
-      prompt: >-
-        Explain how you would convince someone that your parser is correct, and why it is safe to run on files sent
-        by strangers.
-      rubric:
-        - id: t1
-          concept: conformance-test-suite
-          point: "It runs a shared suite of valid and invalid inputs and checks each verdict and exit status, counting an accepted invalid file as a failure just like a rejected valid one"
-        - id: t2
-          concept: lexical-analysis
-          point: "The lexer records the line and column of every token, so an error message can point at the exact token that broke the rules"
-        - id: t3
-          concept: recursive-descent-parsing
-          point: "Each level of nesting is another call, so a file nested thousands of levels deep could overflow the stack, and a depth limit turns that into a clean invalid verdict with a message"
+          hint: Before changing code for a failing file, read what RFC 8259 says about that case.

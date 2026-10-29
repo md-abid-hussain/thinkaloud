@@ -18,8 +18,31 @@ Exported spreadsheets, logs and the output of other tools are all columns of tex
 
 **Where it shows up here.** cut prints chosen fields of each line, split at a tab or at the character given with -d, counting fields from 1.
 
+**How it works.** A delimited file is the simplest table format there is: each line is a record, and one chosen character, the delimiter, separates the fields inside it. Tab is the traditional choice for Unix tools because it rarely appears inside data; the comma is the choice of spreadsheets. To read field n you split the line at every delimiter and take the nth piece, counting from 1.
+
+Three details decide whether a tool is right or quietly wrong. Two delimiters in a row are an empty field, not a single separator, so splitting a,,c gives three fields, the middle one empty; tools that collapse runs of whitespace, such as awk by default, behave differently, and mixing the two mental models is a classic bug. A line may have fewer fields than the one you ask for, and the convention for cut is to print an empty result for it rather than fail, while a line with no delimiter at all is printed whole unless you ask otherwise. And the line ending is not part of the last field: a file from Windows ends each line with a carriage return before the newline, and if you only strip the newline, the carriage return becomes the last character of the last field.
+
+The delimiter is a contract between whoever wrote the file and whoever reads it. Nothing in the file says which character was used, so the reader must be told, and a value that happens to contain the delimiter breaks the contract unless the format adds quoting, which plain tab-separated text does not.
+
+**Examples.**
+- A spreadsheet exported as tab-separated text has empty cells; a script that splits on runs of whitespace shifts every later column one place left and reports prices as quantities.
+- Joining two exports by customer id fails for every row whose id came from a Windows machine, because the id field silently ends in a carriage return.
+- A log line format with a pipe delimiter breaks the day a user types a pipe into a free-text field.
+
+**Misconceptions.**
+- Two delimiters in a row are one separator. They are an empty field in between.
+- Asking for field 5 of a line with three fields is an error. The usual convention is an empty result.
+- The newline at the end of a line belongs to the last field. It ends the record, and a carriage return before it needs handling too.
+
+**Elsewhere.**
+- Database bulk loaders, log shippers and spreadsheet imports all depend on the same field and delimiter rules.
+- Command-line tools such as cut, awk, sort -t and join all take a delimiter and number fields from 1.
+- Protocols with header lines, such as HTTP, split each line at a delimiter in the same way.
+
 **Read.**
-- [Delimiter-separated values (Wikipedia)](https://en.wikipedia.org/wiki/Delimiter-separated_values) (not opened)
+- [Delimiter-separated values (Wikipedia)](https://en.wikipedia.org/wiki/Delimiter-separated_values)
+- [RFC 4180: Common Format and MIME Type for CSV Files](https://www.rfc-editor.org/rfc/rfc4180)
+- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline)
 
 **Explain it back.** A finance team exports a spreadsheet as tab-separated text. Some cells are empty, and a script that splits each line on runs of whitespace reports prices in the quantity column. Explain what went wrong and how a field-based tool such as cut avoids it.
 
@@ -27,11 +50,35 @@ Exported spreadsheets, logs and the output of other tools are all columns of tex
 - [ ] Splitting on runs of whitespace merges empty fields away, shifting every later field one place to the left
 - [ ] A field tool splits at every single delimiter and counts positions from 1, so field n stays field n even when cells are empty
 
-### 2. csv-quoting
+### 2. CSV quoting
 
 **Where it shows up here.** The challenge's fourchords.csv has quoted song titles. cut splits at every comma, even inside quotes, which shows where plain field splitting stops being enough.
 
+**How it works.** CSV looks like delimited text with commas, but the common form, written down in RFC 4180, adds quoting so that any value can be stored. A field that contains a comma, a double quote or a line break is wrapped in double quotes, and each double quote inside such a field is written twice. So the title Hello, World is stored as "Hello, World", and the value He said "hi" is stored as "He said ""hi""".
+
+That one rule changes how the file must be read. Splitting a line at every comma cuts "Hello, World" into two fields, and because a quoted field may contain a line break, one record can span several physical lines, so even reading line by line is wrong for general CSV. A correct reader walks the characters with a little state: outside quotes a comma ends a field, inside quotes a comma is data, and a pair of quotes inside quotes stands for one quote.
+
+Real CSV files also disagree with each other. Some use semicolons because the comma is the decimal separator in their locale, some start with a byte order mark, some quote every field and some none. That is why tools built for plain delimited text, such as cut, are the wrong tool for CSV with quoted fields, and why most languages ship a CSV library: the format is simple to write and easy to read wrongly.
+
+**Examples.**
+- Cutting the first field of a song list prints "Hello instead of the title Hello, World, because cut splits inside the quotes.
+- An address field with a line break in it makes a naive importer see two half-records and reject both.
+- A file from a European spreadsheet uses semicolons, and every row arrives as one huge field.
+
+**Misconceptions.**
+- CSV is just text split at commas. Quoted fields may contain commas, quotes and line breaks.
+- One line is one record. A quoted field can span several lines.
+- There is one CSV format. RFC 4180 describes the common one, but delimiters, quoting and headers vary between producers.
+
+**Elsewhere.**
+- Spreadsheet exports, bank statements and data science pipelines all hit the same quoting rules.
+- Injection attacks through CSV files opened in spreadsheets rely on fields that start with an equals sign.
+- Log formats and other text protocols face the same choice between escaping and quoting.
+
 **Read.**
+- [RFC 4180: Common Format and MIME Type for CSV Files](https://www.rfc-editor.org/rfc/rfc4180)
+- [Comma-separated values (Wikipedia)](https://en.wikipedia.org/wiki/Comma-separated_values)
+- [Falsehoods Programmers Believe About CSVs](https://donatstudios.com/Falsehoods-Programmers-Believe-About-CSVs)
 
 **Explain it back.** You run cut -d, -f1 on a CSV of songs and one title comes out as "Hello instead of Hello, World. Explain why, and what a reader of real CSV has to do differently.
 
@@ -75,7 +122,9 @@ code must not treat that piece as a real line.
 - Diff tools show a whole file as changed when only its line endings changed.
 
 **Read.**
-- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline) (not opened)
+- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline)
+- [RFC 5198: Unicode Format for Network Interchange (line endings in text)](https://www.rfc-editor.org/rfc/rfc5198)
+- [Git, gitattributes: end-of-line conversion](https://git-scm.com/docs/gitattributes)
 
 **Explain it back.** A script joins two exports on the last field, a customer ID, and finds no matches, although the IDs look identical on screen. One file came from Windows. Explain what is happening.
 
@@ -226,8 +275,31 @@ between tools work.
 
 **Where it shows up here.** The last step runs cut, then uniq, then wc, and shows how order in a pipeline changes the answer.
 
+**How it works.** A pipeline such as cut, then sort, then uniq, then wc starts every program at the same time and joins each one's standard output to the next one's standard input through a pipe, a small buffer inside the operating system. Each tool only knows that it reads lines and writes lines, which is what lets small single-purpose tools combine into something none of them does alone.
+
+Because the buffer is small, a pipeline streams. When the reader is slow the buffer fills and the writer is paused until there is room, so memory stays bounded however much data flows; this automatic pause is called backpressure. When the reader exits early, as head does after printing ten lines, the operating system tells the writer the next time it writes: by default it receives the signal SIGPIPE and stops, or it gets an error it should treat as a quiet reason to finish. That is why cut on a huge file, piped into head, returns at once instead of reading the whole file.
+
+Order matters, because each tool sees only what the previous one produced. uniq removes only adjacent duplicate lines, so uniq before sort removes only neighbours, while sort then uniq removes all duplicates. A tool that wants to play well in pipelines writes results to standard output, messages to standard error, flushes when it is done, and does not ask the terminal questions.
+
+**Examples.**
+- Counting distinct artists with cut and uniq gives the wrong number until sort is put before uniq.
+- A script piping a 10 GB log into head finishes instantly, because the producer is stopped once head exits.
+- A tool that prints progress messages to standard output corrupts the data the next tool in the pipeline reads.
+
+**Misconceptions.**
+- Each stage finishes before the next starts. They all run at once, connected by small buffers.
+- A pipe holds the whole output. It holds a few kilobytes, and the writer waits when it is full.
+- An early exit by the reader is an error to report. For the writer it is usually a reason to stop quietly.
+
+**Elsewhere.**
+- Shell scripts, build systems and data pipelines are built from the same composition idea.
+- Streaming frameworks and reactive libraries reinvent backpressure for network services.
+- Container logging and log shippers rely on programs writing plain lines to standard output.
+
 **Read.**
-- [Pipeline (Unix) (Wikipedia)](https://en.wikipedia.org/wiki/Pipeline_(Unix)) (not opened)
+- [Pipeline (Unix) (Wikipedia)](https://en.wikipedia.org/wiki/Pipeline_(Unix))
+- [pipe(7), Linux manual page (pipe capacity, SIGPIPE)](https://man7.org/linux/man-pages/man7/pipe.7.html)
+- [The Art of Unix Programming: Taxonomy of Unix IPC Methods](http://www.catb.org/~esr/writings/taoup/html/ch07s02.html)
 
 **Explain it back.** cut on fourchords.csv into head prints its five lines instantly even though the file is large, and cut into uniq into wc -l gives a different count from cut into sort into uniq into wc -l. Explain both.
 

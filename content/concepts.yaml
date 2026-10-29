@@ -725,13 +725,56 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Tab- and comma-separated files store one record per line, split into fields at a delimiter character. Fields are
-      numbered from 1, and two delimiters in a row mean an empty field, not a missing one. Plain splitting breaks when
-      a value contains the delimiter inside quotes, which full CSV parsers handle and simple tools do not.
+      Tab- and comma-separated files hold one record per line, split into fields at a delimiter. Fields are numbered
+      from 1, two delimiters in a row mean an empty field, and a line with fewer fields than asked for is normal, not
+      an error.
     related: [ line-endings ]
     resources:
       - title: Delimiter-separated values (Wikipedia)
         url: https://en.wikipedia.org/wiki/Delimiter-separated_values
+        opened: true
+      - title: "RFC 4180: Common Format and MIME Type for CSV Files"
+        url: https://www.rfc-editor.org/rfc/rfc4180
+        opened: true
+      - title: Newline (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Newline
+        opened: true
+    lesson:
+      how_it_works: >-
+        A delimited file is the simplest table format there is: each line is a record, and one chosen character, the
+        delimiter, separates the fields inside it. Tab is the traditional choice for Unix tools because it rarely
+        appears inside data; the comma is the choice of spreadsheets. To read field n you split the line at every
+        delimiter and take the nth piece, counting from 1.
+
+
+        Three details decide whether a tool is right or quietly wrong. Two delimiters in a row are an empty field, not
+        a single separator, so splitting a,,c gives three fields, the middle one empty; tools that collapse runs of
+        whitespace, such as awk by default, behave differently, and mixing the two mental models is a classic bug. A
+        line may have fewer fields than the one you ask for, and the convention for cut is to print an empty result
+        for it rather than fail, while a line with no delimiter at all is printed whole unless you ask otherwise. And
+        the line ending is not part of the last field: a file from Windows ends each line with a carriage return
+        before the newline, and if you only strip the newline, the carriage return becomes the last character of the
+        last field.
+
+
+        The delimiter is a contract between whoever wrote the file and whoever reads it. Nothing in the file says
+        which character was used, so the reader must be told, and a value that happens to contain the delimiter breaks
+        the contract unless the format adds quoting, which plain tab-separated text does not.
+      examples:
+        - A spreadsheet exported as tab-separated text has empty cells; a script that splits on runs of whitespace
+          shifts every later column one place left and reports prices as quantities.
+        - Joining two exports by customer id fails for every row whose id came from a Windows machine, because the id
+          field silently ends in a carriage return.
+        - A log line format with a pipe delimiter breaks the day a user types a pipe into a free-text field.
+      misconceptions:
+        - Two delimiters in a row are one separator. They are an empty field in between.
+        - Asking for field 5 of a line with three fields is an error. The usual convention is an empty result.
+        - The newline at the end of a line belongs to the last field. It ends the record, and a carriage return before
+          it needs handling too.
+      elsewhere:
+        - Database bulk loaders, log shippers and spreadsheet imports all depend on the same field and delimiter rules.
+        - Command-line tools such as cut, awk, sort -t and join all take a delimiter and number fields from 1.
+        - Protocols with header lines, such as HTTP, split each line at a delimiter in the same way.
 
   - slug: unix-pipelines
     name: Composing tools with pipes
@@ -739,28 +782,113 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Small tools that read standard input and write standard output can be chained, so each does one job and the
-      shell joins them. Lines of text are the shared format. The order of the chain matters, because some tools only
-      work on what they see next to each other, such as uniq, which only removes adjacent duplicates.
+      A pipe connects one program's standard output to the next program's standard input, so small tools each do one
+      job and run at the same time. Data flows through a small buffer, a slow reader pauses the writer, and a reader
+      that exits early stops the writer.
     prerequisites: [ stdin-vs-file ]
     resources:
       - title: Pipeline (Unix) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Pipeline_(Unix)
+        opened: true
+      - title: pipe(7), Linux manual page (pipe capacity, SIGPIPE)
+        url: https://man7.org/linux/man-pages/man7/pipe.7.html
+        opened: true
+      - title: "The Art of Unix Programming: Taxonomy of Unix IPC Methods"
+        url: http://www.catb.org/~esr/writings/taoup/html/ch07s02.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        A pipeline such as cut, then sort, then uniq, then wc starts every program at the same time and joins each
+        one's standard output to the next one's standard input through a pipe, a small buffer inside the operating
+        system. Each tool only knows that it reads lines and writes lines, which is what lets small single-purpose
+        tools combine into something none of them does alone.
+
+
+        Because the buffer is small, a pipeline streams. When the reader is slow the buffer fills and the writer is
+        paused until there is room, so memory stays bounded however much data flows; this automatic pause is called
+        backpressure. When the reader exits early, as head does after printing ten lines, the operating system tells
+        the writer the next time it writes: by default it receives the signal SIGPIPE and stops, or it gets an error
+        it should treat as a quiet reason to finish. That is why cut on a huge file, piped into head, returns at once
+        instead of reading the whole file.
+
+
+        Order matters, because each tool sees only what the previous one produced. uniq removes only adjacent
+        duplicate lines, so uniq before sort removes only neighbours, while sort then uniq removes all duplicates. A
+        tool that wants to play well in pipelines writes results to standard output, messages to standard error,
+        flushes when it is done, and does not ask the terminal questions.
+      examples:
+        - Counting distinct artists with cut and uniq gives the wrong number until sort is put before uniq.
+        - A script piping a 10 GB log into head finishes instantly, because the producer is stopped once head exits.
+        - A tool that prints progress messages to standard output corrupts the data the next tool in the pipeline
+          reads.
+      misconceptions:
+        - Each stage finishes before the next starts. They all run at once, connected by small buffers.
+        - A pipe holds the whole output. It holds a few kilobytes, and the writer waits when it is full.
+        - An early exit by the reader is an error to report. For the writer it is usually a reason to stop quietly.
+      elsewhere:
+        - Shell scripts, build systems and data pipelines are built from the same composition idea.
+        - Streaming frameworks and reactive libraries reinvent backpressure for network services.
+        - Container logging and log shippers rely on programs writing plain lines to standard output.
 
   - slug: regex-matching
-    name: Matching with regular expressions
+    name: Regular expressions as automata
     area: formats-parsing
     kind: foundation
     status: generated
     brief: >-
-      A regular expression describes a set of strings using literal characters, classes such as any digit or any word
-      character, and anchors for the start and end of a line. A line matches when the pattern succeeds starting at
-      some position in it, so an unanchored pattern can match anywhere and an empty pattern matches every line.
+      A regular expression describes a set of strings with literals, classes, repetition and anchors. Underneath it is
+      a small state machine: matching walks the text while tracking which states are possible, which is how grep can
+      search huge files quickly.
     resources:
+      - title: Russ Cox, Regular Expression Matching Can Be Simple And Fast
+        url: https://swtch.com/~rsc/regexp/regexp1.html
+        opened: true
+      - title: Thompson's construction (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Thompson%27s_construction
+        opened: true
+      - title: "POSIX Base Definitions, Chapter 9: Regular Expressions"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html
+        opened: true
       - title: Regular expression (Wikipedia)
         url: https://en.wikipedia.org/wiki/Regular_expression
-      - title: MDN, Regular expressions guide
-        url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions
+        opened: true
+    lesson:
+      how_it_works: >-
+        A regular expression is a tiny language for describing a set of strings. Letters match themselves, a dot
+        matches any one character, a class such as a set of digits matches one character from the set, a star repeats
+        the thing before it zero or more times, and anchors match positions rather than characters: the caret the
+        start of a line and the dollar sign the end. A line matches when some part of it is in the set, so the pattern
+        J matches any line containing a J anywhere.
+
+
+        Underneath, every such pattern can be turned into a finite automaton, a graph of states joined by transitions
+        labelled with characters. Thompson's construction builds a nondeterministic automaton with roughly one state
+        per pattern symbol; matching then reads the text one character at a time while keeping the set of states the
+        automaton could be in. Because that set is never larger than the number of states, the work is proportional to
+        the length of the text times the size of the pattern, with no surprises, and it needs to see each character
+        only once, which suits streaming input.
+
+
+        There are several dialects. POSIX defines basic and extended regular expressions, in which a plus or a
+        question mark may or may not be special; Perl-style engines add shorthand classes such as backslash d for a
+        digit and backslash w for a word character, plus features like backreferences that are no longer regular at
+        all. Which characters count as digits or word characters can also depend on the locale and on Unicode mode, so
+        the same pattern can match differently in two tools.
+      examples:
+        - The same pattern that finds error codes in one tool matches nothing in another, because one reads a
+          backslash d as a digit class and the other as the letter d.
+        - A log search tool scans gigabytes per second by compiling the pattern into an automaton once and streaming
+          the file through it.
+        - Input validation that forgets the anchors accepts any string that merely contains a valid value.
+      misconceptions:
+        - A pattern must match the whole line. Without anchors it matches anywhere in the line.
+        - All regex engines speak the same language. POSIX basic, POSIX extended and Perl-style dialects differ in
+          syntax and features.
+        - Regular expressions are slow by nature. Automaton-based matching runs in time linear in the input.
+      elsewhere:
+        - Lexers in compilers and the JSON parser recognise tokens with the same automata.
+        - Web application firewalls, editors, and search in IDEs and databases are built on regex engines.
+        - Network intrusion detection systems compile thousands of patterns into one automaton.
 
   - slug: recursive-file-walk
     name: Walking a directory tree
@@ -823,13 +951,56 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A case-insensitive match maps both the pattern and the text to one common form before comparing. In ASCII that
-      is a simple swap between upper and lower letters, but in Unicode some letters change length or have more than
-      one lower-case form, so the language's case-folding rules are safer than a hand-made table.
+      Ignoring case means mapping both strings to a common form before comparing. In ASCII that is a simple letter
+      swap, but in Unicode some mappings change length or depend on language, so case-insensitive matching is a choice
+      of rules, not a single operation.
     related: [ bytes-vs-characters ]
     resources:
-      - title: Unicode FAQ, case mapping
+      - title: "Unicode FAQ: Character Properties, Case Mappings and Names"
         url: https://unicode.org/faq/casemap_charprop.html
+        opened: true
+      - title: "W3C, Character Model for the World Wide Web: String Matching"
+        url: https://www.w3.org/TR/charmod-norm/
+        opened: true
+      - title: Letter case (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Case_folding
+        opened: true
+    lesson:
+      how_it_works: >-
+        To compare text without regard to case, both sides are mapped to one common form and then compared. For
+        English letters this is easy: each capital has exactly one lowercase partner. Unicode defines case folding for
+        this purpose, a mapping designed for comparison rather than display.
+
+
+        Outside ASCII the rules get interesting. Simple case folding maps one character to one character, which keeps
+        lengths and positions unchanged and is what most search tools use. Full case folding allows one character to
+        become several: the German sharp s ß folds to ss, so under full folding straße matches STRASSE, while under
+        simple folding it does not. GNU grep -i uses the simple form, so on this project's reference straße does not
+        match STRASSE. Some rules depend on language: in Turkish and Azerbaijani the capital of i is İ with a dot, and
+        the lowercase of I is a dotless ı, so a program that lowercases with the wrong locale can break identifiers
+        and keywords.
+
+
+        Case folding also interacts with normalisation: é can be one code point or e plus a combining accent, and
+        folding does not join them, so robust comparison normalises first and then folds. For a search tool the
+        practical questions are which folding it uses, whether classes such as a word character keep their meaning
+        under -i, and whether its behaviour matches the reference tool's under the same locale.
+      examples:
+        - A login that lowercases user names with a Turkish locale turns the admin account TITLE into a different
+          string from title.
+        - A case-insensitive search for straße finds STRASSE in one tool and not in another, because one uses full
+          case folding and the other simple.
+        - Two accounts called André can exist side by side when one name was normalised and folded and the other was
+          not.
+      misconceptions:
+        - Ignoring case is just lowercasing both sides. Lowercasing is for display; case folding is designed for
+          comparison, and some mappings change length.
+        - Case rules are the same in every language. Turkish dotted and dotless i are the famous exception.
+        - Case-insensitive matching keeps all lengths and positions. Full folding can turn one character into two.
+      elsewhere:
+        - User names, email addresses and file names on case-insensitive file systems all need a folding rule.
+        - Database collations decide how case-insensitive indexes compare text.
+        - Search engines fold case and normalise text before indexing.
 
   # ---- added for wave 1: parsing (JSON parser) ----
   - slug: lexical-analysis
@@ -2545,16 +2716,53 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Sorting text compares two strings character by character and decides at the first difference, so apple comes
-      before apricot and a shorter prefix comes first. Comparing raw byte values puts every capital letter before
-      every small one, while a locale's collation rules order text the way a dictionary does, so the same lines can
-      sort differently on two machines.
+      Sorting text compares two strings character by character and decides at the first difference, with a prefix
+      first. Comparing raw bytes puts every capital before every lowercase letter; ordering for people needs locale
+      collation rules instead.
     related: [ bytes-vs-characters ]
     resources:
       - title: Lexicographic order (Wikipedia)
         url: https://en.wikipedia.org/wiki/Lexicographic_order
-      - title: GNU coreutils, sort invocation
-        url: https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
+        opened: true
+      - title: "UTS #10: Unicode Collation Algorithm"
+        url: https://www.unicode.org/reports/tr10/
+        opened: true
+      - title: "Unicode FAQ: Collation"
+        url: https://www.unicode.org/faq/collation.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Lexicographic order compares two strings the way a dictionary does: look at the first position where they
+        differ and order by the characters there; if one string runs out first, the shorter one, being a prefix, comes
+        first. So apple comes before apricot, and app before apple.
+
+
+        The real question is how two characters are compared. In byte order, the C locale's rule, characters are
+        compared by their numeric value. In ASCII every capital letter, 65 to 90, comes before every lowercase letter,
+        97 to 122, so Zebra sorts before apple, and in UTF-8 byte order matches code point order, so all accented
+        letters come after z. Byte order is fast, stable across machines and exactly what tools such as sort with
+        LC_ALL set to C, or a binary search over sorted keys, need.
+
+
+        People expect something else. Collation, defined for Unicode by the Unicode Collation Algorithm and tailored
+        per language, compares base letters first, then accents, then case, so a, A, b and B come out together; it can
+        ignore punctuation, and it differs between languages: Swedish puts ä after z, German treats it near a. That is
+        why sort gives a, A, b, B under an English UTF-8 locale but A, B, a, b under the C locale. Numbers are a
+        further trap: text order puts 10 before 9, so tools offer a separate numeric comparison.
+      examples:
+        - A report sorted on one server lists Zoe before adam, and on another lists adam first, because the two
+          machines have different locales.
+        - Release files named 1.10 and 1.9 sort with 1.10 first in text order, so a script picks the wrong latest
+          version.
+        - A binary search over keys sorted with a locale collation misses keys, because the search compares bytes.
+      misconceptions:
+        - There is one correct alphabetical order. It depends on the language and the collation rules.
+        - Byte order is alphabetical. It puts all capitals before all lowercase letters.
+        - Numbers sort correctly as text. Text order compares digit by digit, so 10 comes before 9.
+      elsewhere:
+        - Database indexes and ORDER BY results depend on the column collation.
+        - File managers use natural sort to put file2 before file10.
+        - Merge and join tools need both inputs sorted with the same comparison, or they silently miss matches.
 
   - slug: sorting-algorithms
     name: Sorting algorithms
@@ -2562,13 +2770,60 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Merge sort, quicksort, heapsort and radix sort all put items in order but differ in cost. Merge sort is stable,
-      meaning equal items keep their input order, and always takes order n log n time; quicksort is usually faster but
-      can degrade on unlucky input; heapsort needs no extra memory; radix sort avoids comparisons altogether.
+      Merge sort, quicksort, heapsort and radix sort all put items in order but differ in worst-case time, memory and
+      stability. Any sort that only compares items needs about n log n comparisons; radix sort avoids comparisons by
+      looking at keys digit by digit.
     prerequisites: [ time-space-complexity ]
     resources:
       - title: Sorting algorithm (Wikipedia)
         url: https://en.wikipedia.org/wiki/Sorting_algorithm
+        opened: true
+      - title: Merge sort (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Merge_sort
+        opened: true
+      - title: Quicksort (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Quicksort
+        opened: true
+      - title: Timsort (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Timsort
+        opened: true
+    lesson:
+      how_it_works: >-
+        Every comparison sort, one that learns about the order only by asking whether one item is less than another,
+        needs about n log n comparisons in the worst case, because it must distinguish all n factorial possible
+        orders. The well-known algorithms reach that bound in different ways and with different costs.
+
+
+        Merge sort splits the input in half, sorts each half and merges the two sorted halves by repeatedly taking the
+        smaller front item. It always takes n log n time, is stable, and merges sequentially, which suits data on
+        disk, but it needs extra memory for the merge. Quicksort picks a pivot, moves smaller items before it and
+        larger after it, and sorts the two parts; it works in place and is usually the fastest in practice, but a bad
+        pivot, such as always the first item on input that is already sorted, splits off one item at a time and takes
+        n squared time. Picking a random pivot or the median of three avoids that on real inputs. Heapsort builds a
+        heap and repeatedly removes the largest item; it is in place and n log n in the worst case, but not stable and
+        less cache friendly.
+
+
+        Radix sort is not a comparison sort: it distributes items into buckets by one digit or byte of the key at a
+        time, so for fixed-length keys it runs in time proportional to n times the key length. Real libraries often
+        combine methods; Timsort, used by several languages, finds runs that are already ordered and merges them,
+        which is very fast on nearly sorted data.
+      examples:
+        - A service sorts records that usually arrive almost sorted; a naive quicksort with the first item as pivot
+          becomes quadratic and times out.
+        - Sorting log lines on disk uses merging because it reads and writes sequentially, which disks and networks
+          handle well.
+        - Sorting millions of fixed-length IDs with radix sort beats any comparison sort because it never compares two
+          IDs.
+      misconceptions:
+        - Quicksort is always n log n. Its worst case is n squared without a careful pivot.
+        - Faster than n log n is impossible. It is impossible only for sorts that compare items.
+        - The algorithm with the best big O is always fastest. Memory access patterns and constant factors often
+          decide.
+      elsewhere:
+        - Database ORDER BY, index builds and external sorting use merge-based methods.
+        - Language standard libraries choose hybrid algorithms such as Timsort or introsort.
+        - Graphics and GPU code use radix sort for its predictable, comparison-free work.
 
   - slug: external-sorting
     name: Sorting more than fits in memory
@@ -2576,14 +2831,55 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      When the input is larger than memory, sort it in pieces that fit, write each sorted piece to a temporary file,
-      then merge the pieces by repeatedly taking the smallest front line among them. Only one line per piece needs to
-      be in memory during the merge.
+      When the input is bigger than memory, sort it in chunks that fit, write each sorted chunk to a temporary file,
+      then merge the chunks by repeatedly taking the smallest front line. Only one line per chunk needs to be in
+      memory during the merge.
     prerequisites: [ sorting-algorithms ]
     related: [ streaming-constant-memory ]
     resources:
       - title: External sorting (Wikipedia)
         url: https://en.wikipedia.org/wiki/External_sorting
+        opened: true
+      - title: k-way merge algorithm (Wikipedia)
+        url: https://en.wikipedia.org/wiki/K-way_merge_algorithm
+        opened: true
+      - title: Merge sort (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Merge_sort
+        opened: true
+    lesson:
+      how_it_works: >-
+        An in-memory sort needs the whole input in memory. When the input is larger than that, external sorting splits
+        the work into two phases. In the first, read as much as fits, sort it in memory and write it out as a sorted
+        run in a temporary file; repeat until the input is used up. In the second, merge the runs: keep one current
+        line from each run, output the smallest, replace it with the next line from the same run, and repeat. A small
+        priority queue makes choosing the smallest of many runs cheap.
+
+
+        The merge only needs one line per run in memory, and every file is read and written sequentially, which is
+        what disks, SSDs and networks handle best. If there are too many runs to open at once, merge them in groups
+        and then merge the results; each pass reads and writes the whole data once, so the number of passes, which
+        depends on memory size and the number of runs, decides the cost.
+
+
+        This is not a niche trick. GNU sort does it automatically, with a buffer size option and temporary files,
+        which is why it can sort files many times larger than memory. Databases use the same method for ORDER BY and
+        index creation on big tables, and frameworks such as MapReduce sort their intermediate data this way. The
+        pieces, sorted runs and a k-way merge, also appear in log-structured storage engines, which merge sorted files
+        in the background.
+      examples:
+        - Sorting a 50 GB log on a machine with 8 GB of memory works with sort but crashes a script that reads all
+          lines into a list first.
+        - A database builds an index on a billion-row table by writing sorted runs to disk and merging them.
+        - A search engine merges sorted lists of document IDs for each word, never holding all of them at once.
+      misconceptions:
+        - Sorting needs all the data in memory. Runs on disk and a merge need only one line per run.
+        - More memory only makes it faster. It reduces the number of runs and merge passes, which is where the time
+          goes.
+        - Merging is the slow part because it compares a lot. It is mostly sequential I/O, the cheapest kind.
+      elsewhere:
+        - Databases, MapReduce and Spark shuffles all sort data larger than memory this way.
+        - Log-structured key-value stores such as LevelDB merge sorted files in the background.
+        - Version control and backup tools merge sorted file lists to find changes.
 
   - slug: time-space-complexity
     name: How cost grows with input
@@ -2640,13 +2936,53 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A subsequence keeps items in order but may skip some, so ACE is a subsequence of ABCDE. The longest common
-      subsequence of two sequences is the longest one that both contain, and it is what stays the same between an old
-      and a new file. It is found with a table where each cell holds the answer for two shorter prefixes.
+      A subsequence keeps items in order but may skip some. The longest common subsequence of two sequences is what
+      stays the same between them, and everything else is what a diff reports as removed or added.
     prerequisites: [ dynamic-programming ]
     resources:
       - title: Longest common subsequence (Wikipedia)
         url: https://en.wikipedia.org/wiki/Longest_common_subsequence
+        opened: true
+      - title: Hirschberg's algorithm (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Hirschberg%27s_algorithm
+        opened: true
+      - title: Eugene W. Myers, An O(ND) Difference Algorithm and Its Variations (paper)
+        url: http://www.xmailserver.org/diff2.pdf
+        opened: true
+    lesson:
+      how_it_works: >-
+        A subsequence of a sequence keeps some of its items in their original order, skipping others: ACE is a
+        subsequence of ABCDE, but EA is not. A common subsequence of two sequences appears in both, and the longest
+        common subsequence, the LCS, is the longest such one. For ABCD and AC it is AC; for ABC and XYZ it is empty.
+
+
+        The LCS is the heart of diff. Treat each file as a sequence of lines: the LCS is the largest set of lines that
+        both versions share in the same order, so those lines are unchanged, every other line of the old file was
+        removed, and every other line of the new file was added. Maximising what stays the same minimises what has to
+        be reported as changed.
+
+
+        Two properties matter in practice. First, the LCS is not unique: two different subsequences can have the same
+        maximal length, and different tools pick different ones, so two correct diffs of the same files can look
+        different. Tests must therefore check that the result is a common subsequence of the right length, not one
+        exact answer. Second, the straightforward method fills a table with one cell per pair of items, which costs
+        time and memory proportional to the product of the lengths; Hirschberg's method gets the same answer in linear
+        memory, and diff programs use faster algorithms that exploit the files being similar.
+      examples:
+        - A diff of two drafts reports the moved paragraph as one deletion and one insertion, because the LCS cannot
+          keep both orders.
+        - Two diff tools produce different but equally short outputs for the same files, because they choose different
+          LCS ties.
+        - Comparing two DNA sequences uses the same idea to find what was conserved between species.
+      misconceptions:
+        - The LCS is unique. Several can share the maximal length.
+        - A subsequence must be contiguous. That is a substring; a subsequence may skip items.
+        - A longer LCS always means a nicer diff. Humans prefer diffs that keep blocks together, which some algorithms
+          optimise for.
+      elsewhere:
+        - Version control, code review tools and merge tools all start from a common subsequence.
+        - Spell checkers and bioinformatics use related edit distance problems.
+        - Collaborative editors compute changes between document versions the same way.
 
   - slug: dynamic-programming
     name: Dynamic programming
@@ -2654,13 +2990,53 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Dynamic programming solves a problem by solving its smaller overlapping parts once each and storing the answers
-      in a table, then building the full answer from them. It turns an exponential search into polynomial work, at the
-      price of the memory the table needs.
+      Dynamic programming solves a problem by solving its overlapping smaller parts once each, storing their answers
+      in a table, and building the full answer from them. It turns an exponential search into a polynomial one, at the
+      cost of memory for the table.
     related: [ time-space-complexity ]
     resources:
       - title: Dynamic programming (Wikipedia)
         url: https://en.wikipedia.org/wiki/Dynamic_programming
+        opened: true
+      - title: Memoization (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Memoization
+        opened: true
+      - title: Longest common subsequence (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Longest_common_subsequence
+        opened: true
+    lesson:
+      how_it_works: >-
+        Some problems can be broken into smaller versions of the same problem that overlap heavily. The longest common
+        subsequence of two strings depends on the LCS of their prefixes: if the last characters match, it is the LCS
+        of both prefixes without them plus that character; otherwise it is the longer of the two answers you get by
+        dropping the last character of one string or the other. Computing that recursion directly recomputes the same
+        prefixes over and over, and the work grows exponentially.
+
+
+        Dynamic programming stores each sub-answer the first time it is computed. Either fill a table in an order
+        where every cell's inputs are already known, bottom up, or keep the recursion but remember results, which is
+        called memoisation. For the LCS the table has one row per prefix of the first string and one column per prefix
+        of the second, so filling it takes time and memory proportional to the product of the lengths, instead of
+        exponential time. The answer is in the last cell, and the subsequence itself is read back by walking from that
+        cell towards the start, following the choices that produced each value.
+
+
+        The method needs two things: optimal answers built from optimal answers to subproblems, and subproblems that
+        repeat. Its cost is the table: when only the final value is needed, two rows are enough, and clever
+        divide-and-conquer methods such as Hirschberg's recover the full answer in linear memory.
+      examples:
+        - A naive recursive LCS of two 30-character strings takes seconds; the table version is instant.
+        - Spell checkers compute edit distances to suggest corrections with the same table technique.
+        - Route planners and text layout engines that break paragraphs into lines are dynamic programs.
+      misconceptions:
+        - Dynamic programming is a kind of fast recursion. It is storing answers to overlapping subproblems so each is
+          solved once.
+        - The table is free. It costs memory proportional to the number of subproblems.
+        - Every recursive problem benefits. It helps only when subproblems repeat.
+      elsewhere:
+        - Edit distance, sequence alignment in genetics and shortest paths use dynamic programming.
+        - Compilers use it for instruction selection and register allocation.
+        - Caching function results in any program applies the same memoisation idea.
 
   - slug: edit-scripts
     name: Describing changes as an edit script
@@ -2668,15 +3044,54 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A diff describes how to turn the old version into the new one: lines only in the old version are removed, lines
-      only in the new version are added, and the common subsequence stays. Classic diff output marks removed lines
-      with a less-than sign and added lines with a greater-than sign, grouped by where they occur.
+      A diff describes how to turn the old version into the new one as removals and additions around the lines that
+      stay the same. A shortest edit script is the flip side of a longest common subsequence, and the output format
+      decides who, or what, can read it.
     prerequisites: [ longest-common-subsequence ]
     resources:
-      - title: Diff (Wikipedia)
+      - title: diff (Wikipedia)
         url: https://en.wikipedia.org/wiki/Diff
-      - title: GNU diffutils, normal format
-        url: https://www.gnu.org/software/diffutils/manual/html_node/Normal.html
+        opened: true
+      - title: POSIX diff utility (output formats and exit status)
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/diff.html
+        opened: true
+      - title: Edit distance (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Edit_distance
+        opened: true
+    lesson:
+      how_it_works: >-
+        An edit script is a list of operations that turns one sequence into another: delete these lines of the old
+        file, insert those lines of the new one, and keep everything else. Finding the shortest edit script and
+        finding the longest common subsequence are the same problem seen from two sides: the lines kept are the LCS,
+        and every other line is a deletion or an insertion, so the script length equals the total lines of both files
+        minus twice the LCS length.
+
+
+        The script must say where each change happens. The classic normal diff format prints a command such as 3c3 or
+        5d4 giving line numbers in both files, then the removed lines marked with a less-than sign and the added lines
+        with a greater-than sign. A change is simply a deletion and an insertion at the same place. The output is
+        ordered from the top of the file down, and line numbers refer to the original files, so a reader, or a program
+        such as patch, can apply the script.
+
+
+        Choices remain even for the shortest script. When the LCS has ties, the deletions and insertions can be placed
+        differently and still be minimal, so tools add rules, such as preferring to keep blank lines and braces as
+        context, to make diffs easier for people to read. And diff also reports whether files differ through its exit
+        status, 0 for identical, 1 for different and 2 for trouble, so scripts can act on it without parsing the text.
+      examples:
+        - A code review shows a function as fully deleted and rewritten because the tool paired the wrong closing
+          braces; a smarter alignment shows two changed lines.
+        - A backup script runs diff and skips the copy when the exit status says the files are identical.
+        - A patch file mailed to a project is an edit script that maintainers apply to their own copy.
+      misconceptions:
+        - A diff lists the lines that changed. It lists operations, with positions, that transform one file into the
+          other.
+        - There is one correct diff. Several minimal edit scripts can exist, and tools break ties differently.
+        - The text output is the only result. The exit status tells scripts whether anything differed.
+      elsewhere:
+        - Patches, code review tools and database migration tools all express changes as edit scripts.
+        - Collaborative editors send edit operations rather than whole documents.
+        - Synchronisation tools such as rsync transfer differences instead of full files.
 
   - slug: unit-tests-first
     name: Writing tests first
@@ -2684,13 +3099,52 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Writing a small failing test before the code makes you decide what the code should do, including edge cases such
-      as empty input, before you decide how. Each test stays as a guard, so later changes and optimisations can be
-      made without silently breaking what already worked.
+      Writing a small failing test before the code forces you to decide what the code should do, including edge cases,
+      before deciding how. Each test stays as a guard, and one suite that every implementation must pass makes it safe
+      to swap algorithms.
     related: [ differential-testing ]
     resources:
       - title: Test-driven development (Wikipedia)
         url: https://en.wikipedia.org/wiki/Test-driven_development
+        opened: true
+      - title: Martin Fowler, Test Driven Development
+        url: https://martinfowler.com/bliki/TestDrivenDevelopment.html
+        opened: true
+      - title: Kent Beck, Canon TDD
+        url: https://tidyfirst.substack.com/p/canon-tdd
+        opened: true
+    lesson:
+      how_it_works: >-
+        Test-driven development works in a short loop: write a test for the next small piece of behaviour, run it and
+        watch it fail, write just enough code to make it pass, then tidy the code while the tests stay green. Watching
+        the test fail first proves that it can fail, so it really checks something.
+
+
+        The benefit is mostly about thinking. A test is a precise question: given these inputs, what exactly should
+        come out? Writing it first makes you decide edge cases before you are attached to an implementation: an empty
+        input, a single item, all items equal, input already in order, input in reverse, no common lines at all. Each
+        test then stays as a guard, so a later change that breaks old behaviour is caught at once.
+
+
+        Tests should describe behaviour, not one implementation. When an answer can legitimately vary, such as two
+        longest common subsequences of the same length, the test should check the properties that must hold, its
+        length and that it is a subsequence of both inputs, rather than one exact string. And a single suite that
+        every implementation must pass, for example every sorting algorithm you offer, lets you add or replace an
+        algorithm with confidence. Tests that run the real tool and compare outputs complement these: they find the
+        cases you did not think to write.
+      examples:
+        - A diff tool rewritten for speed passes the old suite on the first run, so the rewrite ships the same day.
+        - A test written first for the empty input catches that a sort routine crashes on zero lines.
+        - A test that demanded one exact longest common subsequence failed for a correct algorithm that found a
+          different one of the same length.
+      misconceptions:
+        - Tests are written after the code to prove it works. Writing them first shapes what the code must do.
+        - A passing test proves the code is right. It proves only the cases it checks.
+        - Tests must check exact outputs. When several answers are correct, check the properties instead.
+      elsewhere:
+        - Continuous integration runs the same suites on every change.
+        - Refactoring large codebases is only safe with tests guarding behaviour.
+        - Library authors publish test suites, like conformance suites, that every implementation must pass.
 
   - slug: lexer-states
     name: Scanning with context states
@@ -4239,10 +4693,15 @@ concepts:
     related:
       - explicit-charsets
     resources:
-      - title: The GNU C Library, Locales and Internationalization
-        url: https://www.gnu.org/software/libc/manual/html_node/Locales.html
-      - title: ArchWiki, Locale
+      - title: "POSIX Base Definitions, Chapter 7: Locale"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap07.html
+        opened: true
+      - title: locale(7), Linux manual page
+        url: https://man7.org/linux/man-pages/man7/locale.7.html
+        opened: true
+      - title: Locale (ArchWiki)
         url: https://wiki.archlinux.org/title/Locale
+        opened: true
   - slug: http-keep-alive
     name: Persistent HTTP connections (keep-alive)
     area: networking-http
@@ -5199,4 +5658,272 @@ concepts:
         opened: true
       - title: Bloom filter calculator (hur.st)
         url: https://hur.st/bloomfilter/
+        opened: true
+  - slug: csv-quoting
+    name: CSV quoting
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: In CSV a field that contains a comma, a double quote or a line break is wrapped in double quotes, and a quote
+      inside it is doubled. Splitting a CSV line at every comma therefore breaks real data; parsing it needs a small
+      state machine.
+    lesson:
+      how_it_works: >-
+        CSV looks like delimited text with commas, but the common form, written down in RFC 4180, adds quoting so that
+        any value can be stored. A field that contains a comma, a double quote or a line break is wrapped in double
+        quotes, and each double quote inside such a field is written twice. So the title Hello, World is stored as
+        "Hello, World", and the value He said "hi" is stored as "He said ""hi""".
+
+
+        That one rule changes how the file must be read. Splitting a line at every comma cuts "Hello, World" into two
+        fields, and because a quoted field may contain a line break, one record can span several physical lines, so
+        even reading line by line is wrong for general CSV. A correct reader walks the characters with a little state:
+        outside quotes a comma ends a field, inside quotes a comma is data, and a pair of quotes inside quotes stands
+        for one quote.
+
+
+        Real CSV files also disagree with each other. Some use semicolons because the comma is the decimal separator
+        in their locale, some start with a byte order mark, some quote every field and some none. That is why tools
+        built for plain delimited text, such as cut, are the wrong tool for CSV with quoted fields, and why most
+        languages ship a CSV library: the format is simple to write and easy to read wrongly.
+      examples:
+        - Cutting the first field of a song list prints "Hello instead of the title Hello, World, because cut splits
+          inside the quotes.
+        - An address field with a line break in it makes a naive importer see two half-records and reject both.
+        - A file from a European spreadsheet uses semicolons, and every row arrives as one huge field.
+      misconceptions:
+        - CSV is just text split at commas. Quoted fields may contain commas, quotes and line breaks.
+        - One line is one record. A quoted field can span several lines.
+        - There is one CSV format. RFC 4180 describes the common one, but delimiters, quoting and headers vary between
+          producers.
+      elsewhere:
+        - Spreadsheet exports, bank statements and data science pipelines all hit the same quoting rules.
+        - Injection attacks through CSV files opened in spreadsheets rely on fields that start with an equals sign.
+        - Log formats and other text protocols face the same choice between escaping and quoting.
+    resources:
+      - title: "RFC 4180: Common Format and MIME Type for CSV Files"
+        url: https://www.rfc-editor.org/rfc/rfc4180
+        opened: true
+      - title: Comma-separated values (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Comma-separated_values
+        opened: true
+      - title: Falsehoods Programmers Believe About CSVs
+        url: https://donatstudios.com/Falsehoods-Programmers-Believe-About-CSVs
+        opened: true
+  - slug: regex-backtracking
+    name: Backtracking versus linear-time matching
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: Many regex engines try alternatives one by one and back up when they fail. For some patterns and inputs that
+      takes exponential time, which has taken down real services. Automaton-based engines avoid it by tracking all
+      possibilities at once.
+    lesson:
+      how_it_works: >-
+        There are two ways to run a regular expression. A backtracking engine tries one way of matching, and when it
+        fails partway it backs up to the last choice it made and tries the next alternative. This is simple and
+        supports features such as backreferences, and on ordinary patterns it is fast. But a pattern with nested or
+        overlapping repetition, such as a group that repeats something that itself repeats, gives the engine
+        exponentially many ways to split the same text. When the text almost matches but fails at the very end, the
+        engine tries every split before giving up, and a few dozen characters can keep it busy for minutes.
+
+
+        An automaton-based engine, in the style of Thompson's construction, never backs up. It reads each character
+        once and keeps the set of states that are still possible, so its time grows only linearly with the text,
+        whatever the pattern. The price is that it cannot support backreferences, which need memory of what was
+        matched earlier. Tools such as GNU grep, RE2 and Rust's regex crate take this route; many language standard
+        libraries use backtracking.
+
+
+        This matters for security as well as speed. If an attacker controls the text, and the service uses a
+        backtracking engine with a vulnerable pattern, one short request can pin a processor; this is called regular
+        expression denial of service, or ReDoS. Cloudflare's global outage on 2 July 2019 was caused by one such
+        pattern in a firewall rule. The defences are to use a linear-time engine for untrusted input, to avoid nested
+        repetition, and to set time limits.
+      examples:
+        - A web firewall rule with a pattern containing two adjacent wildcard repetitions pinned every CPU core at
+          Cloudflare in July 2019.
+        - An email-validation pattern with nested repetition hangs a sign-up form when an attacker submits a long
+          string that almost matches.
+        - Stack Overflow went down briefly in 2016 when a pattern for trimming whitespace met a line with tens of
+          thousands of spaces.
+      misconceptions:
+        - Regex speed depends only on the input size. With a backtracking engine it can depend exponentially on the
+          pattern and input together.
+        - All engines behave the same. Linear-time engines and backtracking engines accept similar syntax but have
+          very different worst cases.
+        - Only huge inputs are dangerous. A few dozen characters are enough for a vulnerable pattern.
+      elsewhere:
+        - Request validation, log parsing and search features in web services all face this risk.
+        - Linting tools flag regex patterns with nested quantifiers for the same reason.
+        - Database full-text and pattern search choose engines with predictable worst cases.
+    resources:
+      - title: Russ Cox, Regular Expression Matching Can Be Simple And Fast
+        url: https://swtch.com/~rsc/regexp/regexp1.html
+        opened: true
+      - title: OWASP, Regular expression Denial of Service (ReDoS)
+        url: https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS
+        opened: true
+      - title: Cloudflare, Details of the Cloudflare outage on July 2, 2019
+        url: https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/
+        opened: true
+  - slug: sort-stability
+    name: Stable sorting
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: A stable sort keeps items that compare equal in the order they arrived. That lets you sort by several keys in
+      passes, and it matters whenever equal-looking items are not really identical.
+    lesson:
+      how_it_works: >-
+        A sort is stable when items that compare as equal come out in the same relative order they went in. If two
+        lines have the same sort key but differ elsewhere, a stable sort keeps the first of them first.
+
+
+        Stability matters whenever the comparison looks at only part of an item. Sorting people by last name, a stable
+        sort keeps their original order within each last name, so if the list was already sorted by first name, the
+        result is sorted by last name and then first name. This is how multi-key sorting is done in passes: sort by
+        the least important key first, then by each more important key with a stable sort, and the earlier orders
+        survive inside ties. With an unstable sort the order inside ties is arbitrary and can change from run to run
+        or between library versions, which shows up as flaky tests and reports that reorder themselves.
+
+
+        Merge sort and insertion sort are naturally stable; quicksort and heapsort, in their usual in-place forms, are
+        not. Any sort can be made stable by adding the original position as a final tie-breaker. Tools expose this
+        too: sort compares whole lines by default and, when keys tie, falls back to comparing the whole line, which
+        hides stability; with a key option and the stable flag it keeps input order among equal keys instead. A sort
+        that removes duplicates also has to decide which of several equal items it keeps.
+      examples:
+        - A table sorted by date and then by customer loses its date order inside each customer when the second sort
+          is unstable.
+        - A snapshot test fails at random because two records with the same score swap places between runs.
+        - A leaderboard sorted by score keeps earlier achievers ahead of later ones only because the sort is stable.
+      misconceptions:
+        - Equal items are identical, so order among them cannot matter. They are equal only on the key being compared.
+        - All built-in sorts are stable. Many in-place sorts are not, and documentation says which.
+        - Stability is only about duplicates. It is about any items whose keys compare equal.
+      elsewhere:
+        - Spreadsheet column sorting and database ORDER BY with several columns rely on stable tie handling.
+        - User interfaces that sort tables by clicked column expect earlier orders to persist inside ties.
+        - Version control and build tools sort file lists stably to keep output reproducible.
+    resources:
+      - title: Sorting algorithm (Wikipedia), Stability
+        url: https://en.wikipedia.org/wiki/Sorting_algorithm#Stability
+        opened: true
+      - title: Merge sort (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Merge_sort
+        opened: true
+      - title: Timsort (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Timsort
+        opened: true
+  - slug: myers-diff
+    name: The Myers diff algorithm
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: Myers' algorithm finds a shortest edit script in time proportional to the file size times the number of
+      differences. It is fast when files are similar, which is the usual case, and it is the default in GNU diff and
+      Git.
+    lesson:
+      how_it_works: >-
+        The table method for diff costs the product of the two file lengths, which is hopeless for large files even
+        when they differ in only a few lines. Eugene Myers' 1986 algorithm takes a different view. Picture a grid with
+        the old file along one side and the new file along the other; moving right deletes an old line, moving down
+        inserts a new line, and where the two lines are equal you may move diagonally for free. A shortest edit script
+        is a path from the top-left corner to the bottom-right with the fewest non-diagonal moves.
+
+
+        The algorithm searches outward by number of edits. With zero edits it follows the diagonal as far as the lines
+        match. With one edit it tries one step right or down and then follows the free diagonal again, keeping only
+        the furthest point reached on each diagonal line. It repeats for two edits, three, and so on, and stops as
+        soon as some path reaches the corner. Because it only explores paths with at most D edits, its time is
+        proportional to the total length times D, the size of the difference. For two versions of a file that differ
+        in a handful of lines, that is close to linear, and a refinement needs only linear memory.
+
+
+        That is why Myers' algorithm, or a variation of it, is the default in GNU diff and Git. It is not always the
+        most readable: Git also offers patience and histogram diffs, which first anchor on lines that occur once in
+        each file and often produce diffs that match how people edited the code.
+      examples:
+        - Diffing two versions of a 100,000-line log that differ in ten lines is instant with Myers and needs
+          gigabytes with the full table.
+        - Git can show the same change with the default algorithm or with the patience option, and the second often
+          lines up functions better.
+        - Diffing two completely different files is the worst case, because the number of differences is as large as
+          the files.
+      misconceptions:
+        - Diff always builds a table of every pair of lines. Practical diffs explore only paths with few edits.
+        - A faster diff gives a different, worse answer. Myers finds a shortest edit script, the same length as the
+          table method.
+        - The shortest diff is always the most readable. Alternative algorithms trade a slightly longer diff for
+          better alignment.
+      elsewhere:
+        - Git, GNU diff and most code review tools use Myers or its variants.
+        - Text editors and IDEs compute the changed-lines gutter with the same algorithm.
+        - Bioinformatics and plagiarism detection compare long sequences with related edit-graph searches.
+    resources:
+      - title: Eugene W. Myers, An O(ND) Difference Algorithm and Its Variations (paper)
+        url: http://www.xmailserver.org/diff2.pdf
+        opened: true
+      - title: "James Coglan, The Myers diff algorithm: part 1"
+        url: https://blog.jcoglan.com/2017/02/12/the-myers-diff-algorithm-part-1/
+        opened: true
+      - title: diff (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Diff
+        opened: true
+  - slug: unified-diff-format
+    name: The unified diff format
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: Unified diffs group changes into hunks with a header giving line ranges, three lines of unchanged context, and
+      lines marked with a space, a minus or a plus. The context is what lets patch apply a diff to a file that has
+      shifted slightly.
+    lesson:
+      how_it_works: >-
+        A unified diff starts with two header lines naming the old and new files, marked with three minus signs and
+        three plus signs. The changes follow as hunks. Each hunk begins with a header such as @@ -12,7 +12,8 @@,
+        meaning the hunk covers seven lines of the old file starting at line 12 and eight lines of the new file
+        starting at line 12. Inside the hunk, a line starting with a space is unchanged context, a line starting with
+        a minus was removed, and a line starting with a plus was added. By default each change carries three lines of
+        context before and after it, and changes close together share one hunk.
+
+
+        The context is the clever part. A patch tool applying the diff does not trust the line numbers blindly: it
+        looks for the context lines near the expected position, so a patch still applies when the target file has
+        gained or lost a few lines elsewhere. If the context does not match, the hunk is rejected and written to a
+        reject file for a person to resolve. The header counts must agree with the body, or the patch is treated as
+        corrupt.
+
+
+        Compared with the older normal format, which prints line-number commands and marks lines with less-than and
+        greater-than signs, unified diffs are shorter and easier to read, because removals and additions sit side by
+        side inside their surrounding lines. They are the format of patch files, Git output and code review tools.
+        Special markers also matter: a line saying there is no newline at end of file records that the last line had
+        no final newline.
+      examples:
+        - A security fix mailed as a unified diff still applies to a slightly newer version of the file because its
+          context lines are found a few lines further down.
+        - A patch is rejected because someone edited one of its context lines; the reject file shows exactly which
+          hunk to fix by hand.
+        - A code review tool turns every pull request into unified hunks with context, so reviewers see each change in
+          place.
+      misconceptions:
+        - The line numbers are enough to apply a patch. Patch tools rely on context and allow the file to have shifted.
+        - Context lines are only for people. They are what lets the patch tool find the right place.
+        - Unified and normal diffs carry different information. They describe the same edit script in different
+          layouts.
+      elsewhere:
+        - Git, GitHub, GitLab and mailing-list patch workflows use the unified format.
+        - Configuration management and infrastructure tools show planned changes as unified diffs.
+        - Database schema migration tools and document comparison tools borrow the hunk layout.
+    resources:
+      - title: POSIX diff utility (the -u unified format)
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/diff.html
+        opened: true
+      - title: patch(1), Linux manual page
+        url: https://man7.org/linux/man-pages/man1/patch.1.html
+        opened: true
+      - title: diff (Wikipedia), unified format
+        url: https://en.wikipedia.org/wiki/Diff
         opened: true

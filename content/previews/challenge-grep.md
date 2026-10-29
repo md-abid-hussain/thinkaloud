@@ -14,13 +14,36 @@ Searching logs, code and data for lines of a certain shape is an everyday progra
 
 ## Learning map
 
-### 1. Matching with regular expressions
+### 1. Regular expressions as automata
 
 **Where it shows up here.** grep prints every line in which the pattern matches somewhere. On the hard route you build the matcher yourself, as a small state machine over the line.
 
+**How it works.** A regular expression is a tiny language for describing a set of strings. Letters match themselves, a dot matches any one character, a class such as a set of digits matches one character from the set, a star repeats the thing before it zero or more times, and anchors match positions rather than characters: the caret the start of a line and the dollar sign the end. A line matches when some part of it is in the set, so the pattern J matches any line containing a J anywhere.
+
+Underneath, every such pattern can be turned into a finite automaton, a graph of states joined by transitions labelled with characters. Thompson's construction builds a nondeterministic automaton with roughly one state per pattern symbol; matching then reads the text one character at a time while keeping the set of states the automaton could be in. Because that set is never larger than the number of states, the work is proportional to the length of the text times the size of the pattern, with no surprises, and it needs to see each character only once, which suits streaming input.
+
+There are several dialects. POSIX defines basic and extended regular expressions, in which a plus or a question mark may or may not be special; Perl-style engines add shorthand classes such as backslash d for a digit and backslash w for a word character, plus features like backreferences that are no longer regular at all. Which characters count as digits or word characters can also depend on the locale and on Unicode mode, so the same pattern can match differently in two tools.
+
+**Examples.**
+- The same pattern that finds error codes in one tool matches nothing in another, because one reads a backslash d as a digit class and the other as the letter d.
+- A log search tool scans gigabytes per second by compiling the pattern into an automaton once and streaming the file through it.
+- Input validation that forgets the anchors accepts any string that merely contains a valid value.
+
+**Misconceptions.**
+- A pattern must match the whole line. Without anchors it matches anywhere in the line.
+- All regex engines speak the same language. POSIX basic, POSIX extended and Perl-style dialects differ in syntax and features.
+- Regular expressions are slow by nature. Automaton-based matching runs in time linear in the input.
+
+**Elsewhere.**
+- Lexers in compilers and the JSON parser recognise tokens with the same automata.
+- Web application firewalls, editors, and search in IDEs and databases are built on regex engines.
+- Network intrusion detection systems compile thousands of patterns into one automaton.
+
 **Read.**
-- [Regular expression (Wikipedia)](https://en.wikipedia.org/wiki/Regular_expression) (not opened)
-- [MDN, Regular expressions guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions) (not opened)
+- [Russ Cox, Regular Expression Matching Can Be Simple And Fast](https://swtch.com/~rsc/regexp/regexp1.html)
+- [Thompson's construction (Wikipedia)](https://en.wikipedia.org/wiki/Thompson%27s_construction)
+- [POSIX Base Definitions, Chapter 9: Regular Expressions](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html)
+- [Regular expression (Wikipedia)](https://en.wikipedia.org/wiki/Regular_expression)
 
 **Explain it back.** A log search tool scans gigabytes of logs for a pattern in seconds. Explain how a regular expression can be turned into something that checks a line by reading each character once.
 
@@ -28,11 +51,35 @@ Searching logs, code and data for lines of a certain shape is an everyday progra
 - [ ] Matching reads the line one character at a time while keeping the set of states the automaton could be in
 - [ ] That set is never bigger than the number of states, so the work grows only with the length of the text times the size of the pattern
 
-### 2. regex-backtracking
+### 2. Backtracking versus linear-time matching
 
 **Where it shows up here.** How your matcher tries alternatives decides whether some patterns finish instantly or never. Comparing your grep with the real one on a nasty pattern shows the difference.
 
+**How it works.** There are two ways to run a regular expression. A backtracking engine tries one way of matching, and when it fails partway it backs up to the last choice it made and tries the next alternative. This is simple and supports features such as backreferences, and on ordinary patterns it is fast. But a pattern with nested or overlapping repetition, such as a group that repeats something that itself repeats, gives the engine exponentially many ways to split the same text. When the text almost matches but fails at the very end, the engine tries every split before giving up, and a few dozen characters can keep it busy for minutes.
+
+An automaton-based engine, in the style of Thompson's construction, never backs up. It reads each character once and keeps the set of states that are still possible, so its time grows only linearly with the text, whatever the pattern. The price is that it cannot support backreferences, which need memory of what was matched earlier. Tools such as GNU grep, RE2 and Rust's regex crate take this route; many language standard libraries use backtracking.
+
+This matters for security as well as speed. If an attacker controls the text, and the service uses a backtracking engine with a vulnerable pattern, one short request can pin a processor; this is called regular expression denial of service, or ReDoS. Cloudflare's global outage on 2 July 2019 was caused by one such pattern in a firewall rule. The defences are to use a linear-time engine for untrusted input, to avoid nested repetition, and to set time limits.
+
+**Examples.**
+- A web firewall rule with a pattern containing two adjacent wildcard repetitions pinned every CPU core at Cloudflare in July 2019.
+- An email-validation pattern with nested repetition hangs a sign-up form when an attacker submits a long string that almost matches.
+- Stack Overflow went down briefly in 2016 when a pattern for trimming whitespace met a line with tens of thousands of spaces.
+
+**Misconceptions.**
+- Regex speed depends only on the input size. With a backtracking engine it can depend exponentially on the pattern and input together.
+- All engines behave the same. Linear-time engines and backtracking engines accept similar syntax but have very different worst cases.
+- Only huge inputs are dangerous. A few dozen characters are enough for a vulnerable pattern.
+
+**Elsewhere.**
+- Request validation, log parsing and search features in web services all face this risk.
+- Linting tools flag regex patterns with nested quantifiers for the same reason.
+- Database full-text and pattern search choose engines with predictable worst cases.
+
 **Read.**
+- [Russ Cox, Regular Expression Matching Can Be Simple And Fast](https://swtch.com/~rsc/regexp/regexp1.html)
+- [OWASP, Regular expression Denial of Service (ReDoS)](https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS)
+- [Cloudflare, Details of the Cloudflare outage on July 2, 2019](https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/)
 
 **Explain it back.** A firewall rule containing a pattern with two wildcard repetitions next to each other pinned every processor of a large company's servers for half an hour. Explain how a regex can do that, and what kind of engine is immune.
 
@@ -76,7 +123,9 @@ code must not treat that piece as a real line.
 - Diff tools show a whole file as changed when only its line endings changed.
 
 **Read.**
-- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline) (not opened)
+- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline)
+- [RFC 5198: Unicode Format for Network Interchange (line endings in text)](https://www.rfc-editor.org/rfc/rfc5198)
+- [Git, gitattributes: end-of-line conversion](https://git-scm.com/docs/gitattributes)
 
 **Explain it back.** A pattern anchored with a dollar sign at the end of a line matches on Linux but finds nothing in a file that came from Windows. Explain why.
 
@@ -134,8 +183,33 @@ still processes the others, and exits with a non-zero status at the end.
 
 **Where it shows up here.** With -r your grep walks a folder tree and prints the path of each file before its matching lines.
 
+**How it works.** A folder holds files and other folders, which hold more, so the file system is a tree. Visiting every file means a traversal: list a folder, handle each file, and do the same for each subfolder. It can be written with recursion, where a function calls itself for each subfolder, or with an explicit list of folders still to visit. The explicit list avoids running out of call stack on very deep trees.
+
+Real file systems are not quite trees. A symbolic link can point to a folder higher up, so a walker that follows links can loop forever. Walkers usually skip links, or remember which folders they have visited. A hard link makes one file appear under two names, so two paths that look different can be the very same file on disk, not a copy of it.
+
+A walk over thousands of folders will meet entries it cannot read, because of permissions, files deleted while the walk runs, or names that are not valid text. A robust walker reports the problem and moves on, so one bad entry does not stop the whole scan.
+
+The order in which a folder lists its entries is not promised. If the output must be stable, sort it.
+
+**Examples.**
+- A backup tool that followed a link from a folder to its own parent filled a disk copying the same tree again and again.
+- A duplicate finder reported two hard links to one file as duplicates, and deleting one would have freed no space.
+- A scan of a home folder stopped halfway at a protected system folder, until it was changed to report and skip errors.
+
+**Misconceptions.**
+- The file system is a tree. Links make cycles and shared files possible.
+- Every entry can be read. Permissions and files that vanish mid-walk are normal.
+- Folders list files in name order. The order depends on the file system; sort it if you need it.
+
+**Elsewhere.**
+- Build tools walk source folders to find files that changed.
+- Search tools such as find and grep with a recursive option use the same traversal.
+- Garbage collectors walk a graph of objects with the same cycle problem, solved by marking visited nodes.
+
 **Read.**
-- [Depth-first search (Wikipedia)](https://en.wikipedia.org/wiki/Depth-first_search) (not opened)
+- [Tree traversal (Wikipedia)](https://en.wikipedia.org/wiki/Tree_traversal)
+- [ftw(3), Linux manual page (file tree walk)](https://man7.org/linux/man-pages/man3/nftw.3.html)
+- [Symbolic link (Wikipedia)](https://en.wikipedia.org/wiki/Symbolic_link)
 
 **Explain it back.** Your recursive search over a home folder never finishes, and on another machine it stops halfway with a permission error. Explain both, and how a tree walker should behave.
 
@@ -193,8 +267,31 @@ file, can receive them.
 
 **Where it shows up here.** grep -r piped into grep -v shows tools composing: each one only filters the lines it receives.
 
+**How it works.** A pipeline such as cut, then sort, then uniq, then wc starts every program at the same time and joins each one's standard output to the next one's standard input through a pipe, a small buffer inside the operating system. Each tool only knows that it reads lines and writes lines, which is what lets small single-purpose tools combine into something none of them does alone.
+
+Because the buffer is small, a pipeline streams. When the reader is slow the buffer fills and the writer is paused until there is room, so memory stays bounded however much data flows; this automatic pause is called backpressure. When the reader exits early, as head does after printing ten lines, the operating system tells the writer the next time it writes: by default it receives the signal SIGPIPE and stops, or it gets an error it should treat as a quiet reason to finish. That is why cut on a huge file, piped into head, returns at once instead of reading the whole file.
+
+Order matters, because each tool sees only what the previous one produced. uniq removes only adjacent duplicate lines, so uniq before sort removes only neighbours, while sort then uniq removes all duplicates. A tool that wants to play well in pipelines writes results to standard output, messages to standard error, flushes when it is done, and does not ask the terminal questions.
+
+**Examples.**
+- Counting distinct artists with cut and uniq gives the wrong number until sort is put before uniq.
+- A script piping a 10 GB log into head finishes instantly, because the producer is stopped once head exits.
+- A tool that prints progress messages to standard output corrupts the data the next tool in the pipeline reads.
+
+**Misconceptions.**
+- Each stage finishes before the next starts. They all run at once, connected by small buffers.
+- A pipe holds the whole output. It holds a few kilobytes, and the writer waits when it is full.
+- An early exit by the reader is an error to report. For the writer it is usually a reason to stop quietly.
+
+**Elsewhere.**
+- Shell scripts, build systems and data pipelines are built from the same composition idea.
+- Streaming frameworks and reactive libraries reinvent backpressure for network services.
+- Container logging and log shippers rely on programs writing plain lines to standard output.
+
 **Read.**
-- [Pipeline (Unix) (Wikipedia)](https://en.wikipedia.org/wiki/Pipeline_(Unix)) (not opened)
+- [Pipeline (Unix) (Wikipedia)](https://en.wikipedia.org/wiki/Pipeline_(Unix))
+- [pipe(7), Linux manual page (pipe capacity, SIGPIPE)](https://man7.org/linux/man-pages/man7/pipe.7.html)
+- [The Art of Unix Programming: Taxonomy of Unix IPC Methods](http://www.catb.org/~esr/writings/taoup/html/ch07s02.html)
 
 **Explain it back.** grep -r Nirvana piped into grep -v Madonna leaves one line. Explain what each stage sees, and what the exit status of the whole pipeline tells a script.
 
@@ -206,8 +303,31 @@ file, can receive them.
 
 **Where it shows up here.** -i makes grep ignore case. Beyond English letters the rules get subtle, and your grep has to agree with the reference.
 
+**How it works.** To compare text without regard to case, both sides are mapped to one common form and then compared. For English letters this is easy: each capital has exactly one lowercase partner. Unicode defines case folding for this purpose, a mapping designed for comparison rather than display.
+
+Outside ASCII the rules get interesting. Simple case folding maps one character to one character, which keeps lengths and positions unchanged and is what most search tools use. Full case folding allows one character to become several: the German sharp s ß folds to ss, so under full folding straße matches STRASSE, while under simple folding it does not. GNU grep -i uses the simple form, so on this project's reference straße does not match STRASSE. Some rules depend on language: in Turkish and Azerbaijani the capital of i is İ with a dot, and the lowercase of I is a dotless ı, so a program that lowercases with the wrong locale can break identifiers and keywords.
+
+Case folding also interacts with normalisation: é can be one code point or e plus a combining accent, and folding does not join them, so robust comparison normalises first and then folds. For a search tool the practical questions are which folding it uses, whether classes such as a word character keep their meaning under -i, and whether its behaviour matches the reference tool's under the same locale.
+
+**Examples.**
+- A login that lowercases user names with a Turkish locale turns the admin account TITLE into a different string from title.
+- A case-insensitive search for straße finds STRASSE in one tool and not in another, because one uses full case folding and the other simple.
+- Two accounts called André can exist side by side when one name was normalised and folded and the other was not.
+
+**Misconceptions.**
+- Ignoring case is just lowercasing both sides. Lowercasing is for display; case folding is designed for comparison, and some mappings change length.
+- Case rules are the same in every language. Turkish dotted and dotless i are the famous exception.
+- Case-insensitive matching keeps all lengths and positions. Full folding can turn one character into two.
+
+**Elsewhere.**
+- User names, email addresses and file names on case-insensitive file systems all need a folding rule.
+- Database collations decide how case-insensitive indexes compare text.
+- Search engines fold case and normalise text before indexing.
+
 **Read.**
-- [Unicode FAQ, case mapping](https://unicode.org/faq/casemap_charprop.html) (not opened)
+- [Unicode FAQ: Character Properties, Case Mappings and Names](https://unicode.org/faq/casemap_charprop.html)
+- [W3C, Character Model for the World Wide Web: String Matching](https://www.w3.org/TR/charmod-norm/)
+- [Letter case (Wikipedia)](https://en.wikipedia.org/wiki/Case_folding)
 
 **Explain it back.** A case-insensitive search for straße finds STRASSE in one tool and not in another, and an application lowercasing user names with a Turkish locale breaks a login. Explain both.
 

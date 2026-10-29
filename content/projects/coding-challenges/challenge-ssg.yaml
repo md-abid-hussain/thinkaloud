@@ -1,51 +1,35 @@
-# Worked example of a generated project file, updated to the v0.4 rules (primer, teach-back, no code in hints).
-# Source: https://codingchallenges.fyi/challenges/challenge-ssg (Coding Challenges, #77)
-# Everything below is written in our own words. The source page is linked, not copied.
-# Every predict and trace key is proven by content/proofs/challenge-ssg.mjs.
+# Coding Challenges, Build your own static site generator. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-static-site-generator . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-ssg
   title: Build your own static site generator
   source_url: https://codingchallenges.fyi/challenges/challenge-ssg
-  level: beginner            # the challenge page is tagged beginner; null when unknown
-  status: generated          # generated = not yet checked by a person. reviewed needs reviewed_by and reviewed_on
+  level: beginner
+  status: generated
   figure:
     kind: pages
-  summary: >-
-    A command-line tool that turns a folder of Markdown pages and an HTML theme into a static website, and can serve
-    the site locally and refresh it when files change.
+  summary: A command-line tool that turns a folder of Markdown pages and an HTML theme into a static website, and can
+    serve the site locally and refresh it when files change.
   requirements:
     - Create a new site with a content folder and a starting page
     - Create themes and new pages from the command line
     - Fill the theme template with each page's title and rendered Markdown, and write the result to a public folder
     - Serve the site locally and update it when a page or the theme changes
-  restate_rubric:
-    - id: r1
-      point: "It builds a static site from Markdown pages and an HTML theme"
-    - id: r2
-      point: "It has commands to create a site, a theme and a page, and a build command that writes the finished HTML to a public folder"
-    - id: r3
-      point: "It can serve the site locally and refresh it when files change"
-  reflection_prompt: >-
-    In your own words, how does your design keep content, theme and output separate, and what would you change if
-    the site had a thousand pages?
   primer:
-    what: >-
-      A static site generator turns pages written in Markdown, a simple way of marking headings and paragraphs in
+    what: A static site generator turns pages written in Markdown, a simple way of marking headings and paragraphs in
       plain text, into a finished website of HTML files. The look of the site lives in a theme, an HTML file with
-      holes where each page's title and text go. You will build one with commands to create a site, a theme and
-      pages, a build command, and a local server that refreshes when you edit.
-    why: >-
-      Most blogs and documentation sites are plain files on a server. Generating them once, instead of building
-      each page when someone asks for it, makes them fast, cheap and hard to break.
-    example: >-
-      After you create a site called mysite, a theme called cc and a page called about, the folder holds
-      content/index.md and content/about.md, written by the author, and themes/cc/index.html, written by the
-      designer. Building fills the theme once per page and writes public/index.html and public/about.html, ready to
-      publish.
+      holes where each page's title and text go. You will build one with commands to create a site, a theme and pages,
+      a build command, and a local server that refreshes when you edit.
+    why: Most blogs and documentation sites are plain files on a server. Generating them once, instead of building each
+      page when someone asks for it, makes them fast, cheap and hard to break.
+    example: After you create a site called mysite, a theme called cc and a page called about, the folder holds
+      content/index.md and content/about.md, written by the author, and themes/cc/index.html, written by the designer.
+      Building fills the theme once per page and writes public/index.html and public/about.html, ready to publish.
     words:
       - term: Markdown
         meaning: Plain text with light marks, such as a hash at the start of a line for a heading, that converts to HTML.
@@ -59,289 +43,306 @@ project:
         meaning: Writing characters such as less-than and ampersand in a safe form, so the browser shows them as text.
       - term: live reload
         meaning: The browser refreshing by itself when the development server rebuilds the site after an edit.
-
+  restate_rubric:
+    - id: r1
+      point: It builds a static site from Markdown pages and an HTML theme
+    - id: r2
+      point: It has commands to create a site, a theme and a page, and a build command that writes the finished HTML to a
+        public folder
+    - id: r3
+      point: It can serve the site locally and refresh it when files change
+  reflection_prompt: In your own words, how does your design keep content, theme and output separate, and what would you
+    change if the site had a thousand pages?
+  reference_tool: The CommonMark specification and its worked examples for rendered Markdown, and a browser's developer
+    tools for what the development server sends.
+  done_when: init, new theme, new page, build and serve all work; every content page builds into public with its title
+    escaped and no stale files left behind; the development server serves the right content types, stays inside
+    public, rebuilds once per save and reloads open pages; and the built site contains no development script. Your
+    notes explain the layout, the single-pass template and your escaping rule in your own words.
+  open_checks:
+    - Which Markdown features beyond headings and paragraphs you will support, and which CommonMark examples you test
+      against.
+    - How many change events one save in your editor produces on your system.
+    - Whether your browser shows a cached page after a reload, and which headers your development server should send
+      to prevent it.
+    - What a page name containing spaces or accented letters should become as a file name and an address.
+learning_map:
+  - concept: site-directory-layout
+    where: "The folder structure is the data model: content holds the pages as Markdown, themes hold the templates, and
+      public holds the generated site, so every command works from these conventions."
+    explain_back:
+      prompt: Explain why a static site generator uses fixed folder names such as content, themes and public, and what goes
+        wrong when generated output is written into the same folder as the sources.
+      rubric:
+        - id: e1
+          point: Each folder has one role, so no configuration is needed and a page's place in content decides its address on
+            the site
+        - id: e2
+          point: People and tools always know where to look for sources, templates and output
+        - id: e3
+          point: Output mixed with sources gets picked up again as content by the next build, edited by hand and then
+            overwritten, or committed by mistake
+        - id: e4
+          point: A separate output folder can be deleted and rebuilt from the sources at any time
+  - concept: cli-subcommands
+    where: init, new theme, new page, build and serve are subcommands of one tool, each with its own arguments, and an
+      unknown command is reported on standard error with a non-zero exit status.
+    explain_back:
+      prompt: Explain how a tool with subcommands such as init, build and serve should behave when run with a mistyped
+        command, with init on a folder that already exists, and with no arguments at all.
+      rubric:
+        - id: e1
+          point: A mistyped command gets a message on standard error naming it, perhaps suggesting the closest real command, and
+            a non-zero exit status
+        - id: e2
+          point: init on an existing folder refuses rather than overwriting the user's work, unless they explicitly ask to force
+            it
+        - id: e3
+          point: With no arguments the tool prints its usage, listing the subcommands
+        - id: e4
+          point: Consistent behaviour and exit statuses make the tool safe to use in scripts
+  - concept: untrusted-paths
+    where: Page names given to new page, and paths requested from the development server, must stay inside the content and
+      public folders.
+    explain_back:
+      prompt: Someone runs new page with a name that starts with two sets of dot-dot-slash, and later requests a path with
+        dots from your development server. Explain the risk in each case, and the one check that prevents both.
+      rubric:
+        - id: e1
+          point: The page name could make the tool write a file outside content, overwriting files that belong to the user
+        - id: e2
+          point: The request could make the server read and return files from outside public
+        - id: e3
+          point: The fix is to work out the final absolute path, after joining and normalising it, and check that it is still
+            inside the allowed folder
+        - id: e4
+          point: Anything outside is refused, rather than trying to strip dots from the text, which attackers can get around
+            with encodings
+  - concept: markup-to-html
+    where: "Each Markdown page is converted to HTML: headings, paragraphs, emphasis, links and lists each become HTML
+      elements."
+    explain_back:
+      prompt: "Two Markdown tools turn the same page into different HTML: one makes a list, the other a plain paragraph.
+        Explain why this happens, and how a specification such as CommonMark helps."
+      rubric:
+        - id: e1
+          point: The original Markdown description was informal and left many cases open, such as indentation, blank lines and
+            nesting, so tools made different choices
+        - id: e2
+          point: CommonMark defines exact rules with hundreds of worked examples, so conforming tools produce the same HTML
+        - id: e3
+          point: "Converting Markdown is parsing: block structure such as headings, paragraphs and lists first, then inline
+            marks such as emphasis and links, not search and replace"
+  - concept: template-substitution
+    where: The theme's page template has placeholders for the title and the content in double braces, and the build fills
+      them with each page's title and rendered HTML in one pass over the template.
+    explain_back:
+      prompt: A page whose text happens to mention the content placeholder, in double braces, shows up after the build with
+        its body pasted in twice. Explain the bug, and how substituting in a single pass avoids it.
+      rubric:
+        - id: e1
+          point: Replacing one placeholder after another re-scans text that has already been inserted, so a placeholder inside a
+            page's own text gets replaced again
+        - id: e2
+          point: A single pass reads the template once and replaces each placeholder with its value, and never scans inserted
+            values
+        - id: e3
+          point: An unknown placeholder should be reported, or at least made visible, so typos in a theme are caught
+  - concept: output-escaping
+    where: The title comes from the page's text and is inserted into HTML, so characters such as less-than and ampersand
+      must be escaped. The rendered Markdown body is already HTML and goes in as it is.
+    explain_back:
+      prompt: A page titled with a less-than sign and an ampersand breaks your site's layout, and a guest author's title
+        runs a script in readers' browsers. Explain both problems, and the rule that fixes them.
+      rubric:
+        - id: e1
+          point: Characters that mean something in HTML, such as less-than, greater-than, ampersand and quotes, are read as
+            markup when inserted raw, which breaks the page
+        - id: e2
+          point: A title containing a script tag is run by the browser, which is cross-site scripting
+        - id: e3
+          point: Text is escaped for the place it goes, replacing those characters with character references, in body text and
+            in attribute values
+        - id: e4
+          point: Values that are meant to be HTML, such as rendered Markdown, are not escaped, so the code must know which
+            values are text and which are markup
+  - concept: build-pipeline
+    where: build reads every content page, renders it, fills the template and writes it to public, after clearing old
+      output, so the output always matches the sources.
+    explain_back:
+      prompt: After you rename about.md to team.md and build again, both about.html and team.html are on your site. Explain
+        why, and how a build should work so that its output always matches the sources.
+      rubric:
+        - id: e1
+          point: The build only writes files and never removes them, so the output of a renamed or deleted page stays behind
+        - id: e2
+          point: Clearing the output first, or tracking and deleting files with no source, makes the result depend only on the
+            current sources
+        - id: e3
+          point: "A good build is repeatable: running it twice on the same sources gives the same output"
+        - id: e4
+          point: Splitting it into clear stages, read, convert, apply the template and write, makes it easy to debug and to
+            rebuild only what changed
+  - concept: static-file-serving
+    where: serve maps / to index.html and other paths to files under public, with the right content type, and answers 404
+      for missing files.
+    explain_back:
+      prompt: Your development server shows a page, but the browser downloads the stylesheet instead of applying it. Explain
+        what the server forgot and how it should decide.
+      rubric:
+        - id: e1
+          point: Every response needs a Content-Type header that matches the file, such as text/css for a stylesheet and
+            text/html for a page
+        - id: e2
+          point: The type is chosen from the file's extension, using a table of media types
+        - id: e3
+          point: With a wrong or missing type the browser treats the file as unknown data, offers to download it, or refuses to
+            apply it
+        - id: e4
+          point: A folder path maps to its index.html, and a missing file gets a 404
+  - concept: file-watching
+    where: serve watches the content and theme folders and rebuilds the site when a file changes.
+    explain_back:
+      prompt: Your watcher rebuilds the site three times every time you save one file, and sometimes misses changes in a new
+        subfolder. Explain why, and how to make watching reliable.
+      rubric:
+        - id: e1
+          point: Editors often save in several steps, such as writing a temporary file and renaming it, and each step produces
+            its own change event
+        - id: e2
+          point: Waiting for a short quiet period after the last event, then rebuilding once, turns the burst into one rebuild
+        - id: e3
+          point: Operating-system watchers, such as inotify on Linux, watch specific folders, so new subfolders must be added as
+            they appear, or the tool falls back to checking modification times
+        - id: e4
+          point: The output folder must be ignored, or each rebuild triggers the next
+  - concept: live-reload-push
+    where: After each rebuild the server tells open browser pages to reload, over a long-lived connection such as
+      server-sent events, using a small script added only by the development server.
+    explain_back:
+      prompt: Explain how a development server can make an open browser tab reload when the site is rebuilt, why it cannot
+        do so without a connection the page opened first, and why the reload script must not end up in the published
+        site.
+      rubric:
+        - id: e1
+          point: HTTP is request and response, so a server cannot contact a browser on its own
+        - id: e2
+          point: The page opens a long-lived connection, such as server-sent events or a WebSocket, and the server sends a
+            message on it after each rebuild, which makes the page reload
+        - id: e3
+          point: The development server adds the reload script only when it serves pages, so the files written by build stay
+            clean
+        - id: e4
+          point: A published page with the script would keep trying to reach a development server that does not exist
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Project layout and commands
-    summary: Create a site, a theme and pages from the command line, with content and themes kept apart.
-    concepts: [site-directory-layout, cli-subcommands, untrusted-paths]
+    summary: Create a project, a theme and pages from the command line, with safe names and clear errors.
     steps:
       - title: Create a project
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Use the layout described in the primer. You run init mysite, then new theme cc, then new page about.
-            How many files are inside mysite when you are done?
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              init creates content/index.md, new theme cc creates themes/cc/index.html, and new page about creates
-              content/about.md. That is 1 + 1 + 1 = 3, because after the challenge's step 3 the root no longer
-              holds an index.html. Proof script output: 3.
-        build:
-          prompt: >-
-            Make init mysite create the project folder with content/index.md, and refuse to overwrite an existing
-            folder. Then make new theme cc create themes/cc/index.html, and new page about create content/about.md.
+        minutes: 45
+        build: Make init mysite create the project folder with content/index.md, and refuse to overwrite an existing folder.
+          Then make new theme cc create themes/cc/index.html, and new page about create content/about.md.
+        outcome: Those three commands create exactly those files, and init on a folder that already exists refuses with a
+          message and a non-zero exit status.
+        concepts:
+          - site-directory-layout
+          - cli-subcommands
         hints:
-          hint: Count what each command creates, and remember that after the content and theme split the root holds no index.html.
-          example: >-
-            The same idea on another tool: init blog creates posts/first.md, new author ada creates authors/ada.md, and
-            new post hello creates posts/hello.md. That is 3 files in total.
-
+          hint: Write down the folder tree you expect after each command before you build it.
       - title: Subcommands and safe names
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: This command dispatcher has two problems. Find them.
-          snippet: |-
-            command = args[0]
-            if command == "new" and args[1] == "page":
-                write_file("content/" + args[2] + ".md", "# " + args[2])
-            elif command == "build":
-                build_site()
-            else:
-                print("unknown command")
-          rubric:
-            - id: p1
-              point: "The page name goes straight into the file path, so a name like ../x writes outside the content folder"
-            - id: p2
-              point: "An unknown command prints a message but the program still exits with a success status"
-        build:
-          prompt: Reject page names that would leave content/, and make an unknown command print to the error stream and exit with a non-zero status.
+        minutes: 30
+        build: Reject page names that would leave content, and make an unknown command print a message on standard error and
+          exit with a non-zero status.
+        outcome: A page name that climbs out of content with dots is refused and nothing is written, and a mistyped command
+          prints a message on standard error and exits non-zero.
+        concepts:
+          - cli-subcommands
+          - untrusted-paths
         hints:
-          hint: Ask what happens if the page name is ../../notes, and what a script sees when the program ends.
-          example: >-
-            A backup tool that glues the folder name backups and a user's chosen name together will write outside
-            backups when the name is ../../home. Normalising the joined path and checking that it still sits inside
-            backups closes the hole.
-
-    teach_back:
-      prompt: >-
-        Explain how your generator lays out a site, and what it does with a command or a page name it should not
-        accept.
-      rubric:
-        - id: t1
-          concept: site-directory-layout
-          point: "Content holds what the author writes, themes hold how pages look, and the output folder is rebuilt from the two"
-        - id: t2
-          concept: cli-subcommands
-          point: "An unknown command or bad input gives a message on the error stream and a non-zero exit status"
-        - id: t3
-          concept: untrusted-paths
-          point: "A page name is joined to the folder, normalised, and checked to still be inside the folder before anything is written"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Check the final resolved path, not the text the user typed.
   - title: Templates and build
-    summary: Render Markdown into HTML, fill the theme template, and build every page into the public folder.
-    concepts: [markup-to-html, template-substitution, output-escaping, build-pipeline]
+    summary: Render Markdown, fill the template safely, and build the whole site into public.
     steps:
       - title: Render Markdown
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A page contains a heading "# Title", a blank line, the paragraph "First paragraph.", a blank line, and the
-            paragraph "Second paragraph.". How many block elements does the HTML contain?
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              One h1 for the heading and two p elements for the paragraphs. A Markdown parser reports heading,
-              paragraph, paragraph. Proof script output: 3.
-        build:
-          prompt: Render headings and paragraphs from a content page to HTML, then add any other Markdown features you want.
+        minutes: 45
+        build: Render headings and paragraphs from a content page to HTML, then add any other Markdown features you want,
+          checking each against examples from the CommonMark specification.
+        outcome: A sample page with headings and paragraphs, plus each feature you added, renders to the HTML its CommonMark
+          examples show.
+        concepts:
+          - markup-to-html
         hints:
-          hint: Blocks are separated by blank lines. Count the heading and each paragraph, not the words.
-          example: A page with "## Tips", a blank line, and "Be kind." has 2 blocks, one h2 and one p.
-
+          hint: Find the blocks first, such as headings and paragraphs, and only then look inside them for emphasis and links.
       - title: Fill the template
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The template is <h1>{{ Title }}</h1>{{ Content }}. The page title is Home, and its rendered Content is
-            <p>Welcome to {{ Title }}</p>, because the author typed that text. A buggy build replaces Content first
-            and then replaces every {{ Title }}. How many times does the word Home appear in the result?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              Replacing Content first gives <h1>{{ Title }}</h1><p>Welcome to {{ Title }}</p>. Replacing every Title
-              then fills both, so Home appears twice. Replacing Title first, or filling both in one pass, gives 1.
-              Proof script output: 2.
-        build:
-          prompt: Fill {{ Title }} with the first top-level heading of the page and {{ Content }} with the rendered HTML, in a single pass over the template.
+        minutes: 45
+        build: Fill the title placeholder with the page's first top-level heading and the content placeholder with the
+          rendered HTML, in a single pass over the template.
+        outcome: A built page shows its own title and body, and a page whose text mentions a placeholder name is not
+          substituted a second time.
+        concepts:
+          - template-substitution
         hints:
-          hint: Write out the text after each replacement, in the order the code does them.
-          example: >-
-            A greeting card reads Hi {{ Name }} {{ Note }}. The note is the text from {{ Name }}, and the name is Sam.
-            Fill the note first and then every name, and Sam appears twice. Fill the name first and then the note,
-            and it appears once.
-
+          hint: Write each value into the output once, and never look at it again.
       - title: Escape what you insert
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: Find the problem when the first heading is "Tom & Jerry <3", and say how to fix it without breaking the content.
-          snippet: |-
-            title = first_heading(markdown)
-            html = template.replace("{{ Title }}", title)
-            html = html.replace("{{ Content }}", render(markdown))
-          rubric:
-            - id: p1
-              point: "The title is inserted into HTML without escaping, so & and < are read as markup"
-            - id: p2
-              point: "Escape the title when it is inserted, but not the content, which is already HTML"
-        build:
-          prompt: Escape the title before it goes into the template.
+        minutes: 30
+        build: Escape the title before it goes into the template, and leave the rendered body as HTML.
+        outcome: A title containing a less-than sign and an ampersand displays exactly as written, and a title containing a
+          script tag shows as text and runs nothing.
+        concepts:
+          - output-escaping
         hints:
-          hint: What does a browser do when it meets a bare < in the middle of a line?
-          example: >-
-            A comment saying 5 < 6 inserted raw into a page can swallow what follows it. Writing &lt; for < shows the
-            symbol as text.
-
+          hint: Which of the values you insert is text, and which is already HTML?
       - title: Build into public
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The content folder holds index.md, about.md and blog.md, and a build writes one HTML file for each into
-            public. You delete blog.md and build again, but this build only writes files and never clears public
-            first. How many HTML files are in public now?
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              The first build writes index.html, about.html and blog.html. The second build writes index.html and
-              about.html again but never removes anything, so the stale blog.html stays: 3 files. A build that clears
-              public first would leave 2. Proof script output: 3.
-        build:
-          prompt: Make build render each content page into public/, for example about.md into public/about.html, after clearing old output.
+        minutes: 45
+        build: Make build render every content page into public, for example about.md into public/about.html, after clearing
+          old output.
+        outcome: build writes one HTML file per content page, and after you rename a page and build again, no stale file is
+          left in public.
+        concepts:
+          - build-pipeline
+          - site-directory-layout
         hints:
-          hint: List what each build writes, and ask which step would ever remove a file.
-          example: >-
-            A bakery that restocks the shelf without removing yesterday's bread still sells stale bread. Clearing the
-            shelf first guarantees everything on it is today's.
-
-    teach_back:
-      prompt: >-
-        Walk through what build does to one Markdown page, from the text the author wrote to the file in public, and
-        say where it could go wrong.
-      rubric:
-        - id: t1
-          concept: markup-to-html
-          point: "The Markdown is rendered to HTML, finding blocks such as headings and paragraphs first, then inline marks inside them"
-        - id: t2
-          concept: template-substitution
-          point: "The theme's placeholders are filled in a single pass, so text in a value that looks like a placeholder is not filled again"
-        - id: t3
-          concept: output-escaping
-          point: "The plain title is escaped when it is inserted, but the rendered content, which is already HTML, is not"
-        - id: t4
-          concept: build-pipeline
-          point: "The output is written into a cleared public folder, so the same inputs always give the same site and no stale files remain"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Delete the output from the last build before writing the new one, or track which outputs belong to which
+            sources.
   - title: Development server and live reload
-    summary: Serve the built site locally and refresh the browser when a page or the theme changes.
-    concepts: [static-file-serving, untrusted-paths, file-watching, live-reload-push]
+    summary: Serve the site locally, keep requests inside public, rebuild on change and reload the browser.
     steps:
       - title: Serve the public folder
-        minutes: 15
-        think:
-          kind: predict
-          prompt: A browser requests /about.html and the file exists. What Content-Type should the server send?
-          key:
-            match: text_ci
-            expected: text/html
-            derivation: >-
-              HTML files are served as text/html. Browsers use this header, not the file extension, to decide how to
-              treat the response. Proof script output: text/html.
-        build:
-          prompt: Serve public/ on a local port, mapping / to index.html and answering 404 for missing files.
+        minutes: 45
+        build: Serve public on a local port, mapping / to index.html, sending the right content type for each file and
+          answering 404 for missing files.
+        outcome: The site appears in a browser with its stylesheet applied, / shows index.html, and a missing page gets a 404.
+        concepts:
+          - static-file-serving
         hints:
-          hint: Look at what a browser does with a file when the server labels it as plain text.
-          example: A stylesheet named site.css must be sent as text/css, otherwise browsers may ignore it.
-
+          hint: Look at the response headers in the browser's developer tools.
       - title: Keep requests inside the folder
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: A browser can send the path /../content/index.md. What goes wrong, and what check fixes it?
-          snippet: |-
-            path = "public" + request.path
-            send_file(path)
-          rubric:
-            - id: p1
-              point: "The request path is joined to the folder without checking, so .. lets the request reach files outside public"
-            - id: p2
-              point: "Resolve the full path and check it is still inside public before sending anything"
-        build:
-          prompt: Refuse any request whose resolved path is outside public/.
+        minutes: 30
+        build: Refuse any request whose resolved path is outside public.
+        outcome: Requests that climb out of public with dots, plain or percent-encoded and sent with curl --path-as-is, never
+          return a file from outside it.
+        concepts:
+          - untrusted-paths
         hints:
-          hint: Write out the final path for /../content/index.md once the .. is applied.
-          example: >-
-            A file server for /srv/files that receives /../secret.txt would build /srv/files/../secret.txt, which
-            resolves to /srv/secret.txt, outside the folder.
-
-      - title: Notice changes
-        minutes: 15
-        think:
-          kind: explain
-          prompt: How can a program notice that files changed, and what does each way cost?
-          rubric:
-            - id: p1
-              point: "Polling checks modification times on a timer, which is simple and portable but delayed and wasteful"
-            - id: p2
-              point: "Operating system notifications are fast and cheap, but they are platform-specific and may report bursts of events"
-        build:
-          prompt: Rebuild the site when a content or theme file changes.
+          hint: Decode the request path first, then resolve it, then check it.
+      - title: Rebuild on change
+        minutes: 45
+        build: Rebuild the site when a content or theme file changes, waiting for a short quiet period so one save causes one
+          rebuild.
+        outcome: Saving a content or theme file triggers exactly one rebuild within a couple of seconds, and a new page in a
+          new subfolder is picked up too.
+        concepts:
+          - file-watching
+          - build-pipeline
         hints:
-          hint: One way asks again and again, the other waits to be told. List what each costs.
-          example: >-
-            A mail app can check the server every minute, or hold a connection open and be told when mail arrives.
-            The first is simple but late, the second is prompt but needs more machinery.
-
+          hint: Log every change event you receive for one save, and look at how many there are.
       - title: Reload the browser
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            An editor saves a file by writing a temporary file, renaming it over the original, and updating its
-            timestamp, so the watcher reports 3 events within 50 ms. How many rebuilds run if the tool rebuilds on
-            every event, and how many if it waits 200 ms after the last event before rebuilding?
-          key:
-            match: numbers_all
-            expected: [3, 1]
-            derivation: >-
-              One rebuild per event gives 3. With a 200 ms wait after the last event, the three events inside 50 ms
-              form one burst, so 1 rebuild. Proof script output: [3, 1].
-        build:
-          prompt: >-
-            Tell open browser pages to reload after each rebuild, for example with a server-sent events connection and a
-            small script added to served pages in development only.
+        minutes: 60
+        build: Tell open browser pages to reload after each rebuild, for example over a server-sent events connection opened
+          by a small script that the development server adds to the pages it serves.
+        outcome: An open page reloads by itself after you save a content file, and the files written by build contain no
+          reload script.
+        concepts:
+          - live-reload-push
         hints:
-          hint: Count the events first. Then ask what the wait does to events that arrive close together.
-          example: >-
-            Typing "hello" in a search box sends 5 key presses. A search that waits 300 ms after the last key runs once
-            instead of five times.
-
-    teach_back:
-      prompt: >-
-        You edit a page while the development server is running. Explain what happens between saving the file and
-        seeing the change in the browser, and how the server keeps requests safe.
-      rubric:
-        - id: t1
-          concept: file-watching
-          point: "A watcher notices the change, and the tool waits for the burst of events to settle before it rebuilds once"
-        - id: t2
-          concept: live-reload-push
-          point: "The server keeps a connection open to the page and sends a message after the rebuild, and a small development-only script reloads the page"
-        - id: t3
-          concept: static-file-serving
-          point: "The reloaded page is served by mapping the URL path to a file in public, with a Content-Type that matches the file"
-        - id: t4
-          concept: untrusted-paths
-          point: "A request path is resolved and checked to still be inside public before any file is sent"
+          hint: Who opens the connection, and who sends the message on it?

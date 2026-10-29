@@ -18,8 +18,31 @@ Stripping comments is the smallest useful job of a lexer, the same first step th
 
 **Where it shows up here.** Your scanner walks the source once and keeps a state, such as in code, in a string, in a line comment or in a block comment, so a comment marker counts only in the right state.
 
+**How it works.** Many characters in source code mean different things depending on where they appear. Two slashes start a comment in code but are just characters inside a string or a web address. A quote ends a string, unless it is escaped, or it sits inside a comment. The only reliable way to decide is to read the file from the start and remember what you are inside.
+
+A context-state scanner, a small state machine, does exactly that. It has a handful of states: in code, in a single-quoted string, in a double-quoted string, in a line comment and in a block comment, plus states such as just after a backslash. In each state only a few characters matter. In code, a quote moves to a string state and a comment marker moves to a comment state. In a string, only the closing quote and the escape character matter. In a line comment, only the end of the line matters, and in a block comment, only its closing marker. Everything else is copied or dropped according to the state.
+
+Because the state carries over from one character to the next, and from one line to the next, the scanner handles block comments that span lines and strings that contain comment markers without special cases. Each language has its own states and transitions: Python has triple-quoted strings, C has character literals and preprocessor lines, Go has raw strings, and some languages allow block comments to nest, which needs a counter or a stack instead of a single state.
+
+**Examples.**
+- A find-and-replace on two slashes cuts a web address stored in a string in half, while a state-aware scanner leaves it alone.
+- Syntax highlighters in editors keep the same kind of state, which is why one missing quote can turn the rest of a file the colour of a string.
+- Minifiers for JavaScript and CSS use a scanner with states to remove comments and whitespace without damaging strings.
+
+**Misconceptions.**
+- Each line can be processed on its own. Block comments and multi-line strings carry state across lines.
+- A comment marker is always a comment. Inside a string or another comment it is ordinary text.
+- All languages share the same comment rules. Each defines its own markers, string forms and escapes.
+
+**Elsewhere.**
+- Every compiler's lexer tracks context in the same way before any parsing happens.
+- Editors, linters and code formatters scan with states to understand where comments and strings are.
+- CSV and configuration file readers keep a quoted-or-not state to handle separators inside quoted fields.
+
 **Read.**
-- [Comment (computer programming) (Wikipedia)](https://en.wikipedia.org/wiki/Comment_(computer_programming)) (not opened)
+- [Comment (computer programming) (Wikipedia)](https://en.wikipedia.org/wiki/Comment_(computer_programming))
+- [Lexical analysis (Wikipedia)](https://en.wikipedia.org/wiki/Lexical_analysis)
+- [Crafting Interpreters, Scanning](https://craftinginterpreters.com/scanning.html)
 
 **Explain it back.** A teammate strips comments with a find-and-replace on two slashes, and a line holding a web address inside a string gets cut in half. Explain why, and how a scanner with states avoids it.
 
@@ -102,13 +125,36 @@ Splitting the work this way keeps each part simple. The lexer knows how characte
 - [ ] Single quotes mean a character literal in C but a string in Python, so the rules for quotes differ too
 - [ ] Each language needs its own rules for strings and comments, chosen from the file extension or an option
 
-### 4. Matching with regular expressions
+### 4. Regular expressions as automata
 
 **Where it shows up here.** A regular expression is tempting for stripping comments, but it cannot follow strings and escapes reliably. It is the right tool later, on comment text the scanner has already found, to spot directives.
 
+**How it works.** A regular expression is a tiny language for describing a set of strings. Letters match themselves, a dot matches any one character, a class such as a set of digits matches one character from the set, a star repeats the thing before it zero or more times, and anchors match positions rather than characters: the caret the start of a line and the dollar sign the end. A line matches when some part of it is in the set, so the pattern J matches any line containing a J anywhere.
+
+Underneath, every such pattern can be turned into a finite automaton, a graph of states joined by transitions labelled with characters. Thompson's construction builds a nondeterministic automaton with roughly one state per pattern symbol; matching then reads the text one character at a time while keeping the set of states the automaton could be in. Because that set is never larger than the number of states, the work is proportional to the length of the text times the size of the pattern, with no surprises, and it needs to see each character only once, which suits streaming input.
+
+There are several dialects. POSIX defines basic and extended regular expressions, in which a plus or a question mark may or may not be special; Perl-style engines add shorthand classes such as backslash d for a digit and backslash w for a word character, plus features like backreferences that are no longer regular at all. Which characters count as digits or word characters can also depend on the locale and on Unicode mode, so the same pattern can match differently in two tools.
+
+**Examples.**
+- The same pattern that finds error codes in one tool matches nothing in another, because one reads a backslash d as a digit class and the other as the letter d.
+- A log search tool scans gigabytes per second by compiling the pattern into an automaton once and streaming the file through it.
+- Input validation that forgets the anchors accepts any string that merely contains a valid value.
+
+**Misconceptions.**
+- A pattern must match the whole line. Without anchors it matches anywhere in the line.
+- All regex engines speak the same language. POSIX basic, POSIX extended and Perl-style dialects differ in syntax and features.
+- Regular expressions are slow by nature. Automaton-based matching runs in time linear in the input.
+
+**Elsewhere.**
+- Lexers in compilers and the JSON parser recognise tokens with the same automata.
+- Web application firewalls, editors, and search in IDEs and databases are built on regex engines.
+- Network intrusion detection systems compile thousands of patterns into one automaton.
+
 **Read.**
-- [Regular expression (Wikipedia)](https://en.wikipedia.org/wiki/Regular_expression) (not opened)
-- [MDN, Regular expressions guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions) (not opened)
+- [Russ Cox, Regular Expression Matching Can Be Simple And Fast](https://swtch.com/~rsc/regexp/regexp1.html)
+- [Thompson's construction (Wikipedia)](https://en.wikipedia.org/wiki/Thompson%27s_construction)
+- [POSIX Base Definitions, Chapter 9: Regular Expressions](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap09.html)
+- [Regular expression (Wikipedia)](https://en.wikipedia.org/wiki/Regular_expression)
 
 **Explain it back.** Explain why a single regular expression cannot reliably remove comments from source code, and give one place in this tool where a regular expression is the right choice.
 
@@ -120,9 +166,31 @@ Splitting the work this way keeps each part simple. The lexer knows how characte
 
 **Where it shows up here.** Some comments are read by tools, not people: Go doc comments above declarations, build constraints, generate directives and linter suppressions. Removing them changes how the program is built or checked.
 
+**How it works.** Most comments are for human readers, and the compiler ignores them. But many toolchains read certain comments as instructions, because a comment is a convenient place to put information without changing the language itself. Such a comment is often called a directive or a pragma.
+
+Several kinds are common. Documentation comments are placed directly above a declaration and are collected by tools into reference documentation; in Go, a doc comment is the group of comment lines immediately before a top-level declaration with no blank line between. Build constraints decide which files are compiled for which platform or configuration; in Go these are go:build lines. Code-generation directives, such as go:generate, tell a tool which command to run to produce source files. Linter directives, such as noqa in Python or nolint in Go, switch off a specific warning on one line.
+
+Tools recognise these comments by two things: position, such as directly above a declaration or at the top of a file, and an exact form, such as a fixed word with no space after the comment marker. A comment remover, formatter or minifier that ignores this can break builds, silence nothing or lose documentation. The safe approach is to find comments with a proper scanner, then examine each comment's text against the exact directive forms, and keep those that match.
+
+**Examples.**
+- Removing a build constraint makes a file meant only for Windows compile on Linux, and the build fails.
+- Stripping noqa comments brings back hundreds of linter warnings that the team had deliberately silenced line by line.
+- Documentation sites generated from code lose their descriptions when doc comments are stripped.
+
+**Misconceptions.**
+- Comments never affect a program. Directives in comments change how it is built, generated and checked.
+- Every comment above a function is documentation. Position rules are strict: a blank line can separate a comment from its declaration.
+- Directives can be found by searching the whole line. They must be matched in comment text found by a real scanner, or a string could be mistaken for one.
+
+**Elsewhere.**
+- License headers and code-coverage exclusions are other comments that tools read.
+- Type checkers in dynamic languages read type hints and ignore markers written as comments.
+- Shebang lines and editor mode lines at the top of scripts are read by the operating system and editors.
+
 **Read.**
-- [Go Doc Comments](https://go.dev/doc/comment) (not opened)
-- [Flake8, selecting and ignoring violations](https://flake8.pycqa.org/en/latest/user/violations.html) (not opened)
+- [Directive (programming) (Wikipedia)](https://en.wikipedia.org/wiki/Directive_(programming))
+- [Go Doc Comments](https://go.dev/doc/comment)
+- [flake8, Selecting and Ignoring Violations](https://flake8.pycqa.org/en/latest/user/violations.html)
 
 **Explain it back.** After running your tool, a Go project fails to build on one operating system, and the linter suddenly reports many warnings. Explain which comments your tool should have kept and how it can recognise them.
 
@@ -180,8 +248,31 @@ the answers, so record which version and settings produced the expected output.
 
 **Where it shows up here.** The rules for Go doc comments are subtle, so you write one test per rule before the code: a one-line doc comment, a three-line one, one separated by a blank line, and a directive.
 
+**How it works.** Test-driven development works in a short loop: write a test for the next small piece of behaviour, run it and watch it fail, write just enough code to make it pass, then tidy the code while the tests stay green. Watching the test fail first proves that it can fail, so it really checks something.
+
+The benefit is mostly about thinking. A test is a precise question: given these inputs, what exactly should come out? Writing it first makes you decide edge cases before you are attached to an implementation: an empty input, a single item, all items equal, input already in order, input in reverse, no common lines at all. Each test then stays as a guard, so a later change that breaks old behaviour is caught at once.
+
+Tests should describe behaviour, not one implementation. When an answer can legitimately vary, such as two longest common subsequences of the same length, the test should check the properties that must hold, its length and that it is a subsequence of both inputs, rather than one exact string. And a single suite that every implementation must pass, for example every sorting algorithm you offer, lets you add or replace an algorithm with confidence. Tests that run the real tool and compare outputs complement these: they find the cases you did not think to write.
+
+**Examples.**
+- A diff tool rewritten for speed passes the old suite on the first run, so the rewrite ships the same day.
+- A test written first for the empty input catches that a sort routine crashes on zero lines.
+- A test that demanded one exact longest common subsequence failed for a correct algorithm that found a different one of the same length.
+
+**Misconceptions.**
+- Tests are written after the code to prove it works. Writing them first shapes what the code must do.
+- A passing test proves the code is right. It proves only the cases it checks.
+- Tests must check exact outputs. When several answers are correct, check the properties instead.
+
+**Elsewhere.**
+- Continuous integration runs the same suites on every change.
+- Refactoring large codebases is only safe with tests guarding behaviour.
+- Library authors publish test suites, like conformance suites, that every implementation must pass.
+
 **Read.**
-- [Test-driven development (Wikipedia)](https://en.wikipedia.org/wiki/Test-driven_development) (not opened)
+- [Test-driven development (Wikipedia)](https://en.wikipedia.org/wiki/Test-driven_development)
+- [Martin Fowler, Test Driven Development](https://martinfowler.com/bliki/TestDrivenDevelopment.html)
+- [Kent Beck, Canon TDD](https://tidyfirst.substack.com/p/canon-tdd)
 
 **Explain it back.** The rules for which Go comments to keep have several edge cases. Explain why writing a test for each rule before the code helps here, and list the cases you would start with.
 

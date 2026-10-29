@@ -101,8 +101,33 @@ still processes the others, and exits with a non-zero status at the end.
 
 **Where it shows up here.** Precedence decides that times and divide bind tighter than plus and minus, and associativity decides that equal operators are worked from left to right, so 10 - 4 - 3 is 3, not 9.
 
+**How it works.** An expression written in one line, such as 1 + 2 * 3, is ambiguous until two rules are fixed. Precedence ranks operators, so times and divide outrank plus and minus and the expression means 1 + (2 * 3), which is 7. Brackets exist to override the ranking when you want the other meaning.
+
+Associativity settles ties between operators of the same rank. Most arithmetic operators are left-associative: 10 - 4 - 3 means (10 - 4) - 3, which is 3, and 8 / 4 / 2 means (8 / 4) / 2, which is 1. Working right to left gives 9 and 4, which is wrong by the usual convention. Raising to a power is normally right-associative, so a power of a power is worked from the top down, because the left-to-right reading would just multiply the exponents.
+
+Unary minus, the minus in -3, is a different operator from subtraction even though it uses the same character. A parser tells them apart by position: a minus at the start, or right after another operator or an opening bracket, is unary.
+
+Every parser that handles infix expressions encodes these two tables somewhere: as levels of rules in a grammar, as numbers in a precedence-climbing or Pratt parser, or as comparisons in the shunting yard algorithm.
+
+**Examples.**
+- Spreadsheets and programming languages disagree on whether minus binds tighter than raising to a power, so -2 squared is 4 in some spreadsheets and -4 in many languages.
+- A shell script that does arithmetic on prices gives a wrong total when a formula relies on left-to-right order that the script author assumed but the tool did not follow.
+- Query languages give AND higher precedence than OR, so a filter written without brackets can match far more rows than intended.
+
+**Misconceptions.**
+- Operators are always worked left to right. Precedence comes first, and only operators of equal rank are worked in the associativity direction.
+- Associativity does not matter for real programs. It changes the result of subtraction, division and powers.
+- The minus sign is one operator. Unary minus and subtraction are different, and a parser has to tell them apart by position.
+
+**Elsewhere.**
+- Boolean conditions in every language: AND binds tighter than OR, which surprises people reading conditions without brackets.
+- Template and query languages, such as SQL WHERE clauses, define their own precedence tables.
+- Any expression parser, from spreadsheets to configuration languages, needs a precedence and associativity table.
+
 **Read.**
-- [Order of operations (Wikipedia)](https://en.wikipedia.org/wiki/Order_of_operations) (not opened)
+- [Order of operations (Wikipedia)](https://en.wikipedia.org/wiki/Order_of_operations)
+- [Operator associativity (Wikipedia)](https://en.wikipedia.org/wiki/Operator_associativity)
+- [Simple but Powerful Pratt Parsing (matklad)](https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html)
 
 **Explain it back.** Two calculators disagree on 8 / 4 / 2 and on 2 - 3 - 4. Explain which answers are right, which rule decides them, and why raising to a power is usually treated the other way round.
 
@@ -115,8 +140,31 @@ still processes the others, and exits with a non-zero status at the end.
 
 **Where it shows up here.** Your calculator rearranges the tokens into postfix order with the shunting yard algorithm and an operator stack, so the evaluator no longer needs to know about precedence or brackets.
 
+**How it works.** Infix notation puts operators between their operands and relies on precedence and brackets. Postfix notation, also called reverse Polish notation, puts each operator after its operands, so 1 + 2 * 3 becomes 1 2 3 times plus. Postfix needs no brackets and no precedence: the order of the list already says what to do.
+
+The shunting yard algorithm, published by Edsger Dijkstra, converts infix to postfix in one left-to-right pass with an output list and an operator stack. Each number goes straight to the output. When an operator arrives, operators already on the stack that should be applied first, those with higher precedence, or equal precedence when the new operator is left-associative, are moved to the output. Then the new operator is pushed. An opening bracket is pushed as a marker. A closing bracket moves operators to the output until the marker appears, and the marker is discarded. When the input ends, the remaining operators are moved to the output.
+
+The name comes from a railway yard: cars, the operators, wait in a siding, the stack, until the rules say they may join the outgoing train. The algorithm also catches some errors on the way, such as a closing bracket with no partner or brackets left on the stack at the end.
+
+**Examples.**
+- Calculator apps and spreadsheet formula engines convert what the user typed into an internal postfix or tree form before evaluating it.
+- Older handheld calculators from some makers asked users to enter postfix directly, which removed the need for brackets and an equals key.
+- Compilers for simple languages use the same idea, or the closely related precedence climbing, to turn expressions into instructions.
+
+**Misconceptions.**
+- Postfix is just infix written backwards. The operands keep their order; only the operators move to after their operands.
+- The algorithm needs to look ahead in the input. It decides each move from the current token and the top of the stack.
+- Brackets end up in the postfix output. They only steer the conversion and are thrown away.
+
+**Elsewhere.**
+- Stack-based virtual machines run postfix-like instruction sequences, so compilers produce this order for expressions.
+- Query planners and rule engines turn infix filter expressions into evaluation trees using the same precedence logic.
+- Pratt parsers and precedence climbing are alternatives built on the same precedence and associativity tables.
+
 **Read.**
-- [Shunting yard algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Shunting_yard_algorithm) (not opened)
+- [Shunting yard algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Shunting_yard_algorithm)
+- [Reverse Polish notation (Wikipedia)](https://en.wikipedia.org/wiki/Reverse_Polish_notation)
+- [Simple but Powerful Pratt Parsing (matklad)](https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html)
 
 **Explain it back.** Explain how the shunting yard algorithm decides when an operator waiting on its stack moves to the output, and how a pair of brackets is handled, so that 1 + 2 * 3 and (1 + 2) * 3 come out in a different order.
 
@@ -129,8 +177,32 @@ still processes the others, and exits with a non-zero status at the end.
 
 **Where it shows up here.** Brackets must pair up. The operator stack in the shunting yard doubles as a bracket matcher: a closing bracket with no partner, or an opening one left over at the end, means invalid input.
 
+**How it works.** Brackets nest: the most recently opened bracket must be the first one closed. A stack captures exactly that rule. Walk the text once. Push each opening bracket, with its position. When a closing bracket appears, pop the top of the stack: if the stack is empty, the closing bracket has no partner; if the popped bracket is a different kind, such as a round one closed by a square one, the pair is wrong. When the text ends, anything left on the stack was opened and never closed.
+
+Counting is not enough. A counter that adds one for each opening bracket and subtracts one for each closing bracket accepts a closing bracket of the wrong kind, and only notices order problems if it checks that the count never goes negative. The stack handles both, and because it stores positions, error messages can point at the exact bracket.
+
+The same pass can record the partner of every bracket. Interpreters and editors use this to jump from a bracket to its match without searching: an interpreter that pairs every loop bracket before running never has to scan the program to find where a loop ends, which turns a slow search on every iteration into a single lookup.
+
+In formal terms, balanced brackets form a language that no regular expression can recognise, because recognising it needs unbounded memory of what is still open. That is why the stack, or recursion, appears.
+
+**Examples.**
+- Code editors highlight the partner of the bracket under the cursor, using pairs worked out by the same stack walk.
+- An interpreter for a language with loop brackets that searches for the matching bracket on every pass becomes dramatically slower on programs with long loops.
+- Configuration and data formats such as JSON reject a document with a missing closing brace, and a good error points at the opening brace that was never closed.
+
+**Misconceptions.**
+- Counting opening and closing brackets is enough. It misses wrong kinds and some wrong orders.
+- A regular expression can check balanced brackets. Arbitrary nesting needs a stack or recursion.
+- Unmatched brackets can only be found while running the program. One pass before running finds them all.
+
+**Elsewhere.**
+- Parsers for every programming language and data format check nesting this way.
+- Editors and formatters use bracket pairs for matching, folding and indentation.
+- HTML and XML validators match opening and closing tags with the same stack discipline.
+
 **Read.**
-- [Stack (abstract data type) (Wikipedia)](https://en.wikipedia.org/wiki/Stack_(abstract_data_type)) (not opened)
+- [Stack (abstract data type) (Wikipedia)](https://en.wikipedia.org/wiki/Stack_(abstract_data_type))
+- [Dyck language (Wikipedia)](https://en.wikipedia.org/wiki/Dyck_language)
 
 **Explain it back.** A user enters (1 + 2)) * (3, and your calculator has to say what is wrong. Explain how a stack finds both problems in one pass, and why simply counting brackets stops working once there are several kinds of bracket.
 
@@ -143,8 +215,33 @@ still processes the others, and exits with a non-zero status at the end.
 
 **Where it shows up here.** The postfix list is evaluated with a stack of numbers: each number is pushed, and each operator pops two operands, applies itself and pushes the result.
 
+**How it works.** Once an expression is in postfix order, evaluating it needs only a stack of values. Read the list from left to right. Push every number. When an operator appears, pop the values it needs, two for a binary operator, apply it, and push the result. When the list ends, exactly one value should remain, and that is the answer.
+
+The order of popping matters. The value on top of the stack is the one pushed last, which is the right-hand operand. So for 10 3 minus, the evaluator pops 3, then 10, and computes 10 - 3. Reversing them silently gives the wrong sign for subtraction and the wrong quotient for division, while addition and multiplication hide the bug because they do not care about order.
+
+The stack also checks the expression. An operator that finds fewer values than it needs means a number was missing, as in a trailing plus. More than one value left at the end means an operator was missing, as in two numbers side by side. Both are reported as invalid input rather than allowed to crash the program.
+
+This is how stack machines work: the Java virtual machine, WebAssembly and many interpreters evaluate expressions by pushing operands and applying instructions that pop and push.
+
+**Examples.**
+- A bug that reverses operands passes every test that only uses plus and times, and is found only when someone subtracts or divides.
+- Stack-based virtual machines, such as the ones behind Java and WebAssembly, run instruction streams in exactly this push and pop pattern.
+- Printers that understand PostScript evaluate a postfix page-description language with an operand stack.
+
+**Misconceptions.**
+- The first value popped is the left operand. It is the right one, because it was pushed last.
+- If evaluation finishes without crashing, the expression was valid. A leftover value on the stack means an operator was missing.
+- Evaluation needs precedence rules again. The postfix order already encodes them.
+
+**Elsewhere.**
+- Virtual machines and bytecode interpreters evaluate expressions on an operand stack.
+- Undo histories, call stacks and parsers all rely on the same last-in, first-out discipline.
+- Reverse Polish calculators let users drive the stack directly.
+
 **Read.**
-- [Reverse Polish notation (Wikipedia)](https://en.wikipedia.org/wiki/Reverse_Polish_notation) (not opened)
+- [Reverse Polish notation (Wikipedia)](https://en.wikipedia.org/wiki/Reverse_Polish_notation)
+- [Stack machine (Wikipedia)](https://en.wikipedia.org/wiki/Stack_machine)
+- [Crafting Interpreters, A Virtual Machine](https://craftinginterpreters.com/a-virtual-machine.html)
 
 **Explain it back.** Your evaluator turns the postfix list 10 3 minus into -7. Explain how a stack evaluates postfix, what went wrong here, and how the same stack tells you that an expression was malformed.
 
@@ -230,8 +327,31 @@ The position that is reported should be where the rule broke, not where the prog
 
 **Where it shows up here.** The challenge asks you to write tests before the code and keep them running on every change, so each new rule, such as precedence, brackets or errors, arrives with its own test.
 
+**How it works.** Test-driven development works in a short loop: write a test for the next small piece of behaviour, run it and watch it fail, write just enough code to make it pass, then tidy the code while the tests stay green. Watching the test fail first proves that it can fail, so it really checks something.
+
+The benefit is mostly about thinking. A test is a precise question: given these inputs, what exactly should come out? Writing it first makes you decide edge cases before you are attached to an implementation: an empty input, a single item, all items equal, input already in order, input in reverse, no common lines at all. Each test then stays as a guard, so a later change that breaks old behaviour is caught at once.
+
+Tests should describe behaviour, not one implementation. When an answer can legitimately vary, such as two longest common subsequences of the same length, the test should check the properties that must hold, its length and that it is a subsequence of both inputs, rather than one exact string. And a single suite that every implementation must pass, for example every sorting algorithm you offer, lets you add or replace an algorithm with confidence. Tests that run the real tool and compare outputs complement these: they find the cases you did not think to write.
+
+**Examples.**
+- A diff tool rewritten for speed passes the old suite on the first run, so the rewrite ships the same day.
+- A test written first for the empty input catches that a sort routine crashes on zero lines.
+- A test that demanded one exact longest common subsequence failed for a correct algorithm that found a different one of the same length.
+
+**Misconceptions.**
+- Tests are written after the code to prove it works. Writing them first shapes what the code must do.
+- A passing test proves the code is right. It proves only the cases it checks.
+- Tests must check exact outputs. When several answers are correct, check the properties instead.
+
+**Elsewhere.**
+- Continuous integration runs the same suites on every change.
+- Refactoring large codebases is only safe with tests guarding behaviour.
+- Library authors publish test suites, like conformance suites, that every implementation must pass.
+
 **Read.**
-- [Test-driven development (Wikipedia)](https://en.wikipedia.org/wiki/Test-driven_development) (not opened)
+- [Test-driven development (Wikipedia)](https://en.wikipedia.org/wiki/Test-driven_development)
+- [Martin Fowler, Test Driven Development](https://martinfowler.com/bliki/TestDrivenDevelopment.html)
+- [Kent Beck, Canon TDD](https://tidyfirst.substack.com/p/canon-tdd)
 
 **Explain it back.** You add brackets, and three earlier examples quietly start giving wrong answers. Explain how writing tests first and running them on every change would have caught this, and what makes a good set of test cases for a calculator.
 

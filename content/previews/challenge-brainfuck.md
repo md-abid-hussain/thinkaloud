@@ -18,9 +18,33 @@ With so few commands you can write a working interpreter in an afternoon, and th
 
 **Where it shows up here.** Your first ccbf reads the program one command at a time with a program counter, does what the command says to the tape, and moves on, skipping every character that is not a command.
 
+**How it works.** An interpreter runs a program directly, without first turning it into machine code. At its heart is one loop, often called the fetch, decode, execute cycle, the same cycle a processor runs in hardware. A program counter says where in the program the interpreter is. Each turn of the loop fetches the instruction there, decodes it to decide what it means, executes it by changing the program's state, and advances the counter, or sets it somewhere else for a jump.
+
+The state an interpreter changes depends on the language. For Brainfuck it is a tape of cells and a data pointer; for a stack language it is a stack; for a language with variables it is an environment that maps names to values.
+
+The loop's overhead is paid for every instruction executed, not every instruction written. A loop body that runs a million times is fetched and decoded a million times. If the interpreter works on raw source text, it also skips comments and searches for jump targets over and over. That is why a direct interpreter is simple and easy to trust but slow, and why faster interpreters move work out of the loop: they translate the source once into a compact form such as bytecode, work out jump targets in advance, and combine common sequences into single instructions.
+
+The opposite approach, compiling ahead of time to machine code, removes the decoding from run time entirely, at the cost of a translation step before the program can start.
+
+**Examples.**
+- Early versions of many scripting languages walked the source or a syntax tree directly, and later versions gained large speed-ups by compiling to bytecode first.
+- A Brainfuck interpreter that reads the text character by character spends much of its time skipping comments and searching for brackets rather than doing the program's work.
+- Emulators for old game consoles run a fetch, decode, execute loop over the original machine's instructions.
+
+**Misconceptions.**
+- Interpreters are slow because the language is slow. Much of the cost is the loop's overhead, which better designs reduce.
+- Interpreting and compiling are opposites with nothing between. Most real systems compile to bytecode and then interpret that.
+- The cost of an instruction is paid once. It is paid every time the instruction is executed.
+
+**Elsewhere.**
+- Language runtimes for Python, Ruby and Lua run a bytecode interpreter loop.
+- Processors run the same fetch, decode, execute cycle in hardware.
+- Rule engines and template engines interpret their own small languages with the same structure.
+
 **Read.**
-- [Interpreter (computing) (Wikipedia)](https://en.wikipedia.org/wiki/Interpreter_(computing)) (not opened)
-- [Brainfuck (Wikipedia)](https://en.wikipedia.org/wiki/Brainfuck) (not opened)
+- [Interpreter (computing) (Wikipedia)](https://en.wikipedia.org/wiki/Interpreter_(computing))
+- [Instruction cycle (Wikipedia)](https://en.wikipedia.org/wiki/Instruction_cycle)
+- [Crafting Interpreters, A Virtual Machine](https://craftinginterpreters.com/a-virtual-machine.html)
 
 **Explain it back.** Explain what a simple interpreter does on every turn of its main loop, using Brainfuck as the example, and why it is usually much slower than the same program compiled ahead of time.
 
@@ -29,11 +53,35 @@ With so few commands you can write a working interpreter in an afternoon, and th
 - [ ] Without preparation, a jump at a bracket means searching for the matching bracket each time
 - [ ] Compiling does the decoding and the searching once, before the program runs, so running only does the work itself
 
-### 2. tape-memory-model
+### 2. A tape of cells as memory
 
 **Where it shows up here.** The program works on 30,000 cells that start at zero, a data pointer that moves left and right, and one byte per cell, so you choose what happens at the tape's ends and when a cell goes past 255 or below 0.
 
+**How it works.** A memory model says what the program's memory is and what happens at its limits. Brainfuck's model is deliberately tiny: a row of cells, traditionally 30,000 of them, each starting at zero, and a data pointer that points at one cell. Commands move the pointer one cell left or right, add or subtract one from the current cell, read a byte of input into it or write it as output, and loop while it is non-zero. It is close to the tape of a Turing machine, which is why such a small language can still compute anything.
+
+Because the original description left the limits open, interpreters differ, and those differences are part of the model. The first is cell size: most use one byte per cell, where adding one to 255 wraps round to 0 and subtracting one from 0 gives 255, but some use larger cells that do not wrap. Many programs depend on wrapping, for example to clear a cell by adding until it reaches zero. The second is the tape's edges: moving left of the first cell or past the last can be an error, wrap to the other end, or grow the tape. The third is end of input: reading when no input is left may leave the cell unchanged, set it to 0, or set it to 255.
+
+A portable interpreter picks the most common conventions, thirty thousand wrapping byte cells and an error or growth at the edges, and documents each choice, so users know which programs it will run as their authors intended.
+
+**Examples.**
+- A program that clears a cell by adding one until it reaches zero runs forever on an interpreter whose cells do not wrap.
+- A program that reads input until a zero byte appears loops forever on an interpreter that leaves the cell unchanged at the end of input.
+- Integer overflow in other languages, where a counter wraps from the largest value to the smallest, is the same choice made for every number.
+
+**Misconceptions.**
+- There is one correct Brainfuck behaviour. The original left cell size, tape ends and end of input open, so interpreters differ.
+- Wrapping is a bug to avoid. Many programs rely on it on purpose.
+- A larger tape is always better. Growing without limit lets a runaway program use all memory, so a limit can be a feature.
+
+**Elsewhere.**
+- Every language defines what happens when a number overflows: wrapping, an error or a larger type.
+- Virtual machines define their memory model, such as how much memory a program may use and what happens past its end.
+- Turing machines, the theoretical model of computation, use the same idea of a tape and a head.
+
 **Read.**
+- [Brainfuck (Wikipedia)](https://en.wikipedia.org/wiki/Brainfuck)
+- [brainfuck (Esolang wiki)](https://esolangs.org/wiki/Brainfuck)
+- [Turing machine (Wikipedia)](https://en.wikipedia.org/wiki/Turing_machine)
 
 **Explain it back.** A Brainfuck program written for another interpreter prints garbage on yours. Explain which memory-model choices differ between interpreters, and how each can change what a program does.
 
@@ -46,8 +94,32 @@ With so few commands you can write a working interpreter in an afternoon, and th
 
 **Where it shows up here.** Loops are square brackets, so every opening bracket needs its partner, including nested loops. You pair them all with a stack before running, and refuse a program whose brackets do not balance.
 
+**How it works.** Brackets nest: the most recently opened bracket must be the first one closed. A stack captures exactly that rule. Walk the text once. Push each opening bracket, with its position. When a closing bracket appears, pop the top of the stack: if the stack is empty, the closing bracket has no partner; if the popped bracket is a different kind, such as a round one closed by a square one, the pair is wrong. When the text ends, anything left on the stack was opened and never closed.
+
+Counting is not enough. A counter that adds one for each opening bracket and subtracts one for each closing bracket accepts a closing bracket of the wrong kind, and only notices order problems if it checks that the count never goes negative. The stack handles both, and because it stores positions, error messages can point at the exact bracket.
+
+The same pass can record the partner of every bracket. Interpreters and editors use this to jump from a bracket to its match without searching: an interpreter that pairs every loop bracket before running never has to scan the program to find where a loop ends, which turns a slow search on every iteration into a single lookup.
+
+In formal terms, balanced brackets form a language that no regular expression can recognise, because recognising it needs unbounded memory of what is still open. That is why the stack, or recursion, appears.
+
+**Examples.**
+- Code editors highlight the partner of the bracket under the cursor, using pairs worked out by the same stack walk.
+- An interpreter for a language with loop brackets that searches for the matching bracket on every pass becomes dramatically slower on programs with long loops.
+- Configuration and data formats such as JSON reject a document with a missing closing brace, and a good error points at the opening brace that was never closed.
+
+**Misconceptions.**
+- Counting opening and closing brackets is enough. It misses wrong kinds and some wrong orders.
+- A regular expression can check balanced brackets. Arbitrary nesting needs a stack or recursion.
+- Unmatched brackets can only be found while running the program. One pass before running finds them all.
+
+**Elsewhere.**
+- Parsers for every programming language and data format check nesting this way.
+- Editors and formatters use bracket pairs for matching, folding and indentation.
+- HTML and XML validators match opening and closing tags with the same stack discipline.
+
 **Read.**
-- [Stack (abstract data type) (Wikipedia)](https://en.wikipedia.org/wiki/Stack_(abstract_data_type)) (not opened)
+- [Stack (abstract data type) (Wikipedia)](https://en.wikipedia.org/wiki/Stack_(abstract_data_type))
+- [Dyck language (Wikipedia)](https://en.wikipedia.org/wiki/Dyck_language)
 
 **Explain it back.** Your interpreter scans forward for the matching bracket on every pass through a loop, and a program with long nested loops runs painfully slowly. Explain why, how pairing every bracket once before running fixes it, and how the same pass finds unbalanced brackets.
 
@@ -60,8 +132,33 @@ With so few commands you can write a working interpreter in an afternoon, and th
 
 **Where it shows up here.** Instead of interpreting the source text, ccbf compiles it to a list of instructions with comments removed and jump targets worked out, and a small virtual machine runs that list.
 
+**How it works.** Bytecode is a compact, regular list of instructions designed to be run by a virtual machine rather than a physical processor. A bytecode compiler reads the source once and translates it: comments and whitespace disappear, each operation becomes an instruction, and anything that can be worked out in advance is attached as an operand. For Brainfuck that means one instruction per command, with each loop bracket carrying the position of its partner.
+
+The virtual machine that runs bytecode is an interpreter loop, but a much cheaper one. It never skips text, never searches for a matching bracket and never re-parses anything. It fetches an instruction, uses its kind to choose an action, and acts, often with the operand already in hand.
+
+The split between compiling and running has a further benefit. The instruction list is data that the compiler can inspect and improve before it runs: merging repeated instructions, replacing common patterns with dedicated ones, and removing work that has no effect. This is where optimisation lives in most language implementations. Some go further and compile hot bytecode to machine code while the program runs, which is called just-in-time compilation.
+
+Bytecode can also be saved, so later runs skip the translation step, and it can be made independent of the processor, so the same compiled program runs anywhere the virtual machine does.
+
+**Examples.**
+- Java compiles source to bytecode once, and the same class files run on any machine with a Java virtual machine.
+- Python compiles each module to bytecode and caches it, so the next run starts faster.
+- A Brainfuck program compiled to bytecode with jump targets resolved runs much faster than the same program interpreted from its text.
+
+**Misconceptions.**
+- Bytecode is machine code. It is run by a virtual machine, not directly by the processor.
+- Compiling to bytecode means the program is no longer interpreted. The virtual machine interprets the bytecode, just far more cheaply.
+- Optimisation needs a full compiler. Even a simple instruction list can be improved before it runs.
+
+**Elsewhere.**
+- Language runtimes such as the Java virtual machine, Python, Lua and WebAssembly engines run bytecode.
+- Database engines compile queries into an internal program of operations before executing them.
+- Regular-expression engines often compile a pattern into a small instruction program for a matching machine.
+
 **Read.**
-- [Bytecode (Wikipedia)](https://en.wikipedia.org/wiki/Bytecode) (not opened)
+- [Bytecode (Wikipedia)](https://en.wikipedia.org/wiki/Bytecode)
+- [Crafting Interpreters, Chunks of Bytecode](https://craftinginterpreters.com/chunks-of-bytecode.html)
+- [Crafting Interpreters, A Virtual Machine](https://craftinginterpreters.com/a-virtual-machine.html)
 
 **Explain it back.** Explain what changes when an interpreter first compiles a program to bytecode and then runs the bytecode, and what an instruction can carry that the raw source text cannot.
 
@@ -74,8 +171,30 @@ With so few commands you can write a working interpreter in an afternoon, and th
 
 **Where it shows up here.** You shrink the instruction list by merging runs of the same command and replacing common loop patterns, such as the clear-cell loop, with one instruction, checking that the output never changes.
 
+**How it works.** Peephole optimisation looks at the instruction list through a small window, a few instructions at a time, and replaces patterns with cheaper equivalents. It needs no deep analysis of the whole program; it relies on local facts that are always true.
+
+Two kinds of rewrite cover most of the gain for simple languages. Merging replaces a run of identical instructions with one instruction and a count: ten pluses become add ten, and five moves right become move five. Pattern replacement recognises a short sequence whose overall effect is known and emits a dedicated instruction instead: a loop whose body only subtracts one from the current cell always ends with that cell at zero, so the whole loop becomes set to zero. Larger patterns, such as a loop that moves a value from one cell to another, can become a single copy instruction.
+
+Every rewrite has to be safe: it must have exactly the same effect for every possible state, not just the states seen in tests. A loop that adds one ends at zero only if cells wrap, so that rewrite depends on the memory model. Rewrites also move instructions, so jump targets must be worked out again after the list changes. The reliable way to check is to run the same programs with and without optimisation and compare the output byte for byte, and to measure the time before and after, because some rewrites cost more than they save.
+
+**Examples.**
+- Merging repeated commands and clearing loops makes typical Brainfuck programs run several times faster without changing their output.
+- Compilers replace multiplication by a power of two with a shift, and remove an instruction that loads a value that is already loaded.
+- A rewrite that assumed wrapping cells silently broke a program on an interpreter that used larger cells.
+
+**Misconceptions.**
+- An optimisation that passes the tests is safe. It must be correct for every possible state, not just the tested ones.
+- Optimising only makes code faster. A wrong rewrite changes behaviour, so the output must be compared as well as the time.
+- Jump targets survive rewriting. Changing the list moves instructions, so jumps must be resolved again.
+
+**Elsewhere.**
+- Production compilers run many peephole passes over their intermediate code and machine code.
+- Query optimisers rewrite query plans with equivalence rules in the same spirit.
+- Build tools and minifiers rewrite code into shorter equivalent forms.
+
 **Read.**
-- [Peephole optimization (Wikipedia)](https://en.wikipedia.org/wiki/Peephole_optimization) (not opened)
+- [Peephole optimization (Wikipedia)](https://en.wikipedia.org/wiki/Peephole_optimization)
+- [Nayuki, Optimizing brainfuck compiler](https://www.nayuki.io/page/optimizing-brainfuck-compiler)
 
 **Explain it back.** Explain how merging runs of plus signs and recognising the clear-cell loop can make a program several times faster, and what you must check to be sure an optimisation never changes the output.
 

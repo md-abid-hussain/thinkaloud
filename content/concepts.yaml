@@ -437,12 +437,52 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A site generator treats folders as its data model. Content holds what the author writes, themes hold how pages
-      look, and the output folder holds what gets published. Keeping them apart lets each change without touching the
-      others, and lets the output be rebuilt from the other two.
+      A static site generator uses folder conventions as its data model: sources, templates and output each live in a
+      fixed place, so a file's location decides what it is and where it appears on the site.
     resources:
-      - title: Hugo, directory structure
+      - title: Hugo, Directory structure
         url: https://gohugo.io/getting-started/directory-structure/
+        opened: true
+      - title: Jekyll, Directory Structure
+        url: https://jekyllrb.com/docs/structure/
+        opened: true
+      - title: Static site generator (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Static_site_generator
+        opened: true
+    lesson:
+      how_it_works: >-
+        Many tools avoid configuration by agreeing on where things live. A static site generator typically has a
+        folder of content written in Markdown, a folder of themes or templates that decide how pages look, a folder of
+        static files such as images and stylesheets copied as they are, and an output folder where the finished HTML
+        is written. The structure itself carries meaning: a page at content/blog/first.md becomes the address
+        blog/first on the site, without any list of pages to maintain.
+
+
+        This is called convention over configuration. It makes a new project quick to start, makes every project look
+        the same to anyone who has used the tool, and lets commands such as new page or build work without being told
+        where anything is.
+
+
+        The most important convention is that sources and output are separate. Output is derived data: it can always
+        be produced again from the sources. Keeping it in its own folder means it can be deleted and rebuilt at any
+        time, excluded from version control, and never mistaken for content. When output is written among the sources,
+        the next build may read its own previous output as new content, people may edit generated files by hand and
+        lose the edits on the next build, and generated files end up committed by accident.
+      examples:
+        - Hugo and Jekyll both define a fixed directory structure, and a page's path in the content folder becomes its
+          address.
+        - A project that wrote generated HTML next to its Markdown ended up publishing pages built from earlier
+          generated pages.
+        - Build tools for many languages keep sources in one folder and compiled output in another that is ignored by
+          version control.
+      misconceptions:
+        - Folder layout is just tidiness. In these tools it is the data model that decides what each file is.
+        - Generated files are part of the project's sources. They are derived and should be rebuildable at any moment.
+        - Conventions limit what you can build. They remove decisions you would otherwise make for every project.
+      elsewhere:
+        - Web frameworks use folder conventions for routes, so a file's path becomes a URL.
+        - Language build tools separate source folders from build output folders.
+        - Version control ignore files exist largely to keep derived output out of the repository.
 
   - slug: cli-subcommands
     name: Command-line arguments and exit codes
@@ -566,15 +606,57 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A Markdown renderer works in two layers. It finds the block structure first, such as headings and paragraphs,
-      then handles inline marks such as emphasis and links inside each block. The result is written out as HTML
-      elements.
+      Markdown is a lightweight markup language that converts to HTML. Doing it reliably is parsing: block structure
+      first, then inline marks, following a precise specification such as CommonMark.
     related: [ explicit-charsets ]
     resources:
-      - title: CommonMark specification
+      - title: CommonMark Spec
         url: https://spec.commonmark.org/
-      - title: Markdown syntax (Daring Fireball)
+        opened: true
+      - title: Daring Fireball, Markdown Syntax Documentation
         url: https://daringfireball.net/projects/markdown/syntax
+        opened: true
+      - title: CommonMark, Markdown Reference
+        url: https://commonmark.org/help/
+        opened: true
+    lesson:
+      how_it_works: >-
+        Markdown lets people write formatted text with plain characters: a line starting with a hash is a heading, a
+        blank line separates paragraphs, a line starting with a dash is a list item, and stars or underscores mark
+        emphasis. A converter turns this into HTML elements: headings, paragraphs, lists, emphasis, links and code
+        blocks.
+
+
+        The original description of Markdown was informal and left many cases open. How much indentation turns a line
+        into a code block? Does a list need a blank line before it? What happens when emphasis markers overlap?
+        Different tools answered differently, so the same document could render as a list in one and as a paragraph in
+        another. CommonMark was created to fix this: it is a precise specification with hundreds of numbered examples
+        showing input and exact expected HTML, and most modern converters follow it.
+
+
+        A correct converter works in two phases, like a parser. First it finds the blocks: it reads the document line
+        by line and decides which lines form headings, paragraphs, lists, quotes and code blocks, including blocks
+        nested inside others. Then it processes the inline content of each block, finding emphasis, links and inline
+        code. Doing it with a series of search-and-replace patterns breaks on nesting and edge cases.
+
+
+        The resulting HTML is markup, which matters for safety: if authors are not trusted, raw HTML inside Markdown
+        must be filtered.
+      examples:
+        - A README renders as a neat list on one hosting site and as a single run-on paragraph on another because
+          their converters disagree on a blank line.
+        - Documentation tools, forums and chat apps all convert Markdown to HTML, usually following CommonMark or a
+          close variant.
+        - A comment system that allowed raw HTML inside Markdown let users inject scripts into other people's pages.
+      misconceptions:
+        - Markdown has one agreed definition. The original was informal; CommonMark is the precise version most tools
+          follow.
+        - Converting Markdown is a few search-and-replace rules. Nesting and edge cases need a real two-phase parse.
+        - Markdown output is always safe. Markdown allows raw HTML, which must be filtered for untrusted authors.
+      elsewhere:
+        - Code hosting sites, wikis and note-taking apps render Markdown.
+        - Documentation generators turn Markdown or similar markup into whole websites.
+        - Chat and forum software convert user Markdown to HTML and sanitise it.
 
   - slug: output-escaping
     name: Escaping text inserted into HTML
@@ -582,11 +664,55 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Text placed into HTML must be escaped, so that characters such as <, > and & show as text and are not read as
-      markup. Escape plain values at the point they are inserted, and leave alone text that is already HTML.
+      Text inserted into HTML must have its special characters replaced with character references, or the browser
+      reads them as markup, breaking the page or running an attacker's script.
     resources:
       - title: OWASP, Cross Site Scripting Prevention Cheat Sheet
         url: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+        opened: true
+      - title: MDN, Character reference
+        url: https://developer.mozilla.org/en-US/docs/Glossary/Character_reference
+        opened: true
+      - title: OWASP, Cross Site Scripting (XSS)
+        url: https://owasp.org/www-community/attacks/xss/
+        opened: true
+    lesson:
+      how_it_works: >-
+        HTML gives a few characters special meaning. A less-than sign starts a tag, an ampersand starts a character
+        reference, and quotes end attribute values. When plain text is inserted into HTML without change, any of these
+        characters in the text are read as markup. At best the page layout breaks; at worst, a value containing a
+        script tag is run by every reader's browser. That second case is called cross-site scripting, and it lets an
+        attacker act as the reader on the site.
+
+
+        Escaping replaces each special character with a character reference that displays the same character without
+        its markup meaning: the less-than sign becomes ampersand-l-t-semicolon, the ampersand becomes
+        ampersand-a-m-p-semicolon, and quotes become their own references. The browser shows the original text, and
+        nothing is interpreted.
+
+
+        The right escaping depends on where the value lands. Text between tags needs the less-than sign and ampersand
+        escaped. A value inside an attribute also needs quotes escaped, and the attribute must be quoted. Values
+        placed inside scripts, styles or addresses need different rules again, which is why the safest designs avoid
+        putting untrusted text there at all.
+
+
+        The other half of the rule is knowing what is already HTML. Rendered Markdown is markup on purpose and must
+        not be escaped, or readers see tags as text. A design that keeps track of which values are text and which are
+        markup, and escapes text at the moment it is inserted, prevents both mistakes.
+      examples:
+        - A page titled with an ampersand and a less-than sign broke a site's layout because the title went into the
+          page without escaping.
+        - A guest author put a script tag in a post title, and every visitor's browser ran it.
+        - Escaping the rendered Markdown body by mistake made readers see angle-bracket tags instead of formatted text.
+      misconceptions:
+        - Only user input needs escaping. Any text from outside the template, including your own content files, does.
+        - One escaping function fits everywhere. Text, attributes, scripts and addresses each need their own rules.
+        - Escaping everything is safe. Escaping a value that is meant to be HTML breaks it.
+      elsewhere:
+        - Web frameworks escape template values by default for exactly this reason.
+        - SQL uses parameters instead of pasting values into queries, the same idea for a different language.
+        - Shell commands and log files need their own escaping when untrusted text is inserted.
 
   - slug: template-substitution
     name: Template substitution
@@ -594,13 +720,55 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A template is text with named holes, such as {{ Title }}. Filling it in one pass over the template, instead of
-      one replace per name, keeps text that merely looks like a placeholder inside a value from being filled in a
-      second time.
-    prerequisites: [ markup-to-html, output-escaping ]
+      A template is a document with placeholders that are filled with values. Correct substitution reads the template
+      once, inserts each value exactly once, and escapes values according to where they land.
+    prerequisites:
+      - markup-to-html
+      - output-escaping
     resources:
-      - title: Hugo, introduction to templating
+      - title: Template processor (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Template_processor
+        opened: true
+      - title: mustache(5), Logic-less templates
+        url: https://mustache.github.io/mustache.5.html
+        opened: true
+      - title: Hugo, Introduction to templating
         url: https://gohugo.io/templates/introduction/
+        opened: true
+    lesson:
+      how_it_works: >-
+        A template separates what a page looks like from what it says. The theme provides an HTML page with
+        placeholders, often written in double braces, for things such as the title and the content. The build replaces
+        each placeholder with a value for the page being generated.
+
+
+        The safe way to substitute is a single pass. Read the template from start to end, copying text to the output,
+        and each time a placeholder appears, write its value and continue after the placeholder. Inserted values are
+        never scanned again. Substituting one placeholder after another with repeated replace operations instead
+        re-scans text that was already inserted: if a page's own text contains the name of another placeholder, it
+        gets replaced too, and a page can end up containing its own body twice, or worse, text an author did not
+        intend.
+
+
+        Two more decisions make templates robust. The first is what to do with a placeholder the template uses but no
+        value exists for: silently writing nothing hides typos in themes, so many engines report it or show a visible
+        marker. The second is escaping: a value that is plain text, such as a title, must be escaped for HTML when it
+        is inserted, while a value that is already HTML, such as rendered Markdown, must be inserted as it is.
+        Template engines usually escape by default and need an explicit mark for trusted HTML.
+      examples:
+        - A blog post that quoted the theme's own placeholder syntax came out with its body pasted in a second time.
+        - Email templates with a misspelled placeholder sent customers messages with a blank where their name should
+          be.
+        - Template engines used by web frameworks escape inserted text by default to prevent script injection.
+      misconceptions:
+        - Replacing each placeholder in turn is the same as substituting once. Repeated replacing re-scans inserted
+          text.
+        - Missing values should quietly become empty. That hides typos in templates.
+        - Every value should be inserted the same way. Text needs escaping, while trusted HTML must not be escaped.
+      elsewhere:
+        - Web frameworks render HTML pages from templates on every request.
+        - Email, invoice and report generators fill templates with data.
+        - Configuration tools and deployment systems fill templated configuration files with values.
 
   - slug: build-pipeline
     name: Build pipeline
@@ -608,13 +776,54 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A build reads inputs, transforms them and writes outputs, and the same inputs should always give the same
-      output. Writing everything into a freshly cleared output folder, instead of editing files in place, keeps stale
-      files out and makes the result safe to publish as a whole.
-    prerequisites: [ site-directory-layout ]
+      A build turns sources into output through a fixed sequence of stages. A good build is repeatable and complete:
+      its output depends only on the current sources, with nothing stale left behind.
+    prerequisites:
+      - site-directory-layout
     resources:
       - title: Static site generator (Wikipedia)
         url: https://en.wikipedia.org/wiki/Static_site_generator
+        opened: true
+      - title: Make (software) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Make_(software)
+        opened: true
+      - title: Idempotence (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Idempotence
+        opened: true
+    lesson:
+      how_it_works: >-
+        A build pipeline is the sequence of steps that turns sources into output. For a static site it is: find every
+        content file, read it, convert its Markdown to HTML, fill the template, and write the result to the output
+        folder, alongside copies of static files such as images.
+
+
+        Two properties make a build trustworthy. It should be repeatable: running it twice on the same sources gives
+        the same output, so the result never depends on what happened before. And it should be complete: the output
+        reflects exactly the current sources. A build that only writes files and never removes them fails the second
+        test, because when a page is renamed or deleted, its old output stays and is published. The simple fix is a
+        clean build that clears the output folder first. The faster fix, used by large sites, is to track which output
+        came from which source and remove the outputs whose sources are gone.
+
+
+        Splitting the pipeline into clear stages with simple inputs and outputs helps in three ways. Each stage can be
+        tested on its own. A failure points at one stage. And incremental builds become possible: if nothing a page
+        depends on has changed, its stage can be skipped. Incremental builds need dependency tracking, since a page
+        depends not only on its own file but also on the template, and a template change must rebuild every page.
+      examples:
+        - A renamed page stayed online under its old address for months because the build never removed old output.
+        - Make and similar build tools rebuild only targets whose sources changed, using timestamps and declared
+          dependencies.
+        - A site that rebuilt only changed pages showed old navigation everywhere after the template changed, because
+          pages were not marked as depending on it.
+      misconceptions:
+        - If the build succeeded, the output is correct. Stale files from earlier builds can remain.
+        - A clean build is wasteful. It is the simplest way to be sure the output matches the sources; incremental
+          builds are an optimisation.
+        - A page depends only on its own source file. It also depends on templates and shared data.
+      elsewhere:
+        - Compilers and bundlers run multi-stage build pipelines.
+        - Continuous integration runs builds from a clean checkout to be sure they are repeatable.
+        - Data pipelines transform raw data into reports through similar stages.
 
   - slug: static-file-serving
     name: Serving static files over HTTP
@@ -687,12 +896,18 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A tool can notice file changes by polling modification times on a timer, or by asking the operating system for
-      change notifications. Notifications are faster and cheaper but platform-specific, and they often arrive in
-      bursts, so a tool waits briefly (debouncing) before it acts.
+      Development tools learn about file changes from operating-system notifications or by polling modification times.
+      Raw events arrive in bursts and miss new folders unless the watcher handles both.
     resources:
       - title: inotify(7), Linux manual page
         url: https://man7.org/linux/man-pages/man7/inotify.7.html
+        opened: true
+      - title: inotify (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Inotify
+        opened: true
+      - title: Microsoft Learn, ReadDirectoryChangesW function
+        url: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw
+        opened: true
       - title: WatchService (Javadoc)
         url: https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/WatchService.html
         language: java
@@ -703,6 +918,40 @@ concepts:
           subdirectories, so register each one yourself, for example while walking the tree with Files.walkFileTree.
           WatchService.take waits for the next batch of events, and WatchKey.reset must be called afterwards or the
           key stops delivering. On some platforms the built-in implementation polls, so changes can arrive late.
+    lesson:
+      how_it_works: >-
+        A tool that rebuilds when files change needs to know when they change. There are two ways. Polling checks the
+        files' modification times every so often: simple, portable and reliable, but slower to react and wasteful on
+        large trees. Notification asks the operating system to report changes as they happen: Linux has inotify, macOS
+        has FSEvents and Windows has ReadDirectoryChangesW. Notifications are fast and cheap, but each has its own
+        rules.
+
+
+        Three practical problems appear with notifications. First, one save is rarely one event. Many editors save
+        safely by writing a temporary file and renaming it over the original, and they may also update metadata, so a
+        single save produces a burst of create, modify and rename events. Reacting to each event rebuilds several
+        times. The fix is to debounce: wait until no events have arrived for a short quiet period, such as a tenth of
+        a second, then rebuild once. Second, watches are often per folder. A new subfolder may not be watched until
+        the tool adds it, so new pages there are missed unless the watcher notices new folders or falls back to
+        polling. Third, the tool's own output must be excluded, or writing the build output triggers another build,
+        endlessly.
+
+
+        Notifications can also be lost when many changes happen at once, so robust tools occasionally rescan to catch
+        up.
+      examples:
+        - A development server rebuilt a site three times for every save because the editor wrote a temporary file,
+          renamed it and touched the metadata.
+        - A watcher that wrote its output inside a watched folder rebuilt itself in an endless loop.
+        - Test runners re-run tests on save using the same watching techniques.
+      misconceptions:
+        - One save produces one change event. It usually produces several.
+        - Watching a folder covers everything inside it forever. New subfolders may need to be added explicitly.
+        - Notifications are never lost. Under heavy load they can be, so tools rescan from time to time.
+      elsewhere:
+        - Build tools, test runners and bundlers in watch mode rely on file notifications.
+        - File synchronisation services watch folders to upload changes.
+        - Editors notice when another program changes a file they have open.
 
   - slug: live-reload-push
     name: Pushing a reload to the browser
@@ -710,13 +959,57 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A page cannot know that the server rebuilt it unless something tells it. The development server keeps a
-      connection open, for example with server-sent events, and sends a message after each rebuild. A small script
-      added to pages in development only then reloads the browser.
-    prerequisites: [ static-file-serving, file-watching ]
+      HTTP lets only the browser start a request, so to push a reload the page first opens a long-lived connection,
+      such as server-sent events, and the server sends a message on it after each rebuild.
+    prerequisites:
+      - static-file-serving
+      - file-watching
     resources:
       - title: MDN, Using server-sent events
         url: https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
+        opened: true
+      - title: HTML Standard, Server-sent events
+        url: https://html.spec.whatwg.org/multipage/server-sent-events.html
+        opened: true
+      - title: MDN, WebSocket API
+        url: https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API
+        opened: true
+    lesson:
+      how_it_works: >-
+        Ordinary HTTP is request and response: the browser asks and the server answers. A server cannot reach out to a
+        browser on its own, so to tell an open page that the site has changed, the page must first open a connection
+        that stays open.
+
+
+        Server-sent events are the simplest way. The page runs a small script that opens a connection to a special
+        address on the development server. The server keeps the response open and writes a short text message down it
+        whenever it wants, and the browser delivers each message to the script. After a rebuild, the server sends a
+        reload message and the script reloads the page. If the connection drops, for example because the server
+        restarted, the browser reconnects automatically. WebSockets offer a two-way channel and work too, but are more
+        than a reload signal needs.
+
+
+        The reload script belongs only to development. A good design adds it while serving, for instance by inserting
+        a script tag into each HTML page as the development server sends it, and never writes it into the files the
+        build produces. A published site that carried the script would keep trying to connect to a server that does
+        not exist, filling readers' browsers with errors.
+
+
+        Two details help: send the reload only after the build has finished writing, and tell the browser not to cache
+        the pages during development, or it may reload an old copy.
+      examples:
+        - Front-end development servers reload or patch the page in the browser a moment after a file is saved.
+        - A site accidentally published with its live-reload script made every visitor's browser retry a connection to
+          a missing development server.
+        - Dashboards use server-sent events to push new numbers to open pages without the page asking repeatedly.
+      misconceptions:
+        - The server can simply tell the browser to reload. HTTP needs the browser to open the connection first.
+        - A WebSocket is required. Server-sent events are simpler and enough for a one-way reload signal.
+        - Adding the script to the template is fine. It must be added only by the development server.
+      elsewhere:
+        - Live dashboards, notifications and progress updates use server-sent events or WebSockets.
+        - Chat applications keep long-lived connections to receive messages as they arrive.
+        - Streaming responses from AI services are often delivered as server-sent events.
 
   # ---- added for wave 1: text tools (cut, grep) ----
   - slug: delimited-fields
@@ -3152,13 +3445,55 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      The same characters mean different things in different places: two slashes start a comment in code but not
-      inside a string. A scanner therefore tracks which context it is in, such as code, string, line comment or block
-      comment, and each character can switch the context. A pattern search that ignores context removes too much.
+      A scanner that keeps a state, such as code, string or comment, reads each character in context, so the same
+      character can be a comment marker in code and ordinary text inside a string.
     related: [ lexical-analysis, word-state-machine ]
     resources:
       - title: Comment (computer programming) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Comment_(computer_programming)
+        opened: true
+      - title: Lexical analysis (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Lexical_analysis
+        opened: true
+      - title: Crafting Interpreters, Scanning
+        url: https://craftinginterpreters.com/scanning.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Many characters in source code mean different things depending on where they appear. Two slashes start a
+        comment in code but are just characters inside a string or a web address. A quote ends a string, unless it is
+        escaped, or it sits inside a comment. The only reliable way to decide is to read the file from the start and
+        remember what you are inside.
+
+
+        A context-state scanner, a small state machine, does exactly that. It has a handful of states: in code, in a
+        single-quoted string, in a double-quoted string, in a line comment and in a block comment, plus states such as
+        just after a backslash. In each state only a few characters matter. In code, a quote moves to a string state
+        and a comment marker moves to a comment state. In a string, only the closing quote and the escape character
+        matter. In a line comment, only the end of the line matters, and in a block comment, only its closing marker.
+        Everything else is copied or dropped according to the state.
+
+
+        Because the state carries over from one character to the next, and from one line to the next, the scanner
+        handles block comments that span lines and strings that contain comment markers without special cases. Each
+        language has its own states and transitions: Python has triple-quoted strings, C has character literals and
+        preprocessor lines, Go has raw strings, and some languages allow block comments to nest, which needs a counter
+        or a stack instead of a single state.
+      examples:
+        - A find-and-replace on two slashes cuts a web address stored in a string in half, while a state-aware scanner
+          leaves it alone.
+        - Syntax highlighters in editors keep the same kind of state, which is why one missing quote can turn the rest
+          of a file the colour of a string.
+        - Minifiers for JavaScript and CSS use a scanner with states to remove comments and whitespace without
+          damaging strings.
+      misconceptions:
+        - Each line can be processed on its own. Block comments and multi-line strings carry state across lines.
+        - A comment marker is always a comment. Inside a string or another comment it is ordinary text.
+        - All languages share the same comment rules. Each defines its own markers, string forms and escapes.
+      elsewhere:
+        - Every compiler's lexer tracks context in the same way before any parsing happens.
+        - Editors, linters and code formatters scan with states to understand where comments and strings are.
+        - CSV and configuration file readers keep a quoted-or-not state to handle separators inside quoted fields.
 
   - slug: meaningful-comments
     name: Comments that tools read
@@ -3166,15 +3501,55 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Some comments are instructions, not notes. Doc comments right before a declaration become documentation, build
-      constraints decide which files compile, and directives tell a linter to skip a line. A tool that strips comments
-      has to recognise and keep these, or it changes what the program does.
+      Some comments are instructions for tools rather than notes for people: documentation comments, build
+      constraints, code-generation and linter directives. Removing them changes how a program is built, checked or
+      documented.
     related: [ lexer-states ]
     resources:
+      - title: Directive (programming) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Directive_(programming)
+        opened: true
       - title: Go Doc Comments
         url: https://go.dev/doc/comment
-      - title: Flake8, selecting and ignoring violations
+        opened: true
+      - title: flake8, Selecting and Ignoring Violations
         url: https://flake8.pycqa.org/en/latest/user/violations.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Most comments are for human readers, and the compiler ignores them. But many toolchains read certain comments
+        as instructions, because a comment is a convenient place to put information without changing the language
+        itself. Such a comment is often called a directive or a pragma.
+
+
+        Several kinds are common. Documentation comments are placed directly above a declaration and are collected by
+        tools into reference documentation; in Go, a doc comment is the group of comment lines immediately before a
+        top-level declaration with no blank line between. Build constraints decide which files are compiled for which
+        platform or configuration; in Go these are go:build lines. Code-generation directives, such as go:generate,
+        tell a tool which command to run to produce source files. Linter directives, such as noqa in Python or nolint
+        in Go, switch off a specific warning on one line.
+
+
+        Tools recognise these comments by two things: position, such as directly above a declaration or at the top of
+        a file, and an exact form, such as a fixed word with no space after the comment marker. A comment remover,
+        formatter or minifier that ignores this can break builds, silence nothing or lose documentation. The safe
+        approach is to find comments with a proper scanner, then examine each comment's text against the exact
+        directive forms, and keep those that match.
+      examples:
+        - Removing a build constraint makes a file meant only for Windows compile on Linux, and the build fails.
+        - Stripping noqa comments brings back hundreds of linter warnings that the team had deliberately silenced line
+          by line.
+        - Documentation sites generated from code lose their descriptions when doc comments are stripped.
+      misconceptions:
+        - Comments never affect a program. Directives in comments change how it is built, generated and checked.
+        - "Every comment above a function is documentation. Position rules are strict: a blank line can separate a
+          comment from its declaration."
+        - Directives can be found by searching the whole line. They must be matched in comment text found by a real
+          scanner, or a string could be mistaken for one.
+      elsewhere:
+        - License headers and code-coverage exclusions are other comments that tools read.
+        - Type checkers in dynamic languages read type hints and ignore markers written as comments.
+        - Shebang lines and editor mode lines at the top of scripts are read by the operating system and editors.
 
   # ---- added for wave 2: interpreters (calculator, Brainfuck) ----
   - slug: operator-precedence
@@ -3183,12 +3558,59 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Precedence decides which operator binds tighter, so multiplication happens before addition unless brackets say
-      otherwise. Associativity decides the order among equal operators: subtraction and division work left to right,
-      so 8 minus 3 minus 2 is 3, not 7.
+      Precedence decides which of two different operators is applied first; associativity decides the order for equal
+      operators side by side. Together they give every flat expression exactly one meaning.
     resources:
       - title: Order of operations (Wikipedia)
         url: https://en.wikipedia.org/wiki/Order_of_operations
+        opened: true
+      - title: Operator associativity (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Operator_associativity
+        opened: true
+      - title: Simple but Powerful Pratt Parsing (matklad)
+        url: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        An expression written in one line, such as 1 + 2 * 3, is ambiguous until two rules are fixed. Precedence ranks
+        operators, so times and divide outrank plus and minus and the expression means 1 + (2 * 3), which is 7.
+        Brackets exist to override the ranking when you want the other meaning.
+
+
+        Associativity settles ties between operators of the same rank. Most arithmetic operators are left-associative:
+        10 - 4 - 3 means (10 - 4) - 3, which is 3, and 8 / 4 / 2 means (8 / 4) / 2, which is 1. Working right to left
+        gives 9 and 4, which is wrong by the usual convention. Raising to a power is normally right-associative, so a
+        power of a power is worked from the top down, because the left-to-right reading would just multiply the
+        exponents.
+
+
+        Unary minus, the minus in -3, is a different operator from subtraction even though it uses the same character.
+        A parser tells them apart by position: a minus at the start, or right after another operator or an opening
+        bracket, is unary.
+
+
+        Every parser that handles infix expressions encodes these two tables somewhere: as levels of rules in a
+        grammar, as numbers in a precedence-climbing or Pratt parser, or as comparisons in the shunting yard
+        algorithm.
+      examples:
+        - Spreadsheets and programming languages disagree on whether minus binds tighter than raising to a power, so
+          -2 squared is 4 in some spreadsheets and -4 in many languages.
+        - A shell script that does arithmetic on prices gives a wrong total when a formula relies on left-to-right
+          order that the script author assumed but the tool did not follow.
+        - Query languages give AND higher precedence than OR, so a filter written without brackets can match far more
+          rows than intended.
+      misconceptions:
+        - Operators are always worked left to right. Precedence comes first, and only operators of equal rank are
+          worked in the associativity direction.
+        - Associativity does not matter for real programs. It changes the result of subtraction, division and powers.
+        - The minus sign is one operator. Unary minus and subtraction are different, and a parser has to tell them
+          apart by position.
+      elsewhere:
+        - "Boolean conditions in every language: AND binds tighter than OR, which surprises people reading conditions
+          without brackets."
+        - Template and query languages, such as SQL WHERE clauses, define their own precedence tables.
+        - Any expression parser, from spreadsheets to configuration languages, needs a precedence and associativity
+          table.
 
   - slug: shunting-yard
     name: The shunting yard algorithm
@@ -3196,13 +3618,57 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      The shunting yard algorithm turns an infix expression into postfix order. Numbers go straight to the output, and
-      operators wait on a stack until an operator of lower or equal precedence, or a closing bracket, pushes them out.
-      The result can be evaluated without any brackets.
-    prerequisites: [ operator-precedence ]
+      Dijkstra's shunting yard algorithm turns an infix expression into postfix order in one pass, using a stack for
+      operators and brackets, so evaluation no longer needs precedence rules.
+    prerequisites:
+      - operator-precedence
     resources:
       - title: Shunting yard algorithm (Wikipedia)
         url: https://en.wikipedia.org/wiki/Shunting_yard_algorithm
+        opened: true
+      - title: Reverse Polish notation (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Reverse_Polish_notation
+        opened: true
+      - title: Simple but Powerful Pratt Parsing (matklad)
+        url: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Infix notation puts operators between their operands and relies on precedence and brackets. Postfix notation,
+        also called reverse Polish notation, puts each operator after its operands, so 1 + 2 * 3 becomes 1 2 3 times
+        plus. Postfix needs no brackets and no precedence: the order of the list already says what to do.
+
+
+        The shunting yard algorithm, published by Edsger Dijkstra, converts infix to postfix in one left-to-right pass
+        with an output list and an operator stack. Each number goes straight to the output. When an operator arrives,
+        operators already on the stack that should be applied first, those with higher precedence, or equal precedence
+        when the new operator is left-associative, are moved to the output. Then the new operator is pushed. An
+        opening bracket is pushed as a marker. A closing bracket moves operators to the output until the marker
+        appears, and the marker is discarded. When the input ends, the remaining operators are moved to the output.
+
+
+        The name comes from a railway yard: cars, the operators, wait in a siding, the stack, until the rules say they
+        may join the outgoing train. The algorithm also catches some errors on the way, such as a closing bracket with
+        no partner or brackets left on the stack at the end.
+      examples:
+        - Calculator apps and spreadsheet formula engines convert what the user typed into an internal postfix or tree
+          form before evaluating it.
+        - Older handheld calculators from some makers asked users to enter postfix directly, which removed the need
+          for brackets and an equals key.
+        - Compilers for simple languages use the same idea, or the closely related precedence climbing, to turn
+          expressions into instructions.
+      misconceptions:
+        - Postfix is just infix written backwards. The operands keep their order; only the operators move to after
+          their operands.
+        - The algorithm needs to look ahead in the input. It decides each move from the current token and the top of
+          the stack.
+        - Brackets end up in the postfix output. They only steer the conversion and are thrown away.
+      elsewhere:
+        - Stack-based virtual machines run postfix-like instruction sequences, so compilers produce this order for
+          expressions.
+        - Query planners and rule engines turn infix filter expressions into evaluation trees using the same
+          precedence logic.
+        - Pratt parsers and precedence climbing are alternatives built on the same precedence and associativity tables.
 
   - slug: stack-evaluation
     name: Evaluating postfix with a stack
@@ -3210,13 +3676,56 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      In postfix order an operator follows its operands, so an expression is evaluated with one stack: push each
-      number, and for each operator pop two numbers, apply it and push the result. The second number popped is the
-      left operand, which matters for subtraction and division. A well-formed expression leaves exactly one number.
+      A postfix expression is evaluated left to right with one stack: numbers are pushed, and each operator pops its
+      operands, computes and pushes the result. Leftover or missing operands reveal malformed input.
     related: [ shunting-yard ]
     resources:
       - title: Reverse Polish notation (Wikipedia)
         url: https://en.wikipedia.org/wiki/Reverse_Polish_notation
+        opened: true
+      - title: Stack machine (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Stack_machine
+        opened: true
+      - title: Crafting Interpreters, A Virtual Machine
+        url: https://craftinginterpreters.com/a-virtual-machine.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Once an expression is in postfix order, evaluating it needs only a stack of values. Read the list from left to
+        right. Push every number. When an operator appears, pop the values it needs, two for a binary operator, apply
+        it, and push the result. When the list ends, exactly one value should remain, and that is the answer.
+
+
+        The order of popping matters. The value on top of the stack is the one pushed last, which is the right-hand
+        operand. So for 10 3 minus, the evaluator pops 3, then 10, and computes 10 - 3. Reversing them silently gives
+        the wrong sign for subtraction and the wrong quotient for division, while addition and multiplication hide the
+        bug because they do not care about order.
+
+
+        The stack also checks the expression. An operator that finds fewer values than it needs means a number was
+        missing, as in a trailing plus. More than one value left at the end means an operator was missing, as in two
+        numbers side by side. Both are reported as invalid input rather than allowed to crash the program.
+
+
+        This is how stack machines work: the Java virtual machine, WebAssembly and many interpreters evaluate
+        expressions by pushing operands and applying instructions that pop and push.
+      examples:
+        - A bug that reverses operands passes every test that only uses plus and times, and is found only when someone
+          subtracts or divides.
+        - Stack-based virtual machines, such as the ones behind Java and WebAssembly, run instruction streams in
+          exactly this push and pop pattern.
+        - Printers that understand PostScript evaluate a postfix page-description language with an operand stack.
+      misconceptions:
+        - The first value popped is the left operand. It is the right one, because it was pushed last.
+        - If evaluation finishes without crashing, the expression was valid. A leftover value on the stack means an
+          operator was missing.
+        - Evaluation needs precedence rules again. The postfix order already encodes them.
+      elsewhere:
+        - Virtual machines and bytecode interpreters evaluate expressions on an operand stack.
+        - Undo histories, call stacks and parsers all rely on the same last-in, first-out discipline.
+        - Reverse Polish calculators let users drive the stack directly.
+    prerequisites:
+      - shunting-yard
 
   - slug: floating-point-numbers
     name: Integer and floating-point numbers
@@ -3282,14 +3791,58 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      An interpreter keeps a program counter that points at the current instruction and runs a loop: fetch the
-      instruction, carry it out, move the counter on. A jump instruction sets the counter somewhere else instead.
-      Everything else the program can touch, such as memory cells and a data pointer, is state the loop updates.
+      An interpreter runs a program by repeating one loop: fetch the next instruction, decode what it means, execute
+      it and move on. Everything it costs is paid again on every instruction executed.
     resources:
       - title: Interpreter (computing) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Interpreter_(computing)
-      - title: Brainfuck (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Brainfuck
+        opened: true
+      - title: Instruction cycle (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Instruction_cycle
+        opened: true
+      - title: Crafting Interpreters, A Virtual Machine
+        url: https://craftinginterpreters.com/a-virtual-machine.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        An interpreter runs a program directly, without first turning it into machine code. At its heart is one loop,
+        often called the fetch, decode, execute cycle, the same cycle a processor runs in hardware. A program counter
+        says where in the program the interpreter is. Each turn of the loop fetches the instruction there, decodes it
+        to decide what it means, executes it by changing the program's state, and advances the counter, or sets it
+        somewhere else for a jump.
+
+
+        The state an interpreter changes depends on the language. For Brainfuck it is a tape of cells and a data
+        pointer; for a stack language it is a stack; for a language with variables it is an environment that maps
+        names to values.
+
+
+        The loop's overhead is paid for every instruction executed, not every instruction written. A loop body that
+        runs a million times is fetched and decoded a million times. If the interpreter works on raw source text, it
+        also skips comments and searches for jump targets over and over. That is why a direct interpreter is simple
+        and easy to trust but slow, and why faster interpreters move work out of the loop: they translate the source
+        once into a compact form such as bytecode, work out jump targets in advance, and combine common sequences into
+        single instructions.
+
+
+        The opposite approach, compiling ahead of time to machine code, removes the decoding from run time entirely,
+        at the cost of a translation step before the program can start.
+      examples:
+        - Early versions of many scripting languages walked the source or a syntax tree directly, and later versions
+          gained large speed-ups by compiling to bytecode first.
+        - A Brainfuck interpreter that reads the text character by character spends much of its time skipping comments
+          and searching for brackets rather than doing the program's work.
+        - Emulators for old game consoles run a fetch, decode, execute loop over the original machine's instructions.
+      misconceptions:
+        - Interpreters are slow because the language is slow. Much of the cost is the loop's overhead, which better
+          designs reduce.
+        - Interpreting and compiling are opposites with nothing between. Most real systems compile to bytecode and
+          then interpret that.
+        - The cost of an instruction is paid once. It is paid every time the instruction is executed.
+      elsewhere:
+        - Language runtimes for Python, Ruby and Lua run a bytecode interpreter loop.
+        - Processors run the same fetch, decode, execute cycle in hardware.
+        - Rule engines and template engines interpret their own small languages with the same structure.
 
   - slug: bracket-matching
     name: Matching brackets with a stack
@@ -3297,12 +3850,53 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      To pair each opening bracket with its closing one, push the position of every opening bracket on a stack and pop
-      it when a closing bracket arrives. A pop from an empty stack, or a stack that is not empty at the end, means the
-      brackets are unbalanced. Doing this once before running gives every jump its target.
+      Nested brackets are matched with a stack: each opening bracket is pushed and each closing bracket pops its
+      partner. One pass finds every unmatched or wrongly paired bracket and records which pairs belong together.
     resources:
       - title: Stack (abstract data type) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Stack_(abstract_data_type)
+        opened: true
+      - title: Dyck language (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Dyck_language
+        opened: true
+    lesson:
+      how_it_works: >-
+        Brackets nest: the most recently opened bracket must be the first one closed. A stack captures exactly that
+        rule. Walk the text once. Push each opening bracket, with its position. When a closing bracket appears, pop
+        the top of the stack: if the stack is empty, the closing bracket has no partner; if the popped bracket is a
+        different kind, such as a round one closed by a square one, the pair is wrong. When the text ends, anything
+        left on the stack was opened and never closed.
+
+
+        Counting is not enough. A counter that adds one for each opening bracket and subtracts one for each closing
+        bracket accepts a closing bracket of the wrong kind, and only notices order problems if it checks that the
+        count never goes negative. The stack handles both, and because it stores positions, error messages can point
+        at the exact bracket.
+
+
+        The same pass can record the partner of every bracket. Interpreters and editors use this to jump from a
+        bracket to its match without searching: an interpreter that pairs every loop bracket before running never has
+        to scan the program to find where a loop ends, which turns a slow search on every iteration into a single
+        lookup.
+
+
+        In formal terms, balanced brackets form a language that no regular expression can recognise, because
+        recognising it needs unbounded memory of what is still open. That is why the stack, or recursion, appears.
+      examples:
+        - Code editors highlight the partner of the bracket under the cursor, using pairs worked out by the same stack
+          walk.
+        - An interpreter for a language with loop brackets that searches for the matching bracket on every pass
+          becomes dramatically slower on programs with long loops.
+        - Configuration and data formats such as JSON reject a document with a missing closing brace, and a good error
+          points at the opening brace that was never closed.
+      misconceptions:
+        - Counting opening and closing brackets is enough. It misses wrong kinds and some wrong orders.
+        - A regular expression can check balanced brackets. Arbitrary nesting needs a stack or recursion.
+        - Unmatched brackets can only be found while running the program. One pass before running finds them all.
+      elsewhere:
+        - Parsers for every programming language and data format check nesting this way.
+        - Editors and formatters use bracket pairs for matching, folding and indentation.
+        - HTML and XML validators match opening and closing tags with the same stack discipline.
 
   - slug: bytecode-compilation
     name: Compiling to bytecode
@@ -3310,13 +3904,59 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Instead of interpreting source text directly, a compiler first turns it into a compact list of instructions,
-      dropping comments and working out jump targets once. A small virtual machine then runs the list, which is faster
-      because the slow decisions were made ahead of time.
+      Compiling source to bytecode translates the program once into a compact list of instructions with their operands
+      worked out, so the run-time loop only executes and never reads text.
     related: [ interpreter-loop ]
     resources:
       - title: Bytecode (Wikipedia)
         url: https://en.wikipedia.org/wiki/Bytecode
+        opened: true
+      - title: Crafting Interpreters, Chunks of Bytecode
+        url: https://craftinginterpreters.com/chunks-of-bytecode.html
+        opened: true
+      - title: Crafting Interpreters, A Virtual Machine
+        url: https://craftinginterpreters.com/a-virtual-machine.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Bytecode is a compact, regular list of instructions designed to be run by a virtual machine rather than a
+        physical processor. A bytecode compiler reads the source once and translates it: comments and whitespace
+        disappear, each operation becomes an instruction, and anything that can be worked out in advance is attached
+        as an operand. For Brainfuck that means one instruction per command, with each loop bracket carrying the
+        position of its partner.
+
+
+        The virtual machine that runs bytecode is an interpreter loop, but a much cheaper one. It never skips text,
+        never searches for a matching bracket and never re-parses anything. It fetches an instruction, uses its kind
+        to choose an action, and acts, often with the operand already in hand.
+
+
+        The split between compiling and running has a further benefit. The instruction list is data that the compiler
+        can inspect and improve before it runs: merging repeated instructions, replacing common patterns with
+        dedicated ones, and removing work that has no effect. This is where optimisation lives in most language
+        implementations. Some go further and compile hot bytecode to machine code while the program runs, which is
+        called just-in-time compilation.
+
+
+        Bytecode can also be saved, so later runs skip the translation step, and it can be made independent of the
+        processor, so the same compiled program runs anywhere the virtual machine does.
+      examples:
+        - Java compiles source to bytecode once, and the same class files run on any machine with a Java virtual
+          machine.
+        - Python compiles each module to bytecode and caches it, so the next run starts faster.
+        - A Brainfuck program compiled to bytecode with jump targets resolved runs much faster than the same program
+          interpreted from its text.
+      misconceptions:
+        - Bytecode is machine code. It is run by a virtual machine, not directly by the processor.
+        - Compiling to bytecode means the program is no longer interpreted. The virtual machine interprets the
+          bytecode, just far more cheaply.
+        - Optimisation needs a full compiler. Even a simple instruction list can be improved before it runs.
+      elsewhere:
+        - Language runtimes such as the Java virtual machine, Python, Lua and WebAssembly engines run bytecode.
+        - Database engines compile queries into an internal program of operations before executing them.
+        - Regular-expression engines often compile a pattern into a small instruction program for a matching machine.
+    prerequisites:
+      - interpreter-loop
 
   - slug: peephole-optimization
     name: Peephole optimisation
@@ -3324,13 +3964,54 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A peephole optimiser looks at short runs of instructions and replaces them with fewer that do the same thing,
-      such as five increments becoming one add of five, or a loop that only empties a cell becoming one clear. Each
-      rewrite must leave the program's output unchanged.
-    prerequisites: [ bytecode-compilation ]
+      A peephole optimiser looks at short runs of instructions and replaces them with fewer or cheaper ones that have
+      exactly the same effect, such as merging repeats or turning a clearing loop into one instruction.
+    prerequisites:
+      - bytecode-compilation
     resources:
       - title: Peephole optimization (Wikipedia)
         url: https://en.wikipedia.org/wiki/Peephole_optimization
+        opened: true
+      - title: Nayuki, Optimizing brainfuck compiler
+        url: https://www.nayuki.io/page/optimizing-brainfuck-compiler
+        opened: true
+    lesson:
+      how_it_works: >-
+        Peephole optimisation looks at the instruction list through a small window, a few instructions at a time, and
+        replaces patterns with cheaper equivalents. It needs no deep analysis of the whole program; it relies on local
+        facts that are always true.
+
+
+        Two kinds of rewrite cover most of the gain for simple languages. Merging replaces a run of identical
+        instructions with one instruction and a count: ten pluses become add ten, and five moves right become move
+        five. Pattern replacement recognises a short sequence whose overall effect is known and emits a dedicated
+        instruction instead: a loop whose body only subtracts one from the current cell always ends with that cell at
+        zero, so the whole loop becomes set to zero. Larger patterns, such as a loop that moves a value from one cell
+        to another, can become a single copy instruction.
+
+
+        Every rewrite has to be safe: it must have exactly the same effect for every possible state, not just the
+        states seen in tests. A loop that adds one ends at zero only if cells wrap, so that rewrite depends on the
+        memory model. Rewrites also move instructions, so jump targets must be worked out again after the list
+        changes. The reliable way to check is to run the same programs with and without optimisation and compare the
+        output byte for byte, and to measure the time before and after, because some rewrites cost more than they
+        save.
+      examples:
+        - Merging repeated commands and clearing loops makes typical Brainfuck programs run several times faster
+          without changing their output.
+        - Compilers replace multiplication by a power of two with a shift, and remove an instruction that loads a
+          value that is already loaded.
+        - A rewrite that assumed wrapping cells silently broke a program on an interpreter that used larger cells.
+      misconceptions:
+        - An optimisation that passes the tests is safe. It must be correct for every possible state, not just the
+          tested ones.
+        - Optimising only makes code faster. A wrong rewrite changes behaviour, so the output must be compared as well
+          as the time.
+        - Jump targets survive rewriting. Changing the list moves instructions, so jumps must be resolved again.
+      elsewhere:
+        - Production compilers run many peephole passes over their intermediate code and machine code.
+        - Query optimisers rewrite query plans with equivalence rules in the same spirit.
+        - Build tools and minifiers rewrite code into shorter equivalent forms.
 
   - slug: benchmarking
     name: Measuring performance
@@ -5926,4 +6607,59 @@ concepts:
         opened: true
       - title: diff (Wikipedia), unified format
         url: https://en.wikipedia.org/wiki/Diff
+        opened: true
+  - slug: tape-memory-model
+    name: A tape of cells as memory
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: Brainfuck's memory is a tape of byte cells and a pointer. The choices of cell size, wrapping, tape length and
+      end-of-input behaviour are part of the language, and programs break when interpreters choose differently.
+    lesson:
+      how_it_works: >-
+        A memory model says what the program's memory is and what happens at its limits. Brainfuck's model is
+        deliberately tiny: a row of cells, traditionally 30,000 of them, each starting at zero, and a data pointer
+        that points at one cell. Commands move the pointer one cell left or right, add or subtract one from the
+        current cell, read a byte of input into it or write it as output, and loop while it is non-zero. It is close
+        to the tape of a Turing machine, which is why such a small language can still compute anything.
+
+
+        Because the original description left the limits open, interpreters differ, and those differences are part of
+        the model. The first is cell size: most use one byte per cell, where adding one to 255 wraps round to 0 and
+        subtracting one from 0 gives 255, but some use larger cells that do not wrap. Many programs depend on
+        wrapping, for example to clear a cell by adding until it reaches zero. The second is the tape's edges: moving
+        left of the first cell or past the last can be an error, wrap to the other end, or grow the tape. The third is
+        end of input: reading when no input is left may leave the cell unchanged, set it to 0, or set it to 255.
+
+
+        A portable interpreter picks the most common conventions, thirty thousand wrapping byte cells and an error or
+        growth at the edges, and documents each choice, so users know which programs it will run as their authors
+        intended.
+      examples:
+        - A program that clears a cell by adding one until it reaches zero runs forever on an interpreter whose cells
+          do not wrap.
+        - A program that reads input until a zero byte appears loops forever on an interpreter that leaves the cell
+          unchanged at the end of input.
+        - Integer overflow in other languages, where a counter wraps from the largest value to the smallest, is the
+          same choice made for every number.
+      misconceptions:
+        - There is one correct Brainfuck behaviour. The original left cell size, tape ends and end of input open, so
+          interpreters differ.
+        - Wrapping is a bug to avoid. Many programs rely on it on purpose.
+        - A larger tape is always better. Growing without limit lets a runaway program use all memory, so a limit can
+          be a feature.
+      elsewhere:
+        - "Every language defines what happens when a number overflows: wrapping, an error or a larger type."
+        - Virtual machines define their memory model, such as how much memory a program may use and what happens past
+          its end.
+        - Turing machines, the theoretical model of computation, use the same idea of a tape and a head.
+    resources:
+      - title: Brainfuck (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Brainfuck
+        opened: true
+      - title: brainfuck (Esolang wiki)
+        url: https://esolangs.org/wiki/Brainfuck
+        opened: true
+      - title: Turing machine (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Turing_machine
         opened: true

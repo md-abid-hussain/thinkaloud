@@ -6,7 +6,7 @@ import { EventEmitter } from "node:events";
 import { one, query, rows } from "@/lib/db";
 import { ModelUnavailable } from "@/lib/llm";
 
-export type RunKind = "grade" | "mentor";
+export type RunKind = "grade" | "mentor" | "language" | "references";
 export type RunStatus = "queued" | "running" | "done" | "failed" | "paused";
 export interface Run {
   id: string;

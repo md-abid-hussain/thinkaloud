@@ -170,7 +170,50 @@ test('every key accepts natural correct answers and rejects an obvious guess lis
     for (const a of wrong) if (keyMatches(k, a, context)) failures.push(`${k.where}: should fail: ${a.slice(0, 80)}`);
   }
   assert.deepEqual(failures, []);
-  assert.equal(base.keys.length, 135);
+  assert.ok(base.keys.length > 100, 'every project file was read');
+});
+
+// Content v2 (concept-first): the worked example is wc.
+const wcIndex = content.projects.findIndex((p) => p.data.project.slug === 'challenge-wc');
+const wc = (c) => c.projects[wcIndex].data;
+const concept = (c, slug) => c.catalogue.concepts.find((x) => x.slug === slug);
+
+test('content v2: wc is concept-first, and every concept it uses has a full lesson', () => {
+  assert.equal(wc(content).format, 2);
+  const used = new Set(wc(content).milestones.flatMap((m) => m.concepts));
+  for (const slug of used) {
+    const l = concept(content, slug).lesson;
+    assert.ok(l?.how_it_works?.length > 400, `${slug} has a lesson`);
+    for (const field of ['examples', 'misconceptions', 'elsewhere']) assert.ok(l[field].length >= 1, `${slug} ${field}`);
+  }
+  assert.ok(wc(content).milestones.some((m) => m.concepts.length < 3), 'a v2 milestone can be one tight group of concepts');
+});
+
+test('content v2: validation enforces lessons and superseded concepts, and flags made-up-input prompts', () => {
+  const cases = [
+    [(c) => delete concept(c, 'grapheme-clusters').lesson, /concept grapheme-clusters has no lesson/],
+    [(c) => (wc(c).milestones[0].concepts.push('bytes-vs-characters')), /superseded by text-encoding-utf8/],
+    [(c) => (concept(c, 'io-buffering').lesson.examples = []), /lesson.examples needs 1 to 5 entries/],
+    [(c) => (concept(c, 'io-buffering').lesson.misconceptions[0] = 'Call `read` once.'), /lesson.misconceptions 1 contains a backtick/],
+    [(c) => (concept(c, 'bytes-vs-characters').superseded_by = 'no-such-concept'), /superseded_by names unknown concept/],
+    [(c) => (wc(c).format = 3), /format must be 1 or 2/],
+    [(c) => (milestone(c).concepts = ['site-directory-layout']), /a milestone covers 3 to 4 concepts/],
+  ];
+  for (const [mutate, expected] of cases) assert.match(errorsFor(mutate), expected, String(mutate));
+
+  const c = copy();
+  wc(c).milestones[0].steps[0].think.prompt = 'A file holds h, i and a newline. What does ccwc -c report?';
+  const flags = validate(c).flags.filter((f) => f.project === 'challenge-wc');
+  assert.ok(flags.some((f) => f.id === '1.1'), 'the rejected v1 style of question is flagged for a person');
+});
+
+test('content v2: lessons load into the database with a shape check', async () => {
+  const { rows } = await base.db.query(`select lesson -> 'misconceptions' ->> 0 as first from concept where slug = 'utf16-code-units'`);
+  assert.match(rows[0].first, /UTF-16/);
+  await assert.rejects(
+    () => base.db.query(`update concept set lesson = '{"how_it_works": "x", "examples": []}' where slug = 'utf16-code-units'`),
+    /check/i
+  );
 });
 
 test('a key that its proof does not support fails the check, and so does a key with no proof', async () => {

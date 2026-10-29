@@ -13,7 +13,7 @@ interface Driver extends Q {
   exec(sql: string): Promise<void>;
 }
 
-const g = globalThis as unknown as { __taDriver?: Promise<Driver>; __taReady?: Promise<void> };
+const g = globalThis as unknown as { __taDriver?: Promise<Driver>; __taReady?: Promise<void>; __taMigrations?: number };
 
 async function pgDriver(url: string): Promise<Driver> {
   const { Pool } = await import("pg");
@@ -80,8 +80,14 @@ async function setup(d: Driver) {
   }
 }
 
+const migrationCount = () =>
+  readdirSync(path.join(/*turbopackIgnore: true*/ root(), "db", "migrations")).filter((f) => f.endsWith(".sql")).length;
+
 async function ready(): Promise<Driver> {
   const d = await driver();
+  // In development a new migration file is applied on the next request, without a restart.
+  if (process.env.NODE_ENV !== "production" && g.__taReady && g.__taMigrations !== migrationCount()) g.__taReady = undefined;
+  g.__taMigrations = migrationCount();
   g.__taReady ??= setup(d).catch((e) => {
     g.__taReady = undefined; // a failed setup is retried on the next request
     throw e;

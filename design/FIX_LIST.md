@@ -26,6 +26,13 @@ The design was frozen on 29 Oct 2026. These items are fixed in the app, not in t
 - Landing: the wc card says "Milestone 1 checked", but every content file is `status: generated`. Show "Not yet checked" until a project is marked reviewed, as the user chose for the catalogue.
 - Landing: "Browse projects" shows a toast. Link it to the catalogue route.
 
+## Step workspace (`design/workspace.html`, version 2, waiting for the user's one round)
+
+- Workspace: the concept names, step titles, lesson text and teach-back in the sample are design placeholders. Replace them with the rewritten concept-first `challenge-wc.yaml` and its concept lessons when they exist.
+- Workspace: the lesson needs stored fields for its four parts (how it works, examples, misconceptions, where else) and for its figures. The byte-layout figures are drawn from per-character data (glyph, code point, UTF-8 bytes, UTF-16 units). Store that data with the lesson rather than hard-coding it.
+- Workspace: "I've read it, start step 1" shows a toast. Wire it to mark the concept's ideas seen and open step 1.
+- Workspace: the mentor replies, "Show me code" and "Check my answer" are toasts or fixed samples. Wire them to the mentor agent's tools and the grader.
+
 ## Every page
 
 - Remove the design preview strip (`.preview`). It switches sample states in the artifacts and is not part of the product.

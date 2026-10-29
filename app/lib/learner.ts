@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { createHash } from "node:crypto";
 import { one, tx } from "@/lib/db";
 import { recipes } from "@/vendor/db/support/recipes.mjs";
+import { startLanguageRun, startReferencesRun } from "@/lib/research";
 
 export const GUEST_COOKIE = "ta_guest";
 export const SUPPORT_LEVELS = ["guided", "standard", "independent"] as const;
@@ -74,6 +75,11 @@ export async function startEnrollment(input: StartInput, ip: string | null) {
     }
     return { learnerId, enrollmentId };
   });
+
+  // Background research: references for thin concepts, and the language notes when a language was chosen.
+  // Neither blocks the start; failures only mean the notes arrive later.
+  await startReferencesRun(result.learnerId, result.enrollmentId).catch((e) => console.error("[references]", e));
+  await startLanguageRun(result.learnerId, result.enrollmentId, language, framework).catch((e) => console.error("[language]", e));
 
   (await cookies()).set(GUEST_COOKIE, result.learnerId, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365,

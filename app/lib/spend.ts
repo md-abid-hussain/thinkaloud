@@ -33,7 +33,7 @@ export const caps = () => ({
 });
 
 export async function recordUsage(
-  o: { learnerId: string | null; enrollmentId: string | null; purpose: "tutor" | "grade" | "summarise"; model: string },
+  o: { learnerId: string | null; enrollmentId: string | null; purpose: "tutor" | "grade" | "summarise" | "generate"; model: string },
   u: Usage
 ) {
   const input = u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);

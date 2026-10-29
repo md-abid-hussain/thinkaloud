@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { currentLearnerId } from "@/lib/learner";
 import { conceptPage } from "@/lib/learning";
 import MarkSeen from "./MarkSeen";
+import Lesson from "@/ws/Lesson";
 import "../../learning/inner.css";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ export default async function Concept({ params, searchParams }: { params: Promis
           <section className="sec" aria-labelledby="brief-h">
             <div className="sec-h"><p className="label">The brief</p><h2 id="brief-h">In plain words</h2></div>
             <p className="brief">{c.brief}</p>
+            <div style={{ marginTop: 24 }}><Lesson concepts={[{ id: c.id, slug: c.slug, name: c.name, lesson: c.lesson }]} open /></div>
             {link ? <p style={{ marginTop: 16 }}><a href={link.url} rel="noopener">{link.title} ↗</a> <span className="fine">verified link</span></p> : null}
             {mine && mine.status === "new" ? <div className="actions"><MarkSeen conceptId={c.id} slug={from ?? null} /></div> : null}
             {mine?.quote ? (

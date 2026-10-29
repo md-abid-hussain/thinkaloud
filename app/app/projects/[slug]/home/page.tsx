@@ -9,6 +9,7 @@ import { META, shortName } from "@/lib/catalogue";
 import { STATUS_WORD, SUPPORT_NAMES } from "@/ws/types";
 import Restate from "./Restate";
 import Support from "./Support";
+import LanguagePick from "./LanguagePick";
 import Reflection from "./Reflection";
 import "../home.css";
 
@@ -207,6 +208,12 @@ export default async function ProjectHome({ params }: { params: Promise<{ slug: 
                 </li>
               ))}
             </ol>
+          </section>
+
+          <section className="sec" id="language" aria-labelledby="language-h">
+            <div className="sec-h"><p className="label">Optional</p><h2 id="language-h">Your language</h2></div>
+            <p className="fine" style={{ marginBottom: 12 }}>Pick one to see the classes and APIs it offers for each idea, from its official docs. Ideas only works too.</p>
+            <LanguagePick slug={slug} language={en.language} framework={en.framework} />
           </section>
 
           <section className="sec" id="support" aria-labelledby="support-h">

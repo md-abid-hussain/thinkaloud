@@ -21,44 +21,212 @@ concepts:
     kind: foundation
     status: reviewed
     brief: A byte is a unit of storage. A character is a unit of text. In UTF-8 one character takes one to four bytes.
+    superseded_by: text-encoding-utf8   # content v2 teaches this inside the full encoding lesson
 
   - slug: explicit-charsets
     name: Explicit charsets
     area: text-encodings
     kind: foundation
-    status: reviewed
+    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: Decoding bytes needs a named encoding. Relying on a platform default breaks when the tool runs elsewhere.
-    prerequisites: [bytes-vs-characters]
+    lesson:
+      how_it_works: |-
+        Decoding needs an encoding. If code does not name one, the language picks a default, and defaults differ: the
+        operating system's setting, the user's locale, or a fixed value that changed between versions. Java used the
+        platform encoding until Java 18, so the same program decoded files as Windows-1252 on many Windows machines and
+        as UTF-8 on Linux. Since Java 18 the default is UTF-8, but older code and other languages still vary.
+
+        The safe habit is to name the encoding every time bytes become text or text becomes bytes, usually UTF-8. Then
+        the program gives the same answer on a laptop, a server and a CI runner.
+
+        Sometimes the encoding has to be discovered. Protocols state it: HTTP in the Content-Type header, XML in its
+        declaration, email in its headers. Plain files usually say nothing. A byte order mark at the start is a strong
+        hint: EF BB BF for UTF-8, FF FE or FE FF for UTF-16. Without one a program can only guess, which is why formats
+        such as JSON simply require UTF-8.
+
+        When a UTF-8 file does start with a byte order mark, decide what to do with it. Most readers should skip it,
+        since it is not part of the text.
+      examples:
+        - A CSV saved by Excel as CSV UTF-8 starts with EF BB BF. A script that does not skip it reads the first column
+          name as an invisible character followed by name, and lookups by that name fail.
+        - A program that shows é correctly on a developer's Mac shows Ã© on a Windows build server, because it decoded
+          with the default encoding instead of UTF-8.
+        - A web page served with the wrong charset in its Content-Type header shows mojibake, although the file itself
+          is fine.
+      misconceptions:
+        - A text file records its own encoding. Most do not, so the reader must know or guess.
+        - The default encoding is always UTF-8. It depends on the language, its version and the machine.
+        - A byte order mark is harmless. Many tools treat it as part of the first line.
+      elsewhere:
+        - Database connections have their own encoding, and a mismatch corrupts names on the way in.
+        - Command-line tools read the locale to decide how to decode, so the same command can count differently on two
+          machines.
+        - APIs that accept text should say which encoding they expect, and reject or convert anything else.
+    prerequisites: [text-encoding-utf8]
 
   - slug: decoding-across-chunks
     name: Decoding across chunk boundaries
     area: text-encodings
     kind: foundation
-    status: reviewed
+    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: A chunk of bytes can end in the middle of a character, so a decoder keeps the leftover bytes for the next chunk.
+    lesson:
+      how_it_works: |-
+        A streaming program reads bytes in chunks, and chunk boundaries fall wherever the buffer happens to fill. In
+        UTF-8 a character can take up to four bytes, so a chunk can end after the first byte of é or after two bytes of
+        an emoji.
+
+        If each chunk is decoded on its own, the decoder sees an unfinished sequence at the end of one chunk and stray
+        continuation bytes at the start of the next. It reports both as invalid, usually replacing each with the
+        replacement character U+FFFD, so one real character becomes two wrong ones. The bug depends on where the boundary
+        falls: the same file can count correctly with one buffer size and wrongly with another, and small test files that
+        fit in one chunk never show it.
+
+        The fix is a decoder that keeps state between chunks. It decodes every complete character in a chunk and holds
+        back the bytes of an unfinished one, then puts them in front of the next chunk. At the very end of the input, any
+        bytes still held back are a truncated character, which is invalid. Languages provide such decoders, as a reader
+        that wraps a byte stream or as a decoder object that accepts partial input.
+
+        Byte-level counts such as bytes and newlines need no decoding at all, because in UTF-8 a newline byte never
+        appears inside a multi-byte character.
+      examples:
+        - A tool counts characters correctly on a short test file but reports a few extra on a large Chinese text, where
+          three-byte characters often straddle the 4096-byte boundary.
+        - A chat server that decodes each network packet separately sometimes shows a broken symbol in the middle of a
+          message with emoji, whenever a packet boundary splits one.
+        - A log shipper that cuts files into fixed-size pieces for upload must cut on line boundaries, or each piece can
+          no longer be decoded on its own.
+      misconceptions:
+        - Decoding chunk by chunk is the same as decoding the whole file. Only when no character crosses a boundary.
+        - A bigger buffer fixes it. It only makes boundaries rarer, so the bug hides better.
+        - Counting bytes and lines needs decoding too. In UTF-8 newline bytes can be counted on the raw bytes.
+      elsewhere:
+        - Anything that carries text over a stream, such as chat, WebSockets or server-sent events, needs a decoder that
+          keeps state.
+        - "Compression and encryption streams have the same shape: state is carried from one block to the next."
+        - Editors that open huge files in pieces must align the pieces to character boundaries.
     prerequisites: [explicit-charsets, stream-read-contract]
 
   - slug: streaming-constant-memory
     name: Streaming in constant memory
     area: streams-io
     kind: foundation
-    status: reviewed
+    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: Read input in fixed-size chunks and keep running totals, so memory does not grow with the input.
+    lesson:
+      how_it_works: |-
+        A program that reads a whole file into memory before working on it needs as much memory as the file is big.
+        That is fine for a 2 KB file and fatal for a 20 GB log on a machine with 8 GB of memory: the program slows to a
+        crawl as the system swaps, or the operating system stops it.
+
+        A streaming program keeps a fixed-size buffer, perhaps 64 KB, fills it with the next part of the input, updates
+        a few running totals and reuses the same buffer for the next part. Its memory depends on the buffer and the
+        totals, not on the input, so it is the same for 2 KB and for 20 GB. The time still grows with the input, since
+        every byte is read once, but the memory does not.
+
+        Not every question can be answered this way. Counting bytes, lines and words, finding the longest line or adding
+        up a column needs only a few numbers carried from one chunk to the next. Counting distinct words, sorting lines or
+        finding the median needs memory that grows with the input, because the answer depends on everything seen so far.
+        The skill is to ask, before writing code, what state the answer has to carry.
+
+        Streaming also lets a program produce output before its input has finished arriving, which is what makes pipes
+        between tools work.
+      examples:
+        - Counting the lines of a 20 GB web server log with a streaming counter takes a few megabytes of memory and
+          finishes as fast as the disk can be read. Loading it first fails on most laptops.
+        - A video player decodes a few seconds ahead and throws away what it has shown, so a two-hour film never sits in
+          memory at once.
+        - Database backups are written and read as streams, so the size of the database is not limited by the memory of
+          the machine that makes the backup.
+      misconceptions:
+        - Reading line by line is always streaming. It is, until the code collects the lines into a list.
+        - A bigger buffer is always faster. Beyond some tens of kilobytes the disk is the limit, and more buffer only
+          costs memory.
+        - Streaming is only for huge files. The same code handles small files and pipes, so there is no reason to write
+          two versions.
+      elsewhere:
+        - HTTP servers stream request and response bodies, so a large upload does not need to fit in memory.
+        - grep, gzip, checksum programs and the merge phase of sort all stream.
+        - Data pipelines are designed around what state they must keep per record.
     prerequisites: [stream-read-contract]
 
   - slug: stdin-vs-file
     name: Standard input vs file
     area: streams-io
     kind: foundation
-    status: reviewed
+    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: A file and standard input can be treated as the same kind of byte stream, so one loop serves both.
+    lesson:
+      how_it_works: |-
+        Unix tools are built to be joined. A tool given a file name opens and reads that file; a tool given no name reads
+        standard input, which is whatever the shell connects to it: the keyboard, a file redirected into it, or the output
+        of another program through a pipe. Many tools also accept a single dash as a name that means standard input.
+
+        A file and standard input are both byte streams, read in the same way under the same read contract. So a tool
+        should open the right source and hand it to one shared counting loop, not keep one code path for files and
+        another for pipes.
+
+        Some things are true only of files. A file has a size that can be asked for without reading it, and a position
+        that can be moved back. A pipe has neither: its size is unknown until the writer finishes, and data once read is
+        gone. A tool that takes a shortcut that only works on files, such as asking for the size instead of counting
+        bytes, breaks the moment it is used in a pipeline.
+
+        The output side mirrors this: a tool writes its results to standard output, so the next tool in a pipeline, or a
+        file, can receive them.
+      examples:
+        - Piping a compressed log through a decompressor into wc counts its lines without ever writing the 20 GB of
+          uncompressed text to disk.
+        - wc prints the file name next to its counts, but reading a pipe there is no name to print, so it prints the
+          counts alone.
+        - A program that rewinds its input to read it twice works on files and fails, or hangs, on a pipe.
+      misconceptions:
+        - Standard input is the keyboard. It is whatever the shell connects to the program.
+        - A pipe is a temporary file. It is a buffer in the operating system, with no size and no rewind.
+        - Supporting pipes needs a separate code path. One loop over a byte stream serves both.
+      elsewhere:
+        - Compilers, formatters and build tools read standard input so editors and scripts can pipe code through them.
+        - Containers and services write logs to standard output so the platform can collect the stream.
+        - "Network sockets behave like pipes: no size and no rewind."
 
   - slug: stream-read-contract
     name: The read contract
     area: streams-io
     kind: foundation
-    status: reviewed
+    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: A read can return fewer bytes than the buffer holds. The returned count says how many are valid, and -1 means the end.
+    lesson:
+      how_it_works: |-
+        When a program asks the operating system to read into a buffer, it says how many bytes it wants at most. The
+        read returns how many it actually delivered, which can be anything from one to the size of the buffer. Only
+        those bytes are valid. The rest of the buffer still holds whatever was there before, often bytes from the
+        previous read.
+
+        A short read does not mean the input has ended. A file usually fills the buffer until its last part, but a pipe
+        delivers whatever the writing program has produced so far, and a network socket whatever packets have arrived.
+        Only a special result says the end has been reached: zero bytes in C and most operating systems, or minus one
+        from an InputStream in Java.
+
+        So a correct read loop follows three rules. Use the returned count, never the buffer size, for everything done
+        with the data. Keep reading after a short read. Stop only on the end marker. A loop that breaks the first rule
+        counts leftover bytes again. A loop that breaks the second stops early on pipes and networks while appearing to
+        work on files, which is why the bug often survives testing.
+      examples:
+        - A 10 KB file read with a 4 KB buffer usually comes back as 4 KB, 4 KB and 2 KB, then the end marker. A program
+          that always adds 4 KB reports 12 KB.
+        - When a slow program writes into a pipe a line at a time, each read may return one short line, although much
+          more is coming.
+        - Network code that expects one read to return one whole message works on a fast local network and fails when a
+          message is split across packets.
+      misconceptions:
+        - A read fills the buffer unless the input is over. It can return fewer bytes at any time.
+        - Getting fewer bytes than asked for means the end. Only the end marker means the end.
+        - The bytes beyond the count are zero. They are left over from earlier reads, so counting them adds real-looking
+          data.
+      elsewhere:
+        - Sockets follow the same contract, which is why network protocols need message framing.
+        - Every language wraps it, for example InputStream in Java, the read call in C and streams in Node.
+        - "Writes have a matching contract: a write can accept fewer bytes than offered, and the rest must be written
+          again."
 
   # ---- added for wc ----
   - slug: line-endings
@@ -70,7 +238,41 @@ concepts:
       A line is the text up to and including a newline byte, so tools count lines by counting newlines. A last
       line with no newline after it is not counted. Files written on Windows end each line with a carriage return
       and a newline, and the carriage return is an extra byte that line counting ignores but byte counting sees.
-    related: [bytes-vs-characters]
+    lesson:
+      how_it_works: |-
+        A file has no lines, only bytes. A line is a convention: in Unix, the text up to a newline byte, 0A. POSIX
+        defines a line as characters followed by a newline, so a file whose last line has no newline ends with an
+        incomplete line. wc counts newline bytes, so for such a file it reports one line fewer than an editor shows.
+
+        Windows ends each line with two bytes, a carriage return 0D and then a newline 0A, a habit from typewriters and
+        teleprinters, where returning the carriage and feeding the paper were separate actions. Classic Mac systems used
+        a carriage return alone. Most modern tools accept both, but not all.
+
+        The carriage return causes quiet bugs. Counting lines by newline still works, but the carriage return stays at
+        the end of each line's text, so a comparison with yes fails because the value is really yes followed by an
+        invisible character. It is also a byte, and whitespace for word counting. Git can convert line endings on
+        checkout, which changes a file's byte count between Windows and Linux machines.
+
+        Splitting a whole text at its newlines also produces an empty last piece when the file ends with a newline, and
+        code must not treat that piece as a real line.
+      examples:
+        - A CSV exported on Windows and read on Linux keeps a carriage return at the end of every last column, so a
+          filter for the value active matches nothing.
+        - An editor shows 10 lines and wc -l reports 9, because the last line has no newline. Each is right by its own
+          definition.
+        - A test that checks the byte count of a fixture passes on Linux and fails on a Windows CI runner, because Git
+          converted the line endings on checkout.
+      misconceptions:
+        - A line ends however the operating system ends it. Files move between systems, so a tool must handle both
+          endings.
+        - The number of lines is the number of newlines plus one. Not for a file that ends with a newline, and not for
+          an empty one.
+        - The carriage return is harmless because it is invisible. It changes comparisons, lengths and byte counts.
+      elsewhere:
+        - HTTP, SMTP and many other protocols require a carriage return and a newline at the end of every header line.
+        - Git's autocrlf setting and attributes file exist to control this conversion.
+        - Diff tools show a whole file as changed when only its line endings changed.
+    related: [text-encoding-utf8]
     resources:
       - title: Newline (Wikipedia)
         url: https://en.wikipedia.org/wiki/Newline
@@ -84,6 +286,40 @@ concepts:
       A word counter walks the text once and remembers one thing: whether it is inside a word. A word starts when a
       non-space character follows a space or the start of input, so runs of spaces never make empty words. The
       remembered state has to survive from one chunk of input to the next.
+    lesson:
+      how_it_works: |-
+        What is a word? wc's answer is simple and strict: a word is a run of characters that are not whitespace.
+        Punctuation is part of the word, so don't, e-mail and 3.14 are each one word, and a dash with spaces around it is
+        a word of its own. Spell checkers and search engines use the more complex word boundary rules of Unicode; wc does
+        not.
+
+        That definition fits a tiny state machine. The counter remembers one thing: whether it is inside a word. Reading
+        a non-space while outside a word starts a word, so the count goes up and the state becomes inside. Reading
+        whitespace makes the state outside. Runs of spaces therefore never create empty words, and leading or trailing
+        spaces do not matter.
+
+        The state has to survive chunk boundaries. If a word straddles two chunks and the counter forgets that it was
+        inside a word, the second half counts as a new word. Carrying one flag from one chunk to the next fixes it, and
+        that flag is the whole state.
+
+        The hard part is deciding what whitespace is. Space, tab, newline, carriage return, form feed and vertical tab
+        are the classic set. Unicode adds others, such as the no-break space U+00A0, the em space and the ideographic
+        space used in Chinese and Japanese text. Which of them count depends on the tool, its version and the locale, so
+        the same file can have different word counts on two machines.
+      examples:
+        - The phrase rock-and-roll is one word to wc and three to a person or a search engine.
+        - Text pasted from a web page often has no-break spaces between words, and a counter that does not treat them as
+          whitespace reports fewer words than the author expects.
+        - Japanese text usually has no spaces between words, so wc counts whole sentences as single words.
+      misconceptions:
+        - Counting words means counting spaces and adding one. Double spaces, leading spaces and empty files break that.
+        - A word is what a dictionary calls a word. For wc it is any run of non-whitespace.
+        - Whitespace means the space bar. Tabs, newlines and several Unicode characters count too, depending on the
+          locale.
+      elsewhere:
+        - "Lexers in compilers use the same idea with more states: inside a number, a string or a comment."
+        - Editors and search engines use the Unicode word boundary rules to select and index words.
+        - Protocol parsers carry a small state across network packets in exactly this way.
     related: [streaming-constant-memory]
     resources:
       - title: Finite-state machine (Wikipedia)
@@ -98,6 +334,37 @@ concepts:
       Run your tool and a trusted reference on the same inputs and compare the outputs. Your own expected values
       only test what you already believe, while the reference exposes cases you did not think of, such as odd
       whitespace or line endings. Pin the reference version and settings, since they can change its answers.
+    lesson:
+      how_it_works: |-
+        Unit tests compare your program with expected values that you wrote. That checks the cases you thought of,
+        against your understanding of the right answer. If your understanding is wrong, the code and the test are wrong
+        together, and the test passes.
+
+        Differential testing compares your program with another implementation on the same input, often a trusted
+        reference tool. When the outputs differ, one of the two is wrong, and finding out which teaches you something you
+        did not know, such as how the reference treats a no-break space or a file without a final newline.
+
+        It works best with many and varied inputs: an empty file, one without a final newline, Windows line endings,
+        accented text, emoji, invalid bytes, a file larger than the buffer, and piped input as well as named files.
+        Generating random inputs and comparing automatically, a form of fuzzing, finds cases nobody would write by hand.
+
+        The reference must be pinned. Different versions and builds of wc disagree on some inputs, and the locale changes
+        the answers, so record which version and settings produced the expected output.
+      examples:
+        - The real wc in Git Bash reports 58070 words for the challenge's file when run from a script and 58164 in its
+          terminal, because the locale differs, so a test that compares against it must pin the locale first.
+        - Compiler teams compile the same programs with two compilers and compare the results to find miscompilations.
+        - When a service is rewritten, running the old and new versions side by side on real traffic and comparing their
+          responses catches differences before users do.
+      misconceptions:
+        - If my unit tests pass, my tool matches the original. Only for the cases and answers you wrote down.
+        - The reference is always right. It has bugs and version differences too, so a difference is a question, not a
+          verdict.
+        - Comparing a couple of files is enough. The bugs live in the unusual inputs.
+      elsewhere:
+        - Browser engines, databases and JSON parsers are tested against each other and against shared test suites.
+        - Large refactorings often rely on comparing old and new outputs.
+        - Data migrations compare row counts and checksums between the old store and the new one.
     resources:
       - title: Differential testing (Wikipedia)
         url: https://en.wikipedia.org/wiki/Differential_testing
@@ -125,6 +392,37 @@ concepts:
       A command-line tool reads its options, subcommands and file names from its arguments, and rejects ones it does
       not understand. It writes results to standard output and problems to the error stream, and exits with a
       non-zero status on failure, so scripts can tell success from failure.
+    lesson:
+      how_it_works: |-
+        A command-line tool has a contract with its caller, which is often another program rather than a person. The
+        contract has three channels.
+
+        Standard output carries the result and nothing else, so it can be piped into the next tool or saved to a file.
+        Standard error carries messages for the person: warnings, usage help and errors. Keeping the two apart means an
+        error message never ends up inside a file of results.
+
+        The exit status, a small number returned when the program ends, says whether it worked. Zero means success and
+        anything else means failure, and some tools use different values for different problems. Shells, scripts and CI
+        systems check it, so a step that fails but exits with zero lets a broken build pass.
+
+        Arguments complete the contract. Options such as -c and -l choose what to do and can usually be combined, the
+        remaining words are file names, and an unknown option is an error with a usage message, not something to ignore.
+        When several files are given and one cannot be read, a well-behaved tool reports that file on standard error,
+        still processes the others, and exits with a non-zero status at the end.
+      examples:
+        - A deploy script runs the tests and checks their exit status. If the tests fail but the command exits with
+          zero, broken code ships.
+        - A tool that prints its errors on standard output corrupts every report that saves its output to a file.
+        - GNU wc given three files, one of them missing, prints counts for the two that exist and a total, writes an
+          error about the third on standard error, and exits with status 1.
+      misconceptions:
+        - Exit codes are for people to read. They are mainly for other programs.
+        - Printing an error is enough. Without a non-zero exit status a script cannot tell that anything went wrong.
+        - Results and error messages can share one stream. Mixing them breaks pipelines.
+      elsewhere:
+        - CI systems mark a step as failed purely from its exit status.
+        - HTTP status codes play the same role for web APIs that exit statuses play for commands.
+        - Container platforms decide whether to restart a service from how its process exited.
     resources:
       - title: Command Line Interface Guidelines
         url: https://clig.dev/
@@ -1286,3 +1584,321 @@ concepts:
     resources:
       - title: Write-ahead logging (Wikipedia)
         url: https://en.wikipedia.org/wiki/Write-ahead_logging
+
+  # ---- added for content v2 (concept-first), wc ----
+  - slug: text-encoding-utf8
+    name: Unicode code points and UTF-8
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: Unicode gives every character a number, its code point. UTF-8 stores each code point in one to four bytes,
+      with plain ASCII in one byte, so the byte count and the character count of the same text often differ.
+    lesson:
+      how_it_works: |-
+        Text in a file is only bytes. To turn bytes into letters, the program that wrote them and the program that
+        reads them must agree on an encoding: a rule that maps each character to bytes and back.
+
+        Unicode splits this into two questions. First, which character is it? Unicode gives every character a number
+        called its code point, written like U+0041 for the capital letter A or U+1F600 for the grinning face emoji, with
+        room for about 1.1 million of them. Second, how is that number stored? That is the job of an encoding such as
+        UTF-8, UTF-16 or UTF-32.
+
+        UTF-8 uses a variable number of bytes. Code points up to U+007F, which is plain ASCII, take one byte, exactly as
+        in ASCII. Code points up to U+07FF take two bytes (accented Latin letters, Greek, Cyrillic, Arabic, Hebrew), up
+        to U+FFFF take three (most Chinese, Japanese and Hindi text, and the euro sign), and the rest take four, which
+        includes most emoji. The first byte of a character says how many bytes it has: its leading bits are 0 for one
+        byte, or 110, 1110 or 11110 for two, three or four. Every following byte starts with the bits 10, so a reader
+        dropped anywhere in a file finds the start of the next character by skipping bytes that start with 10.
+
+        Why this design? Every ASCII file is already valid UTF-8, so old files and tools kept working. No multi-byte
+        character contains a byte that looks like an ASCII letter, a slash, a newline or a zero, so tools that only care
+        about those bytes, such as counting lines by newline, work on UTF-8 without decoding it. And UTF-8 has no byte
+        order question, because it is a sequence of single bytes.
+
+        Some programs write the three bytes EF BB BF at the very start of a UTF-8 file. This byte order mark only says
+        "this is UTF-8", and many tools do not expect it.
+      examples:
+        - The word café is 4 characters but 5 bytes in UTF-8, because é (U+00E9) needs two bytes. A column limited to 4
+          bytes cannot hold it, and a tool that counts bytes as letters reports 5.
+        - For years the MySQL encoding called utf8 stored at most three bytes per character, so saving an emoji in a
+          username failed or cut the text short. The fix was a separate encoding, utf8mb4, which allows four.
+        - "A web address cannot contain é directly, so browsers send its two UTF-8 bytes in percent form: café becomes
+          caf%C3%A9."
+      misconceptions:
+        - UTF-8 means 8 bits per character. It means the code unit is 8 bits, and a character takes one to four units.
+        - Unicode is an encoding. Unicode is the list of characters and their numbers; UTF-8, UTF-16 and UTF-32 are ways
+          to store those numbers.
+        - A file's size in bytes is its number of characters. That holds only for plain ASCII text.
+        - A UTF-8 file must start with a byte order mark. It needs none, and the mark can break tools that read the
+          first line or column name.
+      elsewhere:
+        - JSON exchanged between systems must be UTF-8, and so is almost every web page and API.
+        - Databases limit text in bytes or in characters depending on the type, which matters as soon as users type
+          other scripts or emoji.
+        - Go and Rust strings hold UTF-8 bytes, so their length is a byte count, not a character count.
+    related:
+      - utf16-code-units
+      - grapheme-clusters
+    resources:
+      - title: UTF-8 (Wikipedia)
+        url: https://en.wikipedia.org/wiki/UTF-8
+      - title: Unicode FAQ, UTF-8, UTF-16, UTF-32 and BOM
+        url: https://www.unicode.org/faq/utf_bom.html
+
+  - slug: utf16-code-units
+    name: UTF-16, UTF-32 and code units
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: "UTF-16 stores code points in 16-bit units: one unit for most characters and a surrogate pair of two units
+      for the rest, including most emoji. Java, JavaScript, C# and Windows use it, so their string length counts
+      units, not characters."
+    lesson:
+      how_it_works: |-
+        UTF-16 stores text in units of 16 bits. A code point up to U+FFFF, the Basic Multilingual Plane that holds almost
+        every living script, fits in one unit. A code point above U+FFFF, such as U+1F600, does not fit, so it is split
+        across two units called a surrogate pair. The first comes from the high surrogate range D800 to DBFF and the
+        second from the low surrogate range DC00 to DFFF. Those ranges are never used for real characters, so a reader
+        always recognises a pair.
+
+        This matters because Java, JavaScript, C#, Objective-C and the Windows text APIs store strings as UTF-16, and
+        their length counts code units. A string holding one grinning face has length 2 there. Cutting such a string at
+        a fixed length can split a pair and leave half an emoji, which shows up as a box or a question mark. Counting or
+        slicing by code point needs separate methods that each language provides.
+
+        Because a unit is two bytes, UTF-16 also needs a byte order: UTF-16LE puts the low byte first and UTF-16BE the
+        high byte first. A file may begin with the mark FF FE or FE FF to say which.
+
+        UTF-32 stores every code point in four bytes. It is simple to index, since the nth code point starts at byte 4n,
+        but it uses four times the space of ASCII text, so it is rare in files.
+
+        Before Unicode, single-byte encodings such as Latin-1 and Windows-1252 mapped 256 values to the letters of one
+        group of languages. Reading UTF-8 bytes as Windows-1252 turns café into cafÃ©, the garbled text called mojibake.
+      examples:
+        - A social app limits posts by JavaScript string length. A post of 140 emoji measures 280, so users meet a limit
+          that seems to shrink.
+        - A notification cuts a message at 100 units to fit the screen. If unit 100 is the first half of a surrogate
+          pair, the phone shows a broken symbol at the end.
+        - Excel's Unicode Text export writes UTF-16LE with the mark FF FE, so a script expecting UTF-8 sees a zero byte
+          after every English letter.
+      misconceptions:
+        - UTF-16 uses exactly two bytes per character. Characters above U+FFFF take four bytes, two units.
+        - String length in Java or JavaScript counts characters. It counts UTF-16 units, so most emoji count as two.
+        - UTF-32 gives one unit per visible character. It gives one per code point, and a visible character can be
+          several.
+      elsewhere:
+        - JSON writes an escaped character above U+FFFF as two escapes, one per surrogate, so a parser must join them.
+        - Windows file names are UTF-16, so tools that move files between Windows and Linux convert the names.
+        - Any API with a length limit needs to say whether it means bytes, UTF-16 units, code points or what users see.
+    prerequisites:
+      - text-encoding-utf8
+    resources:
+      - title: UTF-16 (Wikipedia)
+        url: https://en.wikipedia.org/wiki/UTF-16
+      - title: MDN, String length
+        url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/length
+        language: javascript
+
+  - slug: grapheme-clusters
+    name: What users see as one character
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: "A grapheme cluster is what a reader sees as one character, and it can be several code points: a letter and a
+      combining accent, an emoji and a skin tone, or emoji joined into a family. The same visible text can also be
+      stored as different code points, which normalisation makes comparable."
+    lesson:
+      how_it_works: |-
+        Code points are not the characters a person sees. Unicode builds many visible characters out of several code
+        points, and calls the visible unit a grapheme cluster.
+
+        Combining marks attach to the character before them: e followed by U+0301, the combining acute accent, shows as
+        é. Emoji use the same idea. The thumbs up U+1F44D followed by the skin tone modifier U+1F3FD shows as one thumb
+        but is two code points. A family emoji of a man, a woman and a girl is three person emoji joined by two invisible
+        zero width joiners, U+200D, so it is five code points and eighteen UTF-8 bytes for one picture. A flag is two
+        regional indicator letters: the Indian flag is the letters I and N.
+
+        Because of combining marks, the same visible text can be stored in more than one way. é can be the single code
+        point U+00E9, called precomposed, or e plus U+0301, called decomposed. They look identical but compare as
+        different strings and have different lengths and bytes. Normalisation converts text to one agreed form: NFC
+        prefers precomposed characters and NFD takes them apart. Compare and store text only after normalising it the
+        same way.
+
+        Counting what users see needs the segmentation rules of Unicode Annex 29, which libraries implement. Most tools,
+        including wc with -m, count code points instead, so a family emoji counts as five characters there.
+      examples:
+        - Two accounts both called José can exist side by side if one phone sent the precomposed é and another system
+          sent e plus an accent, unless the sign-up form normalises names.
+        - A form that limits display names to 10 characters by counting code points rejects a short name with a family
+          emoji in it, although the user sees far fewer than 10 characters.
+        - macOS used to store file names in decomposed form, so a file named café there could fail to match the same
+          name typed on Linux.
+      misconceptions:
+        - One code point is one character. A visible character can be many code points.
+        - Strings that look the same are equal. They are equal only when their code points match, which may need
+          normalising first.
+        - Reversing or cutting text one code point at a time is safe. It can separate an accent from its letter or break
+          up an emoji.
+      elsewhere:
+        - Text editors move the cursor and delete by grapheme cluster, so one backspace removes a whole family emoji.
+        - Search and databases need normalisation and collation rules so that café finds café however it was typed.
+        - Password checks should normalise first, or the same password typed on another keyboard can fail.
+    prerequisites:
+      - text-encoding-utf8
+    resources:
+      - title: Unicode Standard Annex 29, Text Segmentation
+        url: https://www.unicode.org/reports/tr29/
+      - title: Unicode Standard Annex 15, Normalization Forms
+        url: https://unicode.org/reports/tr15/
+
+  - slug: io-buffering
+    name: Buffered I/O and system calls
+    area: streams-io
+    kind: foundation
+    status: generated
+    brief: Every read from the operating system is a system call with a fixed cost, so reading one byte at a time is
+      slow even though the data is the same. Reading into a buffer of some kilobytes and working from memory spreads
+      that cost over many bytes.
+    lesson:
+      how_it_works: |-
+        Programs do not read files by themselves. They ask the operating system through a system call, and each call
+        has a fixed cost: switching into the kernel, checking the request, copying the data, switching back. That cost
+        is small, but paid once per byte it dominates everything else.
+
+        A buffer fixes this. The program asks for many bytes at once, perhaps 64 KB, then works through them in memory,
+        where each byte costs almost nothing. One system call now serves tens of thousands of bytes. Languages offer
+        buffered readers and writers that keep such a buffer behind the scenes, so code can ask for one byte or one line
+        at a time without paying a system call for each.
+
+        The operating system buffers too. Recently read parts of files stay in memory in the page cache, and the system
+        reads ahead when it sees a file being read in order. That is why counting a file the second time is often much
+        faster than the first.
+
+        Bigger is not always better. Once the buffer holds some tens of kilobytes, the time goes into waiting for the
+        disk or copying memory, not into calls, and a bigger buffer only uses more memory. Measuring is the honest way to
+        choose a size.
+      examples:
+        - Counting a 1 GB file one byte per system call makes about a billion calls and can take minutes. Reading 64 KB
+          at a time makes about sixteen thousand calls and takes seconds.
+        - Writing a log without a buffer slows a busy server down, so logging libraries buffer and write out the buffer
+          on a timer or when it fills.
+        - Running wc twice on the same large file is faster the second time, because the file now sits in the page cache.
+      misconceptions:
+        - A buffered reader holds the whole file. It holds one buffer's worth at a time.
+        - When code asks for one byte, the disk reads one byte. Disks and the operating system work in blocks of
+          kilobytes.
+        - Buffered output is written the moment the code writes it. It waits in the buffer until the buffer fills or is
+          flushed, so a crash can lose the last part.
+      elsewhere:
+        - Sockets, database drivers and file uploads all buffer for the same reason.
+        - Forgetting to flush a buffered writer before a program exits is a classic cause of missing last lines in
+          output files.
+        - Tracing tools such as strace on Linux count system calls, which exposes unbuffered code.
+    related:
+      - streaming-constant-memory
+      - stream-read-contract
+    resources:
+      - title: System call (Wikipedia)
+        url: https://en.wikipedia.org/wiki/System_call
+      - title: Page cache (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Page_cache
+
+  - slug: malformed-input
+    name: Handling malformed input
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: "Real input breaks its format: invalid UTF-8 bytes, a truncated last record, a value out of range. A tool
+      must decide whether to reject it, replace the bad part or skip it, and say clearly where the problem was."
+    lesson:
+      how_it_works: |-
+        Every format has rules, and real input breaks them: a file cut off in the middle of a write, a byte that cannot
+        start any UTF-8 character, a log line written by a buggy program. A tool cannot pretend this never happens, so it
+        needs a policy.
+
+        There are three honest choices. Reject: stop and report an error with the position of the bad input, which is
+        right when wrong output would be worse than none, such as when loading configuration. Replace: put a marker in
+        place of the bad part and carry on, which is what text decoders usually do, substituting U+FFFD, the replacement
+        character, for each invalid sequence. Skip: drop the bad part quietly, which keeps the tool running but hides
+        problems, so it should at least be counted or logged.
+
+        In UTF-8 the invalid cases are a continuation byte with no lead byte before it, a lead byte without enough
+        continuation bytes after it, a sequence longer than its code point needs, called overlong, and the code points
+        reserved for UTF-16 surrogates. Overlong forms matter for security: an old attack wrote a slash as two bytes to
+        slip past filters that only looked for the one-byte slash.
+
+        Whatever the policy, write it down, apply it the same way at a chunk boundary as in the middle of a chunk, and
+        test it, ideally against a reference tool.
+      examples:
+        - A log file holds a few bytes of binary data from a crashed process. A character counter that stops at the
+          first invalid byte cannot report anything about the rest of a 20 GB file.
+        - Browsers show U+FFFD, often drawn as a black diamond with a question mark, wherever a page's bytes are not
+          valid in its declared encoding.
+        - A JSON parser must reject invalid UTF-8 in a string instead of guessing, because two systems that guess
+          differently would read different data.
+      misconceptions:
+        - Input from files is well formed. Truncated writes, wrong encodings and binary junk happen every day.
+        - Replacing bad bytes loses nothing important. It changes the data, so the tool should say that it happened.
+        - Being lenient is always kinder. A lenient reader and a strict one can disagree about the same input, and
+          attackers use that.
+      elsewhere:
+        - Parsers for JSON, HTTP, DNS and file formats all need a policy for malformed input.
+        - Data pipelines often send bad records to a separate queue instead of failing or dropping them.
+        - Security reviews look for places where two components treat malformed input differently.
+    related:
+      - decoding-across-chunks
+    resources:
+      - title: Robustness principle (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Robustness_principle
+      - title: Specials, the Unicode block with the replacement character (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Specials_(Unicode_block)
+
+  - slug: locale-settings
+    name: Locales and the environment
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: A locale is a set of environment settings, such as LANG and LC_ALL, that tells programs which encoding,
+      character classes and sorting rules to use. The same command can give different answers under two locales, so
+      tests must set it.
+    lesson:
+      how_it_works: |-
+        Many Unix tools do not decide by themselves how to read text. They ask the C library, which follows the locale:
+        environment variables such as LANG, LC_CTYPE and LC_ALL, where LC_ALL overrides the others. A locale name such as
+        en_US.UTF-8 or C.UTF-8 says which language conventions to follow and which encoding to decode with.
+
+        The plain C locale, also called POSIX, treats every byte as one character and only ASCII letters as letters. In
+        that locale wc -m counts bytes, so it gives the same number as wc -c, and é counts as two characters. In a UTF-8
+        locale wc -m decodes UTF-8 and counts code points. The locale also decides which characters are whitespace for
+        wc -w, which characters grep calls letters, and how sort orders lines.
+
+        So a result can change without any change to the file or the program: another terminal, a scheduled job with an
+        almost empty environment, a container image built without locale data, or a CI runner. Git Bash on Windows, for
+        example, sets a UTF-8 locale in its terminal window but not always for scripts, and its wc counts an emoji above
+        U+FFFF as two characters even in UTF-8.
+
+        To get reproducible results, set the locale explicitly whenever a test or script runs a tool, and record which
+        locale an expected value was taken with.
+      examples:
+        - The challenge's test file gives 339292 for wc -m in a UTF-8 locale and 342190, its byte count, in the C
+          locale, on the same machine.
+        - A nightly job that sorts customer names produces a different order from the same command typed in a terminal,
+          because the scheduler runs it with the C locale.
+        - A container image without locale data falls back to C, so a tool that handled accented names on a laptop
+          treats them as bytes in production.
+      misconceptions:
+        - A program behaves the same wherever it runs. Its environment, including the locale, is part of its input.
+        - The locale only changes language and date formats. It also decides decoding, character classes and sort order.
+        - A UTF-8 file is always read as UTF-8. The tool uses the locale's encoding, whatever the file holds.
+      elsewhere:
+        - sort, grep, awk and many language runtimes read the locale.
+        - Databases have a collation setting that plays the same role for sorting and comparing text.
+        - Number formats differ by locale, such as a comma or a point before decimals, which breaks parsing numbers
+          written on another machine.
+    related:
+      - explicit-charsets
+    resources:
+      - title: The GNU C Library, Locales and Internationalization
+        url: https://www.gnu.org/software/libc/manual/html_node/Locales.html
+      - title: ArchWiki, Locale
+        url: https://wiki.archlinux.org/title/Locale

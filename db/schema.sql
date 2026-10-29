@@ -39,6 +39,22 @@ language sql immutable as $$
   end
 $$;
 
+-- A concept lesson (content v2) is {"how_it_works": text, "examples": [text], "misconceptions": [text],
+-- "elsewhere": [text]}, with 1 to 5 entries in each list.
+create function is_lesson(l jsonb) returns boolean
+language sql immutable as $$
+  select case
+    when l is null or jsonb_typeof(l) <> 'object' then false
+    when jsonb_typeof(l -> 'how_it_works') is distinct from 'string' then false
+    else not exists (
+      select 1 from unnest(array['examples', 'misconceptions', 'elsewhere']) f
+      where jsonb_typeof(l -> f) is distinct from 'array'
+         or jsonb_array_length(l -> f) not between 1 and 5
+         or exists (select 1 from jsonb_array_elements(l -> f) e where jsonb_typeof(e) <> 'string')
+    )
+  end
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Lookups
 -- ---------------------------------------------------------------------------
@@ -89,6 +105,7 @@ create table concept (
   language       text check (language is null or language = lower(language)),
   framework      text check (framework is null or framework = lower(framework)),
   brief          text,
+  lesson         jsonb check (lesson is null or is_lesson(lesson)),  -- the full lesson, content v2
   content_status text not null default 'generated'
                  check (content_status in ('generated', 'reviewed')),
   created_at     timestamptz not null default now(),

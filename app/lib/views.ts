@@ -100,6 +100,32 @@ async function pendingRun(enrollmentId: string, column: "step_id" | "question_id
   return r && (r.status === "queued" || r.status === "running" || r.status === "paused") ? r : null;
 }
 
+/** Generated language notes and verified references for some concepts, plus the run still preparing them. */
+export async function languageLayer(enrollmentId: string, language: string | null, framework: string | null, conceptIds: string[]) {
+  const notes = language
+    ? await rows<{ concept_id: string; status: string; data: any }>(
+        `select concept_id, status, data from concept_language where concept_id = any($1) and language = $2 and framework = $3`,
+        [conceptIds, language, framework ?? ""]
+      )
+    : [];
+  const refs = await rows<{ concept_id: string; title: string; url: string }>(
+    `select concept_id, title, url from resource where concept_id = any($1) and http_status = 200 and verified_at is not null and language is null order by verified_at`,
+    [conceptIds]
+  );
+  const runs = await rows<{ id: string; kind: string; status: string }>(
+    `select distinct on (kind) id, kind, status from run where enrollment_id = $1 and kind in ('language', 'references') order by kind, created_at desc`,
+    [enrollmentId]
+  );
+  const active = (k: string) => runs.find((r) => r.kind === k && (r.status === "queued" || r.status === "running"))?.id ?? null;
+  return {
+    language, framework,
+    notes: notes.filter((n) => n.status === "done").map((n) => ({ conceptId: n.concept_id, ...(typeof n.data === "string" ? JSON.parse(n.data) : n.data) })),
+    references: refs.map((r) => ({ conceptId: r.concept_id, title: r.title, url: r.url })),
+    languageRunId: active("language"),
+    referencesRunId: active("references"),
+  };
+}
+
 export async function projectHome(learnerId: string | null, slug: string) {
   const ch = await project(slug);
   if (!ch) return null;
@@ -144,8 +170,8 @@ export async function stepView(learnerId: string, slug: string, m: number, s: nu
   const hasHint = await rows<{ level: string }>(`select distinct level from hint where step_id = $1`, [step.id]);
   const milestones = await milestonesFor(ch.id, en.id);
   const concepts = (await conceptsFor(ch.id, learnerId)).filter((c) => c.milestone === m);
-  const milestoneConcepts = await rows<{ id: string; slug: string; name: string; brief: string; status: string }>(
-    `select c.id, c.slug, c.name, c.brief, coalesce(cs.status, 'new') as status from milestone_concept mc join concept c on c.id = mc.concept_id
+  const milestoneConcepts = await rows<{ id: string; slug: string; name: string; brief: string; status: string; lesson: unknown }>(
+    `select c.id, c.slug, c.name, c.brief, coalesce(cs.status, 'new') as status, to_jsonb(c) -> 'lesson' as lesson from milestone_concept mc join concept c on c.id = mc.concept_id
        left join concept_state cs on cs.concept_id = c.id and cs.learner_id = $2 where mc.milestone_id = $1 order by c.name`,
     [step.milestone_id, learnerId]
   );
@@ -181,6 +207,9 @@ export async function stepView(learnerId: string, slug: string, m: number, s: nu
     help: { hint: hasHint.some((h) => h.level === "hint"), example: hasHint.some((h) => h.level === "example") },
     latest, runId: run?.id ?? null, runPaused: run?.status === "paused", runBody: run?.body ?? null, wrongTries,
     milestones, concepts: milestoneConcepts.length ? milestoneConcepts : concepts,
+    language: await languageLayer(en.id, en.language, en.framework, milestoneConcepts.map((c) => c.id)),
+    // Concept lessons (CONTENT_FORMAT v2). to_jsonb keeps this working before the column exists.
+    lessons: milestoneConcepts.filter((c) => c.lesson).map(({ id, slug, name, lesson }) => ({ id, slug, name, lesson })),
     mentor: { messages, traces, runs: mentorRuns, activeRunId: mentorRun && (mentorRun.status === "queued" || mentorRun.status === "running") ? mentorRun.id : null },
     prev: idx > 0 ? all[idx - 1] : null,
     next: idx >= 0 && idx < all.length - 1 ? all[idx + 1] : null,

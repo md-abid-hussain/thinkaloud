@@ -93,6 +93,8 @@ Other places that matter:
 
 ## 5. Next tasks, in order
 
+> Update 2026-10-29, later: the user rejected the v1 content as tool trivia. Content v2 is concept-first (CONTENT_FORMAT.md, top section). `wc` is rewritten as the worked example (`format: 2`, 5 concept milestones, 15 concept lessons in `concepts.yaml`, preview in `content/previews/challenge-wc.md`) and awaits the user's approval. The other 20 projects are still format 1. Schema change: `concept.lesson`.
+>
 > Update 2026-10-29: steps 1 (decisions 8 and 9), 2 (v0.4) and most of 3 (content) below are done. Task Tracker was not written (v1 is Coding Challenges only). What remains for content is the user's key review in `content/REVIEW_SHEET.md`, then setting reviewed projects to `reviewed`.
 >
 > Key matchers rewritten for dictated answers (`db/support/matching.mjs`, rules in `CONTENT_FORMAT.md`): number words, decimals, restated question numbers ignored, working with a conclusion accepted, order checked for numbers_all, hedges and number sprays rejected, spacing ignored in text keys. `npm test` checks all 135 keys against natural answers and guesses (52 tests).

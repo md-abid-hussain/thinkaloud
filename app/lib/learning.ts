@@ -42,8 +42,8 @@ export async function yourLearning(learnerId: string) {
 }
 
 export async function conceptPage(slug: string, learnerId: string | null) {
-  const c = await one<{ id: string; slug: string; name: string; brief: string; area: string; content_status: string }>(
-    `select c.id, c.slug, c.name, c.brief, a.name as area, c.content_status from concept c join concept_area a on a.slug = c.area_slug where c.slug = $1`, [slug]
+  const c = await one<{ id: string; slug: string; name: string; brief: string; area: string; content_status: string; lesson: unknown }>(
+    `select c.id, c.slug, c.name, c.brief, a.name as area, c.content_status, to_jsonb(c) -> 'lesson' as lesson from concept c join concept_area a on a.slug = c.area_slug where c.slug = $1`, [slug]
   );
   if (!c) return null;
   const link = await one<{ title: string; url: string }>(

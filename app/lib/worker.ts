@@ -2,4 +2,6 @@
 import "server-only";
 import "@/lib/grading";
 import "@/lib/mentor";
+import "@/lib/research";
+export { startLanguageRun, startReferencesRun } from "@/lib/research";
 export { createRun, retryRun, recoverRuns, runFor, eventsAfter, runBus } from "@/lib/runs";

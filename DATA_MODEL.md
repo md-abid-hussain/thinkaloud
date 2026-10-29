@@ -165,7 +165,7 @@ erDiagram
 | Curriculum | `hint` | The static help for a step: a hint and an example, written once | One per step, level and language. An empty language applies to every language |
 | Curriculum | `task` | A step's Think task (required) and Build task (optional) | One of each role per step. Predict and trace need an answer key, explain and spot-the-bug need a rubric of 2 to 4 points, build has neither |
 | Curriculum | `question` | The milestone's teach-back (v1), or up to three older gate questions | Position 1 to 3. A teach-back has no `concept_id` and tags every rubric point with a concept slug. A trigger checks every tag is a concept the milestone covers, and the composite key does the same for `concept_id` |
-| Curriculum | `concept` | A concept with its area, kind (foundation, language, framework) and brief | Foundation has no language. Language has one. Framework has both |
+| Curriculum | `concept` | A concept with its area, kind (foundation, language, framework), brief and lesson | Foundation has no language. Language has one. Framework has both. `lesson` (content v2) is `{how_it_works, examples, misconceptions, elsewhere}` with `is_lesson()` |
 | Curriculum | `concept_edge` | The graph: prerequisite and related links | No self links. A prerequisite cycle is rejected by a trigger. A related pair is stored once |
 | Curriculum | `milestone_concept` | Which concepts a milestone covers | |
 | Curriculum | `resource` | A verified link for a concept | Shown only when the status is 200 and it has been verified |
@@ -301,6 +301,7 @@ select c.slug from up join concept c on c.id = up.id order by c.slug;
 | Primer | `challenge.primer jsonb` with `is_primer()` | `{"what", "why", "example", "words": [{"term", "meaning"}]}`, 1 to 6 words. Loaded from the project file |
 | Figure | `challenge.figure_kind` | One of the 17 kinds in `design/DESIGN_SYSTEM.md` section 7. Optional |
 | Teach-back (decision 8) | `question.concept_id` nullable, `question_concepts_check` trigger, position 1 to 3 | Recipe `gateAnswer` marks each met point's concept explained |
+| Concept lessons (content v2) | `concept.lesson jsonb` with `is_lesson()` | Added 2026-10-29 for concept-first content. Required by the checker for every concept a `format: 2` project uses |
 | Checker rules | `scripts/import-content.mjs` | Primer required, no code signs in hints, examples, primers and language notes, teach-back tags cover the milestone's concepts, every key proven by `content/proofs/<slug>.mjs` |
 
 None of these change the progress rules: a milestone is understood when its steps are done and its teach-back is met, at every support level.

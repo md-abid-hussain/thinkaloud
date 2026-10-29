@@ -2,6 +2,8 @@
 // The step as a transcript: the Think prompt, the learner's answer, the check, then the help ladder and the Build fold.
 // Predict and trace answers are checked by key at once. Explain and spot-the-bug answers start a grade run the
 // learner can leave; coming back follows the same run.
+import Lesson from "./Lesson";
+import Learn from "./Learn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -228,7 +230,7 @@ export default function StepPane({ data }: { data: StepData }) {
   return (
     <>
       <div className="step-h">
-        <p className="label"><b>Milestone {ms.position}</b> · step {step.position} of {ms.steps}</p>
+        <p className="label"><b>Milestone {ms.position} · {ms.title}</b> · check {step.position} of {ms.steps}</p>
         <h1>{step.title}</h1>
         <ul className="kind">
           <li>{kind.t}</li>
@@ -236,6 +238,9 @@ export default function StepPane({ data }: { data: StepData }) {
           <li>{keyed ? "Checked at once against an answer key" : "Graded by rubric, with your words as evidence"}</li>
         </ul>
       </div>
+
+      <Lesson concepts={data.lessons} open={data.enrollment.supportLevel === "guided" && step.position === 1} />
+      <Learn data={data.language} concepts={data.concepts.map((c) => ({ id: c.id, name: c.name }))} open={step.position === 1} />
 
       <div className="tx">
         <Ts at={openedAt} />

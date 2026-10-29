@@ -12,6 +12,8 @@ import { anthropic, FALLBACK_BETA, GRADER_MODEL, MENTOR_MODEL } from "@/lib/llm"
 import { assertBudget, recordUsage } from "@/lib/spend";
 import { registerHandler, type RunContext } from "@/lib/runs";
 import { dryKeyCheck, giveHelp, isKeyed, thinkTask } from "@/lib/progress";
+import { looksLikeCode } from "@/lib/codecheck";
+import { docsFor, REFERENCE_DOCS, searchDocs, verifyLink, type SearchHit } from "@/lib/web";
 
 const MAX_MODEL_CALLS = 6;
 const MAX_TOOL_CALLS = 8;
@@ -44,12 +46,13 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) =>
   ({ type: "object" as const, properties, required, additionalProperties: false });
 
 const TOOLS: ToolDef[] = [
-  { name: "get_step_context", description: "The current step: its Think task (prompt, snippet, kind), the rubric points or answer key (to steer, never to reveal), the stored hint and example, the milestone's concepts with their briefs, and language notes for the learner's language.", input_schema: obj({}) },
+  { name: "get_step_context", description: "The current step: its Think task (prompt, snippet, kind), the rubric points or answer key (to steer, never to reveal), the stored hint and example, the milestone's concepts with their briefs and lessons (teach from the lesson), and language notes for the learner's language.", input_schema: obj({}) },
   { name: "get_learner_history", description: "This learner's past answers on this step with their grades, help used, concept states for this milestone, and misconceptions saved earlier (across projects).", input_schema: obj({}) },
   { name: "check_answer", description: "Read the latest grade the app recorded for this step. For a predict or trace task you may also pass text the learner wrote in chat to see whether it would match the key; this records nothing.", input_schema: obj({ text: { type: "string", description: "Optional: the learner's answer as written in chat" } }) },
   { name: "give_help", description: "Return the stored hint (rung 'hint') or similar-case example (rung 'example') for this step, and log it in the learner's help log.", input_schema: obj({ rung: { type: "string", enum: ["hint", "example"] } }, ["rung"]) },
   { name: "draw_diagram", description: "Show a small Mermaid diagram of one relationship in the mentor panel (flowchart, sequenceDiagram or stateDiagram). Keep it to about 8 nodes.", input_schema: obj({ mermaid: { type: "string" }, caption: { type: "string" } }, ["mermaid", "caption"]) },
-  { name: "find_resource", description: "Look up the verified link for a concept (by concept slug or name). Returns nothing if no verified link exists; never invent links.", input_schema: obj({ concept: { type: "string" } }, ["concept"]) },
+  { name: "find_resource", description: "Verified reading for a concept (by concept slug or name): stored links first, otherwise a search of official docs, specs and well-known references. Every link returned has just answered HTTP 200. Never invent links.", input_schema: obj({ concept: { type: "string" } }, ["concept"]) },
+  { name: "search_docs", description: "Search a language's or framework's official documentation, for questions like 'which class do I use for this in Java?'. Returns verified pages with snippets. Name the APIs you find; don't write code with them.", input_schema: obj({ language: { type: "string" }, query: { type: "string" } }, ["language", "query"]) },
   { name: "note_misconception", description: "Save what the learner got wrong about a concept, so later sessions and projects can address it. Short, factual, in third person.", input_schema: obj({ concept: { type: "string", description: "Concept slug or name" }, text: { type: "string" } }, ["text"]) },
   { name: "save_for_later", description: "Park an off-topic question in the learner's Later list. It never counts toward progress.", input_schema: obj({ text: { type: "string" } }, ["text"]) },
   { name: "suggest_next", description: "Find the learner's next unfinished step and the concepts that are ready to learn next.", input_schema: obj({}) },
@@ -67,6 +70,7 @@ const Inputs = {
   give_help: z.object({ rung: z.enum(["hint", "example"]) }),
   draw_diagram: z.object({ mermaid: z.string().min(5).max(2000), caption: z.string().max(200) }),
   find_resource: z.object({ concept: z.string() }),
+  search_docs: z.object({ language: z.string(), query: z.string().min(3).max(300) }),
   note_misconception: z.object({ concept: z.string().optional(), text: z.string().min(3).max(500) }),
   save_for_later: z.object({ text: z.string().min(3).max(500) }),
   suggest_next: z.object({}).passthrough(),
@@ -79,7 +83,7 @@ export interface MentorInput {
 }
 
 const json = <T,>(v: unknown): T => (typeof v === "string" ? JSON.parse(v) : v) as T;
-const CODE = /```|^\s*(for|while|if|def|function|public|private|int|let|const|var|return)\b[^\n]*[({:=;]\s*$/m;
+const CODE = { test: looksLikeCode };
 
 interface Ctx {
   learnerId: string;
@@ -89,9 +93,15 @@ interface Ctx {
   showCode: boolean;
 }
 
+/** Keeps search hits that answer HTTP 200 on the allow-list right now, with their snippets. */
+async function verifiedHits(hits: SearchHit[], domains: string[], max: number) {
+  const checked = await Promise.all(hits.slice(0, max + 2).map(async (h) => ({ h, url: await verifyLink(h.url, domains) })));
+  return checked.filter((x) => x.url).slice(0, max).map(({ h, url }) => ({ title: h.title, url: url!, snippet: h.snippet.slice(0, 600) }));
+}
+
 async function conceptBySlugOrName(s: string) {
-  return one<{ id: string; slug: string; name: string }>(
-    `select id, slug, name from concept where slug = $1 or lower(name) = lower($1) limit 1`, [s.trim()]
+  return one<{ id: string; slug: string; name: string; brief: string | null }>(
+    `select id, slug, name, brief from concept where slug = $1 or lower(name) = lower($1) limit 1`, [s.trim()]
   );
 }
 
@@ -105,8 +115,8 @@ async function runTool(c: Ctx, name: string, input: any): Promise<{ result: unkn
       const t = await thinkTask(c.stepId);
       const build = await one<{ prompt: string }>(`select prompt from task where step_id = $1 and role = 'build'`, [c.stepId]);
       const hints = await rows<{ level: string; body: string }>(`select level, body from hint where step_id = $1 and language in ('', coalesce($2, ''))`, [c.stepId, c.language]);
-      const concepts = await rows<{ id: string; slug: string; name: string; brief: string }>(
-        `select c.id, c.slug, c.name, c.brief from milestone_concept mc join concept c on c.id = mc.concept_id where mc.milestone_id = $1 order by c.name`, [s.milestone_id]
+      const concepts = await rows<{ id: string; slug: string; name: string; brief: string; lesson: unknown }>(
+        `select c.id, c.slug, c.name, c.brief, to_jsonb(c) -> 'lesson' as lesson from milestone_concept mc join concept c on c.id = mc.concept_id where mc.milestone_id = $1 order by c.name`, [s.milestone_id]
       );
       const notes = c.language
         ? await rows(`select c.slug, n.body from language_note n join concept c on c.id = n.concept_id where n.concept_id = any($1) and n.language = $2`, [concepts.map((x) => x.id), c.language])
@@ -117,7 +127,7 @@ async function runTool(c: Ctx, name: string, input: any): Promise<{ result: unkn
           project: s.project, milestone: `${s.milestone_position}. ${s.milestone}`, step: `${s.position}. ${s.title}`, est_minutes: s.est_minutes,
           think: t && { kind: t.kind, prompt: t.prompt, snippet: t.snippet, answer_key_for_steering_only: t.answer_key, rubric_for_steering_only: t.rubric },
           build: c.language ? build?.prompt ?? null : "hidden: the learner works concept-only",
-          stored_help: hints, concepts: concepts.map(({ slug, name, brief }) => ({ slug, name, brief })), language: c.language, language_notes: notes,
+          stored_help: hints, concepts: concepts.map(({ slug, name, brief, lesson }) => ({ slug, name, brief, lesson: lesson ?? undefined })), language: c.language, language_notes: notes,
         },
       };
     }
@@ -155,12 +165,31 @@ async function runTool(c: Ctx, name: string, input: any): Promise<{ result: unkn
       const h = await giveHelp(c.learnerId, c.enrollmentId, c.stepId, input.rung, "mentor", c.language);
       return { label: input.rung === "hint" ? "Gave the step's hint" : "Gave a similar case", result: { [input.rung]: h.body ?? "No stored text for this step; explain in your own words." } };
     }
+    case "search_docs": {
+      const domains = docsFor(input.language);
+      if (!domains.length) return { label: `No official-docs list for ${input.language} yet`, result: { error: `No allow-listed documentation for ${input.language}.` } };
+      const hits = await searchDocs(input.query, domains, { learnerId: c.learnerId, enrollmentId: c.enrollmentId, purpose: "tutor" }, 6);
+      const pages = await verifiedHits(hits, domains, 4);
+      return { label: `Searched ${domains[0]} for “${String(input.query).slice(0, 60)}”`, result: pages.length ? { pages } : { none: true } };
+    }
     case "draw_diagram":
       return { label: "Drew a diagram", result: { shown: true }, extra: { mermaid: input.mermaid, caption: input.caption } };
     case "find_resource": {
       const con = await conceptBySlugOrName(input.concept);
-      const r = con ? await one<{ title: string; url: string }>(`select title, url from resource where concept_id = $1 and http_status = 200 and verified_at is not null order by verified_at desc limit 1`, [con.id]) : null;
-      return { label: r ? `Found a verified link for ${con!.name}` : "Looked for a verified link (none)", result: r ?? { none: true } };
+      const stored = con
+        ? await rows<{ title: string; url: string }>(
+            `select title, url from resource where concept_id = $1 and http_status = 200 and verified_at is not null and (language is null or language = $2) order by verified_at desc limit 3`, [con.id, c.language]
+          )
+        : [];
+      if (stored.length) return { label: `Found ${stored.length} verified link${stored.length === 1 ? "" : "s"} for ${con!.name}`, result: { links: stored } };
+      const topic = con ? `${con.name}: ${con.brief ?? ""}` : String(input.concept);
+      const hits = await searchDocs(`Find official documentation, specifications or well-known references explaining ${topic}`, REFERENCE_DOCS, { learnerId: c.learnerId, enrollmentId: c.enrollmentId, purpose: "tutor" }, 5);
+      const links = await verifiedHits(hits, REFERENCE_DOCS, 3);
+      if (con) for (const l of links) await query(
+        `insert into resource (concept_id, title, url, http_status, verified_at) values ($1, $2, $3, 200, now()) on conflict (concept_id, url) do update set http_status = 200, verified_at = now()`,
+        [con.id, l.title.slice(0, 200), l.url]
+      );
+      return { label: links.length ? `Searched references and verified ${links.length} link${links.length === 1 ? "" : "s"}` : "Searched references (nothing verified)", result: links.length ? { links } : { none: true } };
     }
     case "note_misconception": {
       const con = input.concept ? await conceptBySlugOrName(input.concept) : null;
@@ -349,5 +378,5 @@ registerHandler("mentor", mentorRun);
 export function toolsFor(showCode: boolean) {
   return showCode ? [...TOOLS, SHOW_CODE] : TOOLS;
 }
-export const looksLikeCode = (s: string) => CODE.test(s);
+export { looksLikeCode };
 export { runTool as _runTool };

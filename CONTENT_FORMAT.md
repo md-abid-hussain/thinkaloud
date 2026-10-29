@@ -60,6 +60,29 @@ Lessons are in words and small worked examples. The no-code rule still holds.
 
 **6. Process.** Rewrite `wc` first as the worked example and show it to the user. Rewrite the other projects only after the user accepts it, in the same shape.
 
+**7. How the checker applies v2 (implemented 29 Oct 2026).**
+- A concept-first project file says `format: 2`. Format 1 files (the first 21 projects) still load until they are rewritten.
+- In format 2 a milestone lists 1 to 4 concepts (one big idea or a tight group), and the teach-back still tags every one.
+- Every concept a format 2 project uses must have a `lesson` in `concepts.yaml`, and must not be `superseded_by` another concept:
+
+```yaml
+  - slug: utf16-code-units
+    ...
+    brief: one or two sentences, shown on chips and cards
+    lesson:
+      how_it_works: |-          # several paragraphs, in words, at least 400 characters
+        ...
+      examples: [1 to 5]        # concrete real-world cases
+      misconceptions: [1 to 5]  # "people think X; in fact Y"
+      elsewhere: [1 to 5]       # where the idea shows up beyond this project
+  - slug: bytes-vs-characters
+    superseded_by: text-encoding-utf8   # kept for format 1 files; format 2 must use the new concept
+```
+
+- Lessons follow the no-code rule. The database stores them in `concept.lesson` with a shape check.
+- The checker flags, but does not fail, Think prompts that look like the tool's output on a made-up input ("A file holds ... What does ccwc report?"). `REVIEW_SHEET.md` lists them for a person to judge.
+- `node scripts/preview.mjs <slug>` writes `content/previews/<slug>.md`, a readable page with the primer, every lesson, every question with its key or rubric, and the teach-backs.
+
 ## Settled choices
 
 - **YAML.** A person has to read and fix these files, and YAML allows comments. JSON would be stricter but harder to review.

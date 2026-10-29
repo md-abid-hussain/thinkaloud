@@ -52,6 +52,17 @@ const CODE_SIGNS = [
 ];
 export const codeSign = (text) => CODE_SIGNS.find(([re]) => re.test(String(text ?? '')))?.[1] ?? null;
 
+// Content v2 (concept-first) bans Think tasks that only ask for the tool's output on a made-up input. Code cannot
+// tell those apart for certain, so these signs flag a prompt for a person to look at; they never fail the check.
+const TOY_SIGNS = [
+  [/\b(what|how many|which)\b[^?]*\b(does|do|would|will|should)\b[^?]*\b(print|prints|report|reports|output|outputs|show|shows)\b/i,
+    'asks what the tool prints or reports'],
+  [/\b(a|the|one|your) (file|line|text|string|input|word|folder|directory|request|message|log)s? (holds|contains|reads)\b/i,
+    'describes a made-up input'],
+];
+export const toySign = (prompt) => TOY_SIGNS.find(([re]) => re.test(String(prompt ?? '')))?.[1] ?? null;
+const LESSON_LISTS = ['examples', 'misconceptions', 'elsewhere'];
+
 // ---------------------------------------------------------------------------
 // Reading
 // ---------------------------------------------------------------------------
@@ -81,6 +92,7 @@ export function validate({ catalogue, projects }) {
   const errors = [];
   const warnings = [];
   const keys = [];
+  const flags = [];
   const e = (where, msg) => errors.push(`${where}: ${msg}`);
   const w = (where, msg) => warnings.push(`${where}: ${msg}`);
   const isText = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -133,6 +145,23 @@ export function validate({ catalogue, projects }) {
       if (!isText(n?.body)) e(where, 'a language note needs a body');
       else if (codeSign(n.body)) e(where, `the ${n.language} note contains ${codeSign(n.body)}. Name the tools and link the docs, without code`);
     }
+    if (c.lesson != null) {
+      const l = c.lesson;
+      if (!isText(l?.how_it_works)) e(where, 'lesson.how_it_works is required');
+      else {
+        if (l.how_it_works.length < 400) w(where, 'lesson.how_it_works is short, under 400 characters');
+        noCode(where, 'lesson.how_it_works', l.how_it_works);
+      }
+      for (const field of LESSON_LISTS) {
+        if (!Array.isArray(l?.[field]) || l[field].length < 1 || l[field].length > 5 || !l[field].every(isText)) {
+          e(where, `lesson.${field} needs 1 to 5 entries of text`);
+        } else l[field].forEach((x, i) => noCode(where, `lesson.${field} ${i + 1}`, x));
+      }
+    }
+    if (c.superseded_by != null && c.superseded_by === c.slug) e(where, 'superseded_by cannot name the concept itself');
+  }
+  for (const c of slugs.values()) {
+    if (c.superseded_by != null && !slugs.has(c.superseded_by)) e(`concepts.yaml, ${c.slug}`, `superseded_by names unknown concept ${c.superseded_by}`);
   }
   for (const c of slugs.values()) {
     for (const field of ['prerequisites', 'related']) {
@@ -147,7 +176,9 @@ export function validate({ catalogue, projects }) {
   const seenProjects = new Set();
   for (const { file, data } of projects) {
     const p = data?.project ?? {};
-    if (data?.format !== 1) e(file, 'format must be 1');
+    // format 1 is the step-by-step shape of the first 21 projects; format 2 is concept-first (CONTENT_FORMAT.md).
+    const v2 = data?.format === 2;
+    if (data?.format !== 1 && !v2) e(file, 'format must be 1 or 2');
     if (!SOURCES[p.source]) e(file, 'project.source must be coding_challenges or roadmap_sh');
     if (!SLUG.test(p.slug ?? '')) e(file, 'project.slug must be lowercase words joined by hyphens');
     const id = `${p.source}/${p.slug}`;
@@ -190,9 +221,16 @@ export function validate({ catalogue, projects }) {
       if (!isText(m?.title)) e(mw, 'title is required');
       if (!isText(m?.summary)) e(mw, 'summary is required');
       const concepts = m?.concepts ?? [];
-      if (!Array.isArray(concepts) || concepts.length < 3) e(mw, 'a milestone covers at least 3 concepts');
+      // In format 2 a milestone is one big concept or a tight group of them; format 1 needed at least 3.
+      const minConcepts = v2 ? 1 : 3;
+      if (!Array.isArray(concepts) || concepts.length < minConcepts || concepts.length > 4) e(mw, `a milestone covers ${minConcepts} to 4 concepts`);
       if (new Set(concepts).size !== concepts.length) e(mw, 'concepts lists a concept twice');
-      for (const c of concepts) if (!slugs.has(c)) e(mw, `unknown concept ${c}. Add it to concepts.yaml first`);
+      for (const c of concepts) {
+        const known = slugs.get(c);
+        if (!known) e(mw, `unknown concept ${c}. Add it to concepts.yaml first`);
+        else if (v2 && known.superseded_by) e(mw, `concept ${c} is superseded by ${known.superseded_by}`);
+        else if (v2 && !known.lesson) e(mw, `concept ${c} has no lesson, and a format 2 project teaches every concept it uses`);
+      }
 
       if (!Array.isArray(m?.steps) || m.steps.length < 1 || m.steps.length > 6) { e(mw, 'a milestone needs 1 to 6 steps'); return; }
       let minutes = 0;
@@ -208,6 +246,7 @@ export function validate({ catalogue, projects }) {
         if (!t || !THINK_KINDS.includes(t.kind)) e(sw, `think.kind must be one of ${THINK_KINDS.join(', ')}`);
         else {
           if (!isText(t.prompt)) e(sw, 'think.prompt is required');
+          else if (toySign(t.prompt)) flags.push({ where: sw, project: p.slug, id: `${mi + 1}.${si + 1}`, kind: t.kind, sign: toySign(t.prompt), prompt: t.prompt });
           if (t.kind === 'predict' || t.kind === 'trace') {
             const k = t.key;
             if (!k || !MATCHES.includes(k.match)) e(sw, `think.key.match must be one of ${MATCHES.join(', ')}`);
@@ -253,7 +292,7 @@ export function validate({ catalogue, projects }) {
       }
     });
   }
-  return { errors, warnings, keys };
+  return { errors, warnings, keys, flags };
 }
 
 // ---------------------------------------------------------------------------
@@ -274,12 +313,17 @@ export function buildSql({ catalogue, projects }, { linkStatus = new Map() } = {
   const inCatalogue = `select id from concept where slug in (${concepts.map((c) => lit(c.slug)).join(', ')})`;
 
   out.push(
-    'insert into concept (slug, name, area_slug, kind, language, framework, brief, content_status) values',
+    'insert into concept (slug, name, area_slug, kind, language, framework, brief, lesson, content_status) values',
     concepts
-      .map((c) => `  (${[c.slug, clean(c.name), c.area, c.kind, c.language ?? null, c.framework ?? null, clean(c.brief), c.status].map(lit).join(', ')})`)
+      .map((c) => {
+        const lesson = c.lesson ? { ...c.lesson, how_it_works: clean(c.lesson.how_it_works) } : null;
+        const cols = [c.slug, clean(c.name), c.area, c.kind, c.language ?? null, c.framework ?? null, clean(c.brief)].map(lit);
+        return `  (${[...cols, jsonb(lesson), lit(c.status)].join(', ')})`;
+      })
       .join(',\n'),
     'on conflict (slug) do update set name = excluded.name, area_slug = excluded.area_slug, kind = excluded.kind,',
-    '  language = excluded.language, framework = excluded.framework, brief = excluded.brief, content_status = excluded.content_status;',
+    '  language = excluded.language, framework = excluded.framework, brief = excluded.brief, lesson = excluded.lesson,',
+    '  content_status = excluded.content_status;',
     ''
   );
 
@@ -487,6 +531,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     console.log(`\n${r.keys.length} answer key(s) to check by hand:`);
     for (const k of r.keys) console.log(`  ${k.where}\n    expected ${JSON.stringify(k.expected)}, proof returned ${JSON.stringify(k.proof.output)}`);
     console.log('\nThe derivations and proof sources are in content/REVIEW_SHEET.md (node scripts/review-sheet.mjs).');
+  }
+  if (r.flags.length) {
+    console.log(`\n${r.flags.length} Think prompt(s) that may ask for the tool's output on a made-up input, for a person to check:`);
+    for (const f of r.flags) console.log(`  ${f.where}: ${f.sign}`);
   }
   if (sqlOut) {
     writeFileSync(resolve(sqlOut), r.sql);

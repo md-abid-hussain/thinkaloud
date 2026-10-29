@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: the step workspace, the main screen. Context bar → three panes: steps rail, the step as a transcript (prompt, answer, check, help ladder), the mentor agent with its tool trace. Teach-back is a state of the same screen. Below 1200px the panes become tabs. */
+/* Layout: the step workspace, the main screen. Context bar → three panes: steps rail, the step as a transcript (prompt, answer, check, help ladder), the mentor agent with its tool trace. Each milestone is a concept that opens with a lesson; the lesson and the teach-back are states of the same screen. Below 1200px the panes become tabs. */
 :root {
   --bg: #EDEFF1; --surface: #FFFFFF; --ink: #15191D; --muted: #525A63; --rule: #C5CBD1;
   --accent: #8F4F00; --fill: #F5B95A; --on-fill: #2A1700; --wave: #C9801A; --soft: #FBE9CF;
@@ -168,7 +168,7 @@ h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
 .slist .done .ic { border: 1.5px solid var(--ok); background: var(--ok-bg); }
 .slist .done .ic::after { content: "✓"; font: 500 11px/1 var(--f-mono); color: var(--ok); }
 .slist .cur .ic { border: 1.5px solid var(--ink); background: var(--fill); }
-.slist .tb a { font-style: italic; }
+.slist .tb a, .slist .ls a { font-style: italic; }
 .slist .m { display: block; font: 400 12px/1.4 var(--f-mono); color: var(--muted); font-style: normal; }
 .ideas-mini { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ideas-mini li { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 15px; line-height: 1.35; }
@@ -247,6 +247,47 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
 .build p { margin: 0 0 14px; max-width: 40em; }
 .next { margin-top: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 
+/* Concept lesson: four parts, worked examples, byte-layout figures */
+.lesson-card { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 18px; border: 1.5px solid var(--ink); border-radius: 8px; background: var(--surface); padding: 12px 14px 12px 16px; max-width: 46em; }
+.lesson-card p { margin: 0; }
+.lesson-card .label { margin-bottom: 2px; }
+@media (max-width: 600px) { .lesson-card { grid-template-columns: minmax(0, 1fr); } .lesson-card .btn { justify-self: start; } }
+.lesson { margin-top: 8px; }
+.part { padding-block: 24px 6px; border-top: 1px solid var(--rule); }
+.part:first-child { border-top: 0; padding-top: 12px; }
+.part > .label { margin-bottom: 8px; }
+.part h2 { font-weight: 600; font-size: 22px; line-height: 1.25; margin-bottom: 10px; }
+.part p { margin: 0 0 12px; max-width: 38em; }
+.part ul { margin: 0 0 12px; padding: 0; list-style: none; max-width: 40em; display: flex; flex-direction: column; gap: 12px; }
+.part li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+.part li::before { content: "→"; font: 500 14px/1.7 var(--f-mono); color: var(--accent); }
+.part li b { font-weight: 500; }
+.myth li::before { content: "×"; color: var(--muted); }
+.ex { border-left: 2px solid var(--wave); padding: 2px 0 2px 14px; margin: 0 0 14px; max-width: 38em; }
+.ex .label { margin-bottom: 4px; }
+.ex p { margin: 0; }
+.figure { margin: 6px 0 18px; background: var(--surface); border: 1.5px solid var(--ink); border-radius: 10px; max-width: 46em; }
+.figure .cap { padding: 10px 14px; border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+.figure .scroll { overflow-x: auto; padding: 10px 12px 6px; }
+.figure svg { display: block; width: 100%; height: auto; }
+.figure svg.wide { min-width: 520px; }
+.figure svg.narrow { display: none; max-width: 400px; }
+@media (max-width: 600px) { .figure svg.wide { display: none; } .figure svg.narrow { display: block; } }
+.figure .key { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px 12px; margin: 0; list-style: none; font: 400 12px/1.4 var(--f-mono); color: var(--muted); }
+.figure .key li { display: flex; align-items: center; gap: 8px; }
+.part .figure .key li::before { content: none; }
+.figure .key i { width: 14px; height: 10px; border-radius: 2px; border: 1.5px solid var(--ink); display: inline-block; }
+.k-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.k-soft { fill: var(--soft); stroke: var(--ink); stroke-width: 1.5; }
+.k-fill { fill: var(--fill); stroke: var(--ink); stroke-width: 1.5; }
+.k-ink { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+.k-dash { stroke: var(--muted); stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; }
+.k-t { fill: var(--ink); font: 500 13px var(--f-mono); }
+.k-tf { fill: var(--on-fill); font: 500 13px var(--f-mono); }
+.k-m { fill: var(--muted); font: 400 12px var(--f-mono); }
+.k-g { fill: var(--ink); font: 400 22px var(--f-body); }
+.lesson-end { margin-top: 18px; padding-top: 18px; border-top: 1.5px solid var(--ink); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+
 /* Mentor panel: an agent whose tool calls show as lines */
 .mentor-h { padding: 18px 20px 14px; border-bottom: 1.5px solid var(--ink); }
 .mentor-h h2 { font-weight: 700; font-size: 22px; margin-top: 4px; }
@@ -296,6 +337,7 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
   <div class="preview-in">
     <span class="fine">Design preview, not part of the page. Show</span>
     <div class="seg" id="pv">
+      <button type="button" data-pv="lesson" aria-pressed="false">Lesson (Guided)</button>
       <button type="button" data-pv="answer" aria-pressed="false">Answering</button>
       <button type="button" data-pv="almost" aria-pressed="true">Almost</button>
       <button type="button" data-pv="right" aria-pressed="false">Right</button>
@@ -358,8 +400,8 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
 
 <div class="ctx">
   <div class="ctx-in">
-    <p class="label crumb"><a href="https://claude.ai/artifact/2Z6dtNWptPYWzi2YC5RxMP">wc</a><span aria-hidden="true">/</span><span>Milestone 2 · Words and characters</span><span aria-hidden="true">/</span><b id="crumb-step">Step 4</b></p>
-    <p class="mode"><b>Standard</b> support · <b>Java</b> · <button type="button" class="linkbtn" data-soon="Change support or language">Change</button></p>
+    <p class="label crumb"><a href="https://claude.ai/artifact/2Z6dtNWptPYWzi2YC5RxMP">wc</a><span aria-hidden="true">/</span><span>2 · How text is encoded</span><span aria-hidden="true">/</span><b id="crumb-step">Step 4</b></p>
+    <p class="mode"><b id="mode-level">Standard</b> support · <b>Java</b> · <button type="button" class="linkbtn" data-soon="Change support or language">Change</button></p>
   </div>
 </div>
 
@@ -373,14 +415,14 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
   <div class="ws">
     <nav class="pane rail" id="p-steps" role="tabpanel" aria-labelledby="tab-steps" aria-label="Steps in wc">
       <div class="rail-h">
-        <p class="label"><b>wc</b> · 10 steps</p>
+        <p class="label"><b>wc</b> · 4 concepts</p>
         <h2>Build your own wc</h2>
         <div class="bar" id="rail-bar" aria-label="Progress"></div>
         <p class="fine" id="rail-count" style="margin-top:6px"></p>
       </div>
       <div id="rail-list"></div>
       <div class="rail-foot">
-        <p class="label">Ideas in milestone 2</p>
+        <p class="label">Inside this concept</p>
         <ul class="ideas-mini" id="ideas-mini"></ul>
         <p class="fine" style="margin-top:14px">Help used: <span id="help-count">1 hint</span></p>
       </div>
@@ -458,10 +500,12 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
   function toast(m) { tEl.textContent = m; tEl.hidden = false; clearTimeout(tTimer); tTimer = setTimeout(function () { tEl.hidden = true; }, 3000); }
 
   /* Content, from content/projects/coding-challenges/challenge-wc.yaml and content/concepts.yaml */
+  /* Concept-first sample for wc (CONTENT_FORMAT.md, v2). Step titles and the lesson are design samples until challenge-wc.yaml is rewritten */
   var MILES = [
-    { t: 'Bytes and lines', steps: [['Count bytes', 10], ['Read in chunks', 15], ['Count lines', 15]] },
-    { t: 'Words and characters', steps: [['Count words', 15], ['Keep state across chunks', 15], ['Bytes are not characters', 15], ['Decode across chunks', 15]] },
-    { t: 'Default output and standard input', steps: [['Default output', 15], ['Read from a pipe', 15], ['Compare with the real wc', 15]] }
+    { t: 'Streaming in constant memory', steps: [['Why not load it all', 15], ['The read contract', 15], ['One loop for files and pipes', 15]] },
+    { t: 'How text is encoded', steps: [['UTF-8 byte lengths', 15], ['UTF-16 and surrogate pairs', 15], ['What counts as a character', 15], ['Decode across chunks', 15]] },
+    { t: 'Lines and words as states', steps: [['Where a line ends', 15], ['A word that spans two chunks', 15]] },
+    { t: 'A tool other programs trust', steps: [['Exit codes and the error stream', 15], ['Compare with the real wc', 15]] }
   ];
   var STEP = {
     title: 'Decode across chunks', kind: 'Spot the bug', minutes: 15,
@@ -473,38 +517,46 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
     build: 'Decode characters with a decoder that carries unfinished characters from one chunk to the next, name the encoding explicitly, and keep counting bytes on the raw input.'
   };
   var TB = {
-    prompt: 'Explain how your tool counts words and characters when the input arrives in chunks, and why characters and bytes can give different counts.',
-    rubric: [['word-state-machine', 'It remembers whether it is inside a word, counts a word when a non-space follows a space or the start, and keeps that state across chunks'], ['bytes-vs-characters', 'A character can take more than one byte in UTF-8, so the character count can be smaller than the byte count'], ['decoding-across-chunks', 'A character split between two chunks is finished with the leftover bytes kept from the previous chunk'], ['explicit-charsets', 'The encoding is named explicitly, so the counts do not change on a machine with a different default']]
+    prompt: 'Explain to a teammate why counting characters in a UTF-8 file is harder than counting bytes, and what your tool does about it.',
+    rubric: [['cp', 'A character is a code point, and UTF-8 stores a code point in 1 to 4 bytes, so the byte count and the character count differ'], ['gc', 'What a person sees as one character can be several code points, so the tool has to say which kind of character it counts'], ['dc', 'A character can be split between two chunks, so the decoder keeps the leftover bytes and finishes it with the next chunk'], ['ec', 'The encoding is named explicitly, so the count does not change on a machine with a different default']]
   };
-  var IDEAS = { 'word-state-machine': 'Counting words with a state machine', 'bytes-vs-characters': 'Bytes vs characters', 'decoding-across-chunks': 'Decoding across chunk boundaries', 'explicit-charsets': 'Explicit charsets' };
+  var IDEAS = { cp: 'Code points and UTF-8', u16: 'UTF-16 and surrogate pairs', gc: 'Grapheme clusters and normalisation', dc: 'Decoding across chunks', ec: 'Naming the encoding' };
 
   /* Sample answers, as a learner might dictate them. Each marked part is the grader's verbatim evidence for a point */
   var A_ALMOST = [['So the problem is the chunk is 4096 bytes and '], ['it can end right in the middle of a character', 1], [', like é is two bytes, so the first byte lands in one chunk and the second in the next, and '], ['decoding each chunk on its own breaks that character', 1], ['. The fix is '], ['a decoder that keeps the leftover bytes and finishes the character with the next chunk', 2], ['.']];
   var A_RIGHT = A_ALMOST.concat([[' The other problem is that '], ['decode uses the platform default encoding', 3], [', so on a machine with a different default the same bytes come out as different characters. '], ['Name UTF-8 explicitly', 3], ['.']]);
   var A_WRONG = [['I think the bug is that the loop never stops when the file is empty, because read keeps returning nothing.']];
-  var A_TB = [['For words '], ['I keep one flag that says whether I\'m inside a word, and I count a word when a letter comes after a space or at the start', 1], [', and '], ['that flag carries over from one chunk to the next', 1], [' so a word split across chunks isn\'t counted twice. For characters, '], ['one character can take more than one byte in UTF-8, so the character count can be smaller than the byte count', 2], ['. And '], ['when a character is split between two chunks, the decoder keeps the leftover bytes and finishes it with the next chunk', 3], ['.']];
+  var A_TB = [['So bytes are easy, you just count them. Characters are harder because '], ['each character is a code point and UTF-8 stores it in one to four bytes', 1], [', so the two counts drift apart as soon as there\'s an accent or an emoji. And '], ['even a code point isn\'t always what you see, like a thumbs-up with a skin tone is two code points but looks like one character', 2], [', so I have to say which one I count. In my tool '], ['the decoder keeps the leftover bytes when a character gets split between two chunks and finishes it with the next chunk', 3], ['.']];
   function plain(a) { return a.map(function (x) { return x[0]; }).join(''); }
   function marked(a) { return a.map(function (x) { return x[1] ? '<mark class="ev">' + esc(x[0]) + '<sup>' + x[1] + '</sup></mark>' : esc(x[0]); }).join(''); }
   function words(t) { return t.trim() ? t.trim().split(/\s+/).length : 0; }
 
   /* Steps rail */
+  function stepStatus(i, j, state) {
+    if (i === 0) return 'done';
+    if (i > 1) return 'todo';
+    if (state === 'lesson') return 'todo';
+    if (j < 3) return 'done';
+    return state === 'right' || state === 'teach' ? 'done' : 'cur';
+  }
   function renderRail(state) {
-    var teach = state === 'teach', done = state === 'right' || teach, n = 0, total = 0, doneN = 0, bar = '';
+    var n = 0, doneN = 0, bar = '';
     $('rail-list').innerHTML = MILES.map(function (m, i) {
-      var items = m.steps.map(function (s, j) {
-        n++; var st = i === 0 || (i === 1 && j < 3) || (i === 1 && j === 3 && done) ? 'done' : (i === 1 && j === 3 ? 'cur' : 'todo');
+      var lst = i === 0 || (i === 1 && state !== 'lesson') ? 'done' : (i === 1 ? 'cur' : 'todo');
+      var items = '<li class="ls ' + lst + '"><a href="#"' + (lst === 'cur' ? ' aria-current="step"' : '') + ' data-pvgo="lesson"><span class="ic" aria-hidden="true"></span><span>Lesson<span class="m">' + (lst === 'done' ? 'read' : 'about 8 min read') + '</span></span></a></li>';
+      items += m.steps.map(function (s, j) {
+        n++; var st = stepStatus(i, j, state);
         if (st === 'done') doneN++; bar += '<span class="' + (st === 'done' ? 'on' : st === 'cur' ? 'cur' : '') + '"></span>';
         return '<li class="' + st + '"><a href="#"' + (st === 'cur' ? ' aria-current="step"' : '') + ' data-soon="Step ' + (i + 1) + '.' + (j + 1) + '"><span class="ic" aria-hidden="true"></span><span>' + s[0] + '<span class="m">' + (i + 1) + '.' + (j + 1) + ' · ' + s[1] + ' min' + (st === 'done' ? ' · done' : '') + '</span></span></a></li>';
       }).join('');
-      var tbst = i === 0 ? 'done' : (i === 1 && teach ? 'cur' : 'todo');
-      items += '<li class="tb ' + tbst + '"><a href="#"' + (tbst === 'cur' ? ' aria-current="step"' : '') + ' data-soon="Explain milestone ' + (i + 1) + ' back"><span class="ic" aria-hidden="true"></span><span>Explain it back<span class="m">' + (tbst === 'done' ? 'done · 3 ideas explained' : 'milestone ' + (i + 1)) + '</span></span></a></li>';
-      return '<div class="mgroup"><p class="label"><b>Milestone ' + (i + 1) + '</b></p><h3>' + m.t + '</h3><ol class="slist">' + items + '</ol></div>';
+      var tbst = i === 0 ? 'done' : (i === 1 && state === 'teach' ? 'cur' : 'todo');
+      items += '<li class="tb ' + tbst + '"><a href="#"' + (tbst === 'cur' ? ' aria-current="step"' : '') + ' data-pvgo="teach"><span class="ic" aria-hidden="true"></span><span>Explain it back<span class="m">' + (tbst === 'done' ? 'done · explained' : 'ends the concept') + '</span></span></a></li>';
+      return '<div class="mgroup"><p class="label"><b>Concept ' + (i + 1) + '</b></p><h3>' + m.t + '</h3><ol class="slist">' + items + '</ol></div>';
     }).join('');
-    total = n;
     $('rail-bar').innerHTML = bar;
-    $('rail-count').textContent = doneN + ' of ' + total + ' steps done';
-    var IDS = teach ? { 'word-state-machine': 'explained', 'bytes-vs-characters': 'explained', 'decoding-across-chunks': 'explained', 'explicit-charsets': 'seen' } : { 'word-state-machine': 'seen', 'bytes-vs-characters': 'seen', 'decoding-across-chunks': 'seen', 'explicit-charsets': 'seen' };
-    $('ideas-mini').innerHTML = Object.keys(IDEAS).map(function (k) { return '<li><span class="sq ' + IDS[k] + '"></span><span>' + IDEAS[k] + '</span><span class="s">' + IDS[k] + '</span></li>'; }).join('');
+    $('rail-count').textContent = doneN + ' of ' + n + ' steps done';
+    var IDS = state === 'teach' ? { cp: 'explained', u16: 'seen', gc: 'explained', dc: 'explained', ec: 'seen' } : state === 'lesson' ? { cp: 'new', u16: 'new', gc: 'new', dc: 'new', ec: 'new' } : { cp: 'seen', u16: 'seen', gc: 'seen', dc: 'seen', ec: 'seen' };
+    $('ideas-mini').innerHTML = Object.keys(IDEAS).map(function (k) { return '<li><span class="sq ' + (IDS[k] === 'new' ? '' : IDS[k]) + '"></span><span>' + IDEAS[k] + '</span><span class="s">' + IDS[k] + '</span></li>'; }).join('');
   }
 
   /* The step pane, one state at a time */
@@ -513,8 +565,8 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
       return '<li class="' + (ok ? 'met' : '') + '"><span class="tick" aria-label="' + (ok ? 'Covered' : 'Not yet covered') + '">' + (ok ? '✓' : i + 1) + '</span><span>' + esc(txt) + '</span>' + (tb ? '<span class="cn">' + IDEAS[p[0]] + (ok ? ' · explained' : ' · not yet') + '</span>' : '') + '</li>'; }).join('') + '</ul>';
   }
   function head(teach) {
-    return '<div class="step-h"><p class="label"><b>Milestone 2</b> · ' + (teach ? 'explain it back' : 'step 4 of 4') + '</p><h1>' + (teach ? 'Explain milestone 2 back' : STEP.title) + '</h1>' +
-      '<ul class="kind">' + (teach ? '<li>4 ideas</li><li>All points needed</li><li>Speak or type</li>' : '<li>' + STEP.kind + '</li><li>about ' + STEP.minutes + ' min</li><li>Graded by rubric, with your words as evidence</li>') + '</ul></div>';
+    return '<div class="step-h"><p class="label"><b>How text is encoded</b> · ' + (teach ? 'explain it back' : 'step 4 of 4') + '</p><h1>' + (teach ? 'Explain how text is encoded' : STEP.title) + '</h1>' +
+      '<ul class="kind">' + (teach ? '<li>4 points</li><li>All points needed</li><li>Speak or type</li>' : '<li>' + STEP.kind + '</li><li>about ' + STEP.minutes + ' min</li><li>Graded by rubric, with your words as evidence</li>') + '</ul></div>';
   }
   function cueBar(btns) { return '<div class="ans-bar"><p class="cue">Hold <span class="keys"></span> to dictate with <a href="https://wisprflow.ai/r?MD13753" rel="sponsored noopener">Wispr Flow</a>, or type · <span data-wc>0</span> words</p><div class="acts">' + btns + '</div></div>'; }
   function helpLadder() {
@@ -527,16 +579,92 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
   }
   function buildTask() { return '<details class="build"><summary>Build it in Java · optional</summary><p>' + esc(STEP.build) + '</p><p class="fine">Checked on your machine, not here. The step finishes on your explanation.</p></details>'; }
 
+  /* Byte-layout figures, drawn with the same helpers as the project figures */
+  function T(x, y, t, c, a) { return '<text x="' + x + '" y="' + y + '" class="' + (c || 'k-t') + '" text-anchor="' + (a || 'middle') + '" dominant-baseline="central">' + t + '</text>'; }
+  function R(x, y, w, h, c) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3" class="' + c + '"/>'; }
+  function L(a, b, c, d, k) { return '<line x1="' + a + '" y1="' + b + '" x2="' + c + '" y2="' + d + '" class="' + (k || 'k-ink') + '"/>'; }
+  /* [glyph, code point, UTF-8 bytes, UTF-16 code units] */
+  var ENC = [['A', 'U+0041', ['41'], ['0041']], ['é', 'U+00E9', ['C3', 'A9'], ['00E9']], ['€', 'U+20AC', ['E2', '82', 'AC'], ['20AC']], ['𝄞', 'U+1D11E', ['F0', '9D', '84', '9E'], ['D834', 'DD1E']]];
+  function figBytes() {
+    var o = T(30, 14, 'shows', 'k-m') + T(110, 14, 'code point', 'k-m') + T(186, 14, 'UTF-8 · 1 to 4 bytes', 'k-m', 'start') + T(380, 14, 'UTF-16 · 2-byte units', 'k-m', 'start');
+    ENC.forEach(function (r, i) { var y = 30 + i * 46;
+      o += T(30, y + 16, r[0], 'k-g') + T(110, y + 16, r[1]);
+      r[2].forEach(function (b, j) { o += R(186 + j * 44, y, 40, 32, j === 0 ? 'k-fill' : 'k-soft') + T(206 + j * 44, y + 16, b, j === 0 ? 'k-tf' : 'k-t'); });
+      r[3].forEach(function (u, j) { o += R(380 + j * 76, y, 72, 32, r[3].length > 1 ? 'k-soft' : 'k-box') + T(416 + j * 76, y + 16, u); });
+      if (i < ENC.length - 1) o += L(14, y + 40, 536, y + 40, 'k-dash'); });
+    return o + T(14, 222, 'Above U+FFFF, UTF-16 needs two units: a surrogate pair', 'k-m', 'start');
+  }
+  function figGlyphs() {
+    var rows = [['é', 'one code point', [['U+00E9', 'C3 A9']]], ['é', 'e plus a combining accent', [['U+0065', '65'], ['U+0301', 'CC 81']]], ['👋🏾', 'hand plus a skin tone', [['U+1F44B', 'F0 9F 91 8B'], ['U+1F3FE', 'F0 9F 8F BE']]]];
+    var o = T(30, 8, 'shows', 'k-m');
+    rows.forEach(function (r, i) { var y = 22 + i * 56, x = 70;
+      o += T(30, y + 18, r[0], 'k-g') + T(70, y + 2, r[1], 'k-m', 'start');
+      r[2].forEach(function (c, j) { var w = Math.round((c[0] + ' · ' + c[1]).length * 8.6 + 20); o += R(x, y + 12, w, 28, j === 0 ? 'k-fill' : 'k-soft') + T(x + w / 2, y + 26, c[0] + ' · ' + c[1], j === 0 ? 'k-tf' : 'k-t'); x += w + 8; });
+      if (i < rows.length - 1) o += L(14, y + 50, 536, y + 50, 'k-dash'); });
+    return o;
+  }
+  /* Phone versions: each character stacks its UTF-8 bytes over its UTF-16 units */
+  function figBytesN() {
+    var o = '';
+    ENC.forEach(function (r, i) { var y = 8 + i * 96;
+      o += T(32, y + 22, r[0], 'k-g') + T(32, y + 50, r[1], 'k-m');
+      o += T(70, y + 16, 'UTF-8', 'k-m', 'start');
+      r[2].forEach(function (b, j) { o += R(128 + j * 42, y + 2, 38, 28, j === 0 ? 'k-fill' : 'k-soft') + T(147 + j * 42, y + 16, b, j === 0 ? 'k-tf' : 'k-t'); });
+      o += T(70, y + 52, 'UTF-16', 'k-m', 'start');
+      r[3].forEach(function (u, j) { o += R(128 + j * 82, y + 38, 78, 28, r[3].length > 1 ? 'k-soft' : 'k-box') + T(167 + j * 82, y + 52, u); });
+      if (i < ENC.length - 1) o += L(8, y + 84, 332, y + 84, 'k-dash'); });
+    return o;
+  }
+  function figGlyphsN() {
+    var rows = [['é', 'one code point', [['U+00E9', 'C3 A9']]], ['e\u0301', 'e plus a combining accent', [['U+0065', '65'], ['U+0301', 'CC 81']]], ['👋🏾', 'hand plus a skin tone', [['U+1F44B', 'F0 9F 91 8B'], ['U+1F3FE', 'F0 9F 8F BE']]]], o = '', y = 8;
+    rows.forEach(function (r, i) {
+      o += T(24, y + 24, r[0], 'k-g') + T(64, y + 8, r[1], 'k-m', 'start');
+      r[2].forEach(function (c, j) { var w = Math.round((c[0] + ' · ' + c[1]).length * 8.6 + 20); o += R(64, y + 18 + j * 34, w, 28, j === 0 ? 'k-fill' : 'k-soft') + T(64 + w / 2, y + 32 + j * 34, c[0] + ' · ' + c[1], j === 0 ? 'k-tf' : 'k-t'); });
+      y += 26 + r[2].length * 34;
+      if (i < rows.length - 1) { o += L(8, y, 332, y, 'k-dash'); y += 10; } });
+    return o;
+  }
+  function lessonHTML() {
+    return '<div class="lesson">' +
+      '<section class="part" aria-labelledby="lp1"><p class="label"><b>1</b> · how it works underneath</p><h2 id="lp1">Text is numbers, and an encoding turns the numbers into bytes</h2>' +
+      '<p>Unicode gives every character a number called a code point, written like U+0041 for A or U+00E9 for é. A file doesn\'t hold code points directly. An encoding decides which bytes stand for each one.</p>' +
+      '<p>UTF-8 uses one to four bytes per code point. Plain English letters keep their old one-byte values, so an ASCII file is already valid UTF-8. Bigger code points take more bytes, and the first byte says how many bytes follow, so a reader dropped anywhere in a file can find where the next character starts.</p>' +
+      '<div class="figure"><div class="cap"><span class="label">The same four characters in two encodings</span><span class="fine">bytes in hex</span></div><div class="scroll"><svg class="wide" viewBox="0 0 550 232" role="img" aria-label="A is one byte in UTF-8 and one code unit in UTF-16. é is two bytes and one unit. The euro sign is three bytes and one unit. The musical G clef, U+1D11E, is four bytes in UTF-8 and two UTF-16 units, a surrogate pair.">' + figBytes() + '</svg><svg class="narrow" viewBox="0 0 340 380" aria-hidden="true">' + figBytesN() + '</svg></div>' +
+      '<ul class="key"><li><i style="background:var(--fill)"></i>first byte, says how long the character is</li><li><i style="background:var(--soft)"></i>continuation byte, or half of a surrogate pair</li></ul></div>' +
+      '<p>UTF-16, used inside Java, JavaScript and Windows, works in 2-byte code units. Most characters fit in one unit. Code points above U+FFFF, which include most emoji, don\'t fit, so they are split across two units called a surrogate pair. That is why a string\'s length can be 2 for one emoji: it counts code units, not characters.</p></section>' +
+      '<section class="part" aria-labelledby="lp2"><p class="label"><b>2</b> · real-world examples</p><h2 id="lp2">Where this bites</h2>' +
+      '<div class="ex"><p class="label">A username limit</p><p>A sign-up form allows 20 characters, and someone\'s name ends in 👋🏾. A person sees one character there. JavaScript\'s length counts 4 code units, and the database stores 8 bytes. Three layers give three answers, and one of them rejects a name that looked fine.</p></div>' +
+      '<div class="ex"><p class="label">A CSV from a spreadsheet</p><p>A file saved as UTF-8 by some spreadsheet apps starts with three invisible bytes, a byte order mark. A script that reads the first column heading gets "id" with an extra character glued to the front, and looking up the column "id" fails.</p></div></section>' +
+      '<section class="part myth" aria-labelledby="lp3"><p class="label"><b>3</b> · common misconceptions</p><h2 id="lp3">What people get wrong</h2><ul>' +
+      '<li><span><b>"One character is one byte."</b> Only for plain ASCII. In UTF-8 a character takes one to four bytes.</span></li>' +
+      '<li><span><b>"Length tells you how many characters someone sees."</b> It usually counts UTF-16 units or bytes, and neither is what a person sees.</span></li>' +
+      '<li><span><b>"é is always the same é."</b> It can be stored as one code point or as e followed by a combining accent. They look identical, but they compare as different strings until you normalise them.</span></li>' +
+      '<li><span><b>"You can cut a buffer anywhere."</b> Cutting in the middle of a multi-byte character breaks it, which is why a decoder carries the leftover bytes into the next chunk.</span></li></ul>' +
+      '<div class="figure"><div class="cap"><span class="label">One visible character, more than one code point</span><span class="fine">UTF-8 bytes in hex</span></div><div class="scroll"><svg class="wide" viewBox="0 0 550 176" role="img" aria-label="é stored as one code point, U+00E9, is 2 bytes. Stored as e plus a combining accent it is two code points and 3 bytes. The waving hand with a skin tone is two code points and 8 bytes.">' + figGlyphs() + '</svg><svg class="narrow" viewBox="0 0 340 282" aria-hidden="true">' + figGlyphsN() + '</svg></div></div></section>' +
+      '<section class="part" aria-labelledby="lp4"><p class="label"><b>4</b> · where else it shows up</p><h2 id="lp4">The same idea, elsewhere</h2><ul>' +
+      '<li><span><b>Databases.</b> MySQL\'s older utf8 type stores at most three bytes per character, so emoji fail until a column uses utf8mb4.</span></li>' +
+      '<li><span><b>JSON and APIs.</b> A character above U+FFFF can be written as two escaped UTF-16 units, so a parser has to join the pair back into one code point.</span></li>' +
+      '<li><span><b>Search.</b> Normalisation decides whether "café" typed on a phone matches "café" saved by a web form.</span></li>' +
+      '<li><span><b>Other languages.</b> Python counts code points, Go\'s strings are bytes, and Swift counts what a person sees. The same text has three different lengths.</span></li></ul></section>' +
+      '<div class="lesson-end"><button type="button" class="btn btn-primary" data-act="read">I\'ve read it, start step 1</button><span class="fine">Marks the ideas as seen. You can come back to the lesson from any step.</span></div></div>';
+  }
+  function lessonCard() { return '<div class="lesson-card"><div><p class="label"><b>Lesson</b> · How text is encoded</p><p>How code points become bytes, why one emoji can have a length of 2, and why é can be stored two ways.</p></div><button type="button" class="btn btn-ghost btn-sm" data-pvgo="lesson">Read the lesson</button></div>'; }
+
   function renderStep(state) {
+    if (state === 'lesson') {
+      $('step').innerHTML = '<div class="step-h"><p class="label"><b>Concept 2 of 4</b> · lesson</p><h1>How text is encoded</h1><ul class="kind"><li>About 8 min read</li><li>Opens first on Guided support</li><li>No code</li></ul></div>' + lessonHTML();
+      return;
+    }
     var o = head(state === 'teach');
     if (state === 'teach') {
       o += '<div class="tx"><span class="ts">00:00</span><div class="turn"><p class="who">Prompt</p><p class="q">' + esc(TB.prompt) + '</p></div>' +
         '<span class="ts">03:42</span><div class="turn"><p class="who">You · spoke for 41 s <span class="wave" aria-hidden="true"><i style="height:6px"></i><i style="height:12px"></i><i style="height:14px"></i><i style="height:8px"></i><i style="height:11px"></i></span></p><p class="said">' + marked(A_TB) + '</p></div>' +
         '<span class="ts">03:44</span><div class="turn"><p class="who">Check · 3 of 4 points <span class="pill soft">Almost</span></p>' + points(TB.rubric, [1, 2, 3], true) +
-        '<div class="verdict"><p><b>3 ideas explained.</b> Explicit charsets isn\'t covered yet.</p><p>Add a sentence about how your tool decides which encoding to read the bytes with.</p></div>' +
+        '<div class="verdict"><p><b>3 of 4 points.</b> Naming the encoding isn\'t covered yet.</p><p>Add a sentence about how your tool decides which encoding to read the bytes with.</p></div>' +
         '<div class="next"><button type="button" class="btn btn-primary" data-act="add">Add to my answer</button><button type="button" class="btn btn-ghost" data-act="unsure">I\'m not sure</button><button type="button" class="linkbtn" data-flag>This grade looks wrong</button></div></div></div>';
       $('step').innerHTML = o; return;
     }
+    o += lessonCard();
     o += '<div class="tx"><span class="ts">00:00</span><div class="turn"><p class="who">Prompt</p><p class="q">' + esc(STEP.prompt) + '</p>' +
       '<div class="snippet"><div class="cap"><span class="label">Read this, don\'t copy it</span><span class="fine">7 lines</span></div><pre>' + esc(STEP.snippet) + '</pre></div></div>';
     if (state === 'answer') {
@@ -554,7 +682,7 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
       } else {
         var pill = state === 'right' ? '<span class="pill ok">Right</span>' : state === 'almost' ? '<span class="pill soft">Almost</span>' : '<span class="pill plain">Not yet</span>';
         o += '<span class="ts">02:12</span><div class="turn"><p class="who">Check · ' + met.length + ' of 3 points ' + pill + '</p>' + points(STEP.rubric, met, false);
-        if (state === 'right') o += '<div class="verdict ok"><p><b>Step done.</b> All three points are in your own words. Decoding across chunk boundaries and Explicit charsets are now seen. You explain them back at the end of the milestone.</p></div><div class="next"><button type="button" class="btn btn-primary" data-pvgo="teach">Explain milestone 2 back</button><button type="button" class="linkbtn" data-flag>This grade looks wrong</button></div>';
+        if (state === 'right') o += '<div class="verdict ok"><p><b>Step done.</b> All three points are in your own words. You explain the whole concept back next.</p></div><div class="next"><button type="button" class="btn btn-primary" data-pvgo="teach">Explain how text is encoded</button><button type="button" class="linkbtn" data-flag>This grade looks wrong</button></div>';
         if (state === 'almost') o += '<div class="verdict"><p><b>You found one problem and its fix.</b> The snippet has a second problem.</p><p>Look again at the decode call itself.</p></div><div class="next"><button type="button" class="btn btn-primary" data-act="edit">Add to my answer</button><button type="button" class="btn btn-ghost" data-act="unsure">I\'m not sure</button><button type="button" class="linkbtn" data-flag>This grade looks wrong</button></div>';
         if (state === 'notyet') o += '<div class="verdict"><p><b>None of the three points came through yet.</b> The loop does stop on an empty file, so that part works.</p><p>Try again, or press I\'m not sure for a hint. There\'s no limit on tries.</p></div><div class="next"><button type="button" class="btn btn-primary" data-act="edit">Try again</button><button type="button" class="btn btn-ghost" data-act="unsure">I\'m not sure</button><button type="button" class="linkbtn" data-flag>This grade looks wrong</button></div>';
         o += '</div>';
@@ -577,6 +705,7 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
     if (state === 'almost') o = ALMOST_CONVO;
     else if (state === 'right') o = ALMOST_CONVO + '<div class="mt"><p class="who">Mentor</p>' + tr([['Saved what you missed the first time', 'note_misconception']]) + '<p class="reply">Noted for your learning log: you first missed the platform default encoding. It shows up again in Explicit charsets.</p></div>';
     else if (state === 'paused') o = '<div class="mt"><p class="idle">The mentor is paused too while the AI model isn\'t responding. Hints and similar cases still work, because they\'re stored with the step.</p></div>';
+    else if (state === 'lesson') o = '<div class="mt"><p class="idle">Ask about anything in the lesson. It answers in words and small examples, and it can draw a diagram of one idea.</p><div class="offer"><button type="button" class="rung" data-ask="Why does the first UTF-8 byte say how long the character is?">Why does the first byte matter?</button><button type="button" class="rung" data-ask="What is a surrogate pair, in plain words?">What is a surrogate pair?</button></div></div>';
     else if (state === 'teach') o = '<div class="mt"><p class="idle">The mentor stays quiet while you explain back. Ask if you get stuck. Anything it gives you beyond a hint is noted in your help log.</p></div>';
     else o = '<div class="mt"><p class="idle">Nothing yet. Ask about the question, an idea, or your own answer. It won\'t raise the help level by itself.</p><div class="offer"><button type="button" class="rung" data-ask="What does it mean for a character to be split?">What does split mean here?</button><button type="button" class="rung" data-ask="Can you explain the question another way?">Explain the question another way</button></div></div>';
     $('convo').innerHTML = o;
@@ -641,6 +770,7 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
     if (a === 'check') { var v = $('answer').value.trim(); if (!v) { toast('Say or type your answer first.'); $('answer').focus(); return; } setState('almost'); return; }
     if (a === 'edit' || a === 'add') { setState(state === 'teach' ? 'teach' : 'answer'); var an = $('answer'); if (an) { an.value = state === 'teach' ? '' : plain(A_ALMOST) + ' '; an.focus(); } return; }
     if (a === 'retry') { setState('almost'); return; }
+    if (a === 'read') { toast('Lesson read. Step 1, UTF-8 byte lengths, opens next.'); return; }
     if (a === 'code-yes') { toast('In the app the mentor\'s show_code tool answers here, part 1 of 2.'); return; }
     if (a === 'code-no' || a === 'nothanks') { var o2 = $('help-out'); if (o2 && a === 'code-no') o2.innerHTML = ''; if (a === 'nothanks') t.closest('.offer').remove(); return; }
   });
@@ -650,7 +780,7 @@ li.met .tick { background: var(--ok-bg); border: 1.5px solid var(--ok); color: v
   /* Design preview */
   var state = 'almost';
   function setState(s) { state = s; document.querySelectorAll('#pv button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.pv === s)); });
-    $('crumb-step').textContent = s === 'teach' ? 'Explain it back' : 'Step 4'; renderRail(s); renderStep(s); renderMentor(s); fillKeys(); if (narrow()) showTab('tab-step'); }
+    $('crumb-step').textContent = s === 'teach' ? 'Explain it back' : s === 'lesson' ? 'Lesson' : 'Step 4'; $('mode-level').textContent = s === 'lesson' ? 'Guided' : 'Standard'; renderRail(s); renderStep(s); renderMentor(s); fillKeys(); if (narrow()) showTab('tab-step'); }
   document.querySelectorAll('#pv button').forEach(function (b) { b.addEventListener('click', function () { setState(b.dataset.pv); }); });
   setState('almost');
 })();

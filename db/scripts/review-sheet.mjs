@@ -45,7 +45,11 @@ for (const p of projects) {
   const n = r.keys.filter((k) => k.project === p.project.slug).length;
   out.push(`- [${p.project.title}](#${p.project.slug}) (${p.project.slug}): ${n} keys, status ${p.project.status}`);
 }
-out.push('- [Concepts not yet reviewed](#concepts-not-yet-reviewed)', '');
+out.push(
+  `- [Prompts to check: the tool on a made-up input](#prompts-to-check-the-tool-on-a-made-up-input) (${r.flags.length})`,
+  '- [Concepts not yet reviewed](#concepts-not-yet-reviewed)',
+  ''
+);
 
 for (const p of projects) {
   const slug = p.project.slug;
@@ -80,6 +84,22 @@ for (const p of projects) {
     );
   }
 }
+
+out.push(
+  '## Prompts to check: the tool on a made-up input',
+  '',
+  'Content v2 bans Think tasks whose only lesson is "you ran the tool in your head". The checker cannot tell for',
+  'certain, so it flags prompts that look like one. Keep a flagged prompt only if the answer is a fact about the',
+  'concept, not about a toy input.',
+  '',
+  '| Project | Step | Kind | Sign | Prompt |',
+  '|---|---|---|---|---|'
+);
+for (const f of r.flags) {
+  out.push(`| ${f.project} | ${f.id} | ${f.kind} | ${f.sign} | ${oneLine(f.prompt).replace(/\|/g, '/')} |`);
+}
+if (!r.flags.length) out.push('| | | | none flagged | |');
+out.push('');
 
 out.push('## Concepts not yet reviewed', '', '| Concept | Area | Brief |', '|---|---|---|');
 for (const c of r.content.catalogue.concepts.filter((c) => c.status !== 'reviewed')) {

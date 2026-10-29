@@ -6,7 +6,7 @@ For each key: read the prompt, work the answer out yourself, then compare with t
 what the proof script returned. Every proof below was run and matched its key, otherwise this sheet would not exist.
 Proofs live in `content/proofs/<project>.mjs` and can be run again on their own.
 
-Status: 21 generated projects, 0 reviewed, 135 keys, 62 teach-backs.
+Status: 21 generated projects, 0 reviewed, 130 keys, 64 teach-backs.
 
 ## Contents
 
@@ -29,8 +29,9 @@ Status: 21 generated projects, 0 reviewed, 135 keys, 62 teach-backs.
 - [Build your own sort](#challenge-sort) (challenge-sort): 9 keys, status generated
 - [Build your own static site generator](#challenge-ssg) (challenge-ssg): 6 keys, status generated
 - [Build your own URL shortener](#challenge-url-shortener) (challenge-url-shortener): 6 keys, status generated
-- [Build your own wc](#challenge-wc) (challenge-wc): 7 keys, status generated
+- [Build your own wc](#challenge-wc) (challenge-wc): 2 keys, status generated
 - [Build your own web server](#challenge-webserver) (challenge-webserver): 5 keys, status generated
+- [Prompts to check: the tool on a made-up input](#prompts-to-check-the-tool-on-a-made-up-input) (24)
 - [Concepts not yet reviewed](#concepts-not-yet-reviewed)
 
 <a id="challenge-bitcask"></a>
@@ -2956,145 +2957,42 @@ Source: https://codingchallenges.fyi/challenges/challenge-url-shortener. Proofs:
 
 Source: https://codingchallenges.fyi/challenges/challenge-wc. Proofs: `content/proofs/challenge-wc.mjs`.
 
-### 1.1 Count bytes (predict)
+### 1.2 Why UTF-8 has variable length (predict)
 
 - [ ] checked
 
-**Prompt.** A file holds the two letters h and i, followed by a newline. How many bytes does ccwc -c report?
+**Prompt.** The grinning face emoji is the code point U+1F600. How many bytes does it take in UTF-8? Answer with one number.
 
-**Expected** (exactly this one number): **3**
+**Expected** (exactly this one number): **4**
 
-**Derivation.** Each plain letter is one byte and the newline is one more byte: 1 + 1 + 1 = 3. Proof script output: 3.
+**Derivation.** UTF-8 uses one byte up to U+007F, two up to U+07FF, three up to U+FFFF and four above that. U+1F600 is above U+FFFF, so it needs four bytes: F0 9F 98 80. It cannot take fewer, because a three-byte sequence only carries 16 bits of the code point and U+1F600 needs 17. Proof script output: 4.
 
-**Proof returned:** 3 (matches)
+**Proof returned:** 4 (matches)
 
 <details><summary>Proof source</summary>
 
 ```js
-() => bytes('hi\n')
+() => utf8Bytes(String.fromCodePoint(0x1f600))
 ```
 
 </details>
 
-### 1.2 Read in chunks (trace)
+### 1.3 Code units are not characters (trace)
 
 - [ ] checked
 
-**Prompt.** Your tool reads with a buffer that holds 4 bytes. The input is the word hello followed by a newline. How many bytes does each read hand back, in order, before the read reports the end of the input?
+**Prompt.** The thumbs up with a medium skin tone is two code points, U+1F44D and U+1F3FD. JavaScript and Java store strings in UTF-16 and their length counts code units. What length does a string holding only this emoji report? Answer with one number.
 
-**Expected** (all of these numbers): **4, 2**
+**Expected** (exactly this one number): **4**
 
-**Derivation.** hello plus a newline is 6 bytes. The first read fills the whole buffer with 4 bytes. Only 2 bytes are left, so the second read returns 2 and the rest of the buffer holds leftovers that must be ignored. The third read reports the end. Proof script output: [4, 2].
+**Derivation.** Both code points are above U+FFFF, so in UTF-16 each needs a surrogate pair of two units. Two code points times two units gives a length of 4, although a reader sees one thumb. Proof script output: 4.
 
-**Proof returned:** [4,2] (matches)
+**Proof returned:** 4 (matches)
 
 <details><summary>Proof source</summary>
 
 ```js
-() => reads('hello\n', 4)
-```
-
-</details>
-
-### 1.3 Count lines (predict)
-
-- [ ] checked
-
-**Prompt.** A file holds the letter a, a newline, then the letter b, with no newline at the end. What does ccwc -l report, and why?
-
-**Expected** (exactly this one number): **1**
-
-**Derivation.** wc counts newline bytes, not pieces of text. There is one newline, after the a, so the answer is 1, even though the b sits on a second line on screen. This value comes from the reviewed SQL sample. Proof script output: 1.
-
-**Proof returned:** 1 (matches)
-
-<details><summary>Proof source</summary>
-
-```js
-() => lines('a\nb')
-```
-
-</details>
-
-### 2.1 Count words (predict)
-
-- [ ] checked
-
-**Prompt.** A line holds two spaces, the word hello, three spaces, the word world, and a newline. How many words does ccwc -w report?
-
-**Expected** (exactly this one number): **2**
-
-**Derivation.** A word is a run of non-space characters. Leading spaces and the run of three spaces only separate words, they never create empty ones, so there are 2 words. Proof script output: 2.
-
-**Proof returned:** 2 (matches)
-
-<details><summary>Proof source</summary>
-
-```js
-() => words(['  hello   world\n'])
-```
-
-</details>
-
-### 2.2 Keep state across chunks (trace)
-
-- [ ] checked
-
-**Prompt.** The text hello world arrives in two chunks: hel, then lo world. A buggy counter forgets whether it was inside a word each time a new chunk starts. How many words does it report?
-
-**Expected** (exactly this one number): **3**
-
-**Derivation.** The first chunk starts the word hel. The second chunk starts with lo, and because the counter forgot it was inside a word, it counts lo as a new word, then world. That gives hel, lo and world, so 3 instead of 2. Proof script output: 3.
-
-**Proof returned:** 3 (matches)
-
-<details><summary>Proof source</summary>
-
-```js
-() => words(['hel', 'lo world'], { keepState: false })
-```
-
-</details>
-
-### 2.3 Bytes are not characters (predict)
-
-- [ ] checked
-
-**Prompt.** A file holds the word café, with an accented e, followed by a newline, saved as UTF-8. What do ccwc -c and ccwc -m report? Give -c first, then -m.
-
-**Expected** (all of these numbers): **6, 5**
-
-**Derivation.** c, a and f are one byte each, the accented e takes two bytes in UTF-8, and the newline is one byte: 1 + 1 + 1 + 2 + 1 = 6 bytes. As characters it is c, a, f, é and the newline, so 5. Proof script output: [6, 5].
-
-**Proof returned:** [6,5] (matches)
-
-<details><summary>Proof source</summary>
-
-```js
-() => [bytes('café\n'), chars('café\n')]
-```
-
-</details>
-
-### 3.1 Default output (predict)
-
-- [ ] checked
-
-**Prompt.** A file holds one two, a newline, three, and a newline. What three numbers does ccwc print when it is given no option?
-
-**Expected** (all of these numbers): **2, 3, 14**
-
-**Derivation.** With no option it prints lines, words and bytes. There are 2 newlines, the words one, two and three, and 7 + 1 + 5 + 1 = 14 bytes (one two is 7 bytes, three is 5, plus two newlines). Proof script output: [2, 3, 14].
-
-**Proof returned:** [2,3,14] (matches)
-
-<details><summary>Proof source</summary>
-
-```js
-() => {
-    const text = 'one two\nthree\n';
-    return [lines(text), words([text]), bytes(text)];
-  }
+() => utf16Units(String.fromCodePoint(0x1f44d, 0x1f3fd))
 ```
 
 </details>
@@ -3212,10 +3110,48 @@ Source: https://codingchallenges.fyi/challenges/challenge-webserver. Proofs: `co
 
 </details>
 
+## Prompts to check: the tool on a made-up input
+
+Content v2 bans Think tasks whose only lesson is "you ran the tool in your head". The checker cannot tell for
+certain, so it flags prompts that look like one. Keep a flagged prompt only if the answer is a fact about the
+concept, not about a toy input.
+
+| Project | Step | Kind | Sign | Prompt |
+|---|---|---|---|---|
+| challenge-bloom | 1.2 | predict | asks what the tool prints or reports | Keep the filter holding cat and dog from the last step. You look up cow, whose hashes point at bits 1, 2 and 7, and fox, whose hashes point at bits 1, 3 and 6. Neither word was ever added. How many of the two does the filter report as probably present? Answer with the count. |
+| challenge-brainfuck | 2.1 | predict | asks what the tool prints or reports | Your compiler emits one bytecode instruction per command and drops everything else. How many instructions does it emit for the source "Set two ++ Loop [>+<-] Show it >." Answer with the total. |
+| challenge-calculator | 1.3 | predict | asks what the tool prints or reports | Your first version stores numbers as integers, where dividing one integer by another drops the remainder. It works through 7 / 2 * 2 from left to right. What does it print? Answer with one number. |
+| challenge-calculator | 2.1 | predict | asks what the tool prints or reports | What should your calculator print for 8 / 4 / 2? Answer with one number. |
+| challenge-cut | 1.1 | predict | asks what the tool prints or reports | A line holds apple, a tab, banana, a tab, cherry. What does cut -f2 print for that line? |
+| challenge-cut | 1.2 | predict | describes a made-up input | A line holds red, two commas in a row, then blue. cut -d, -f2 prints the second field followed by a newline. How many bytes is that output line, counting the newline? |
+| challenge-cut | 1.3 | predict | describes a made-up input | A line holds red,green,blue,black. You run cut -d, -f3,1 on it. Write the output line exactly as cut prints it. |
+| challenge-cut | 2.3 | predict | asks what the tool prints or reports | A small CSV holds four songs, and the artist column reads Toto, Toto, Queen and Toto, in that order. You run cut for the artist field, pipe it into uniq, then into wc -l. What number does wc print? |
+| challenge-duplicate-files | 1.1 | predict | describes a made-up input | A folder holds three files and two subfolders. The subfolder photos holds two files, and the subfolder empty holds nothing. How many file paths does ccdupe list when it is run on the folder? Answer with one number. |
+| challenge-duplicate-files | 2.1 | predict | asks what the tool prints or reports | Six candidate files, A to F, are all 100 bytes. A, C and F hold exactly the same bytes, B and E hold the same bytes as each other, and D is unlike any other. The tool prints one Probable duplicates line for each group of two or more files with the same MD5 digest. How many lines does it print? Answer with one number. |
+| challenge-duplicate-files | 3.1 | predict | describes a made-up input | A folder holds files of 0, 0, 500, 999, 1000, 1000 and 4096 bytes, and you run ccdupe with --minsize=1000, which skips any file smaller than 1000 bytes. How many files are left for the size grouping? Answer with one number. |
+| challenge-grep | 1.1 | predict | asks what the tool prints or reports | A file holds three lines: cat, cow and dog. How many lines does grep print when the pattern is the letter o? |
+| challenge-grep | 1.2 | predict | asks what the tool prints or reports | A file holds the letter a, a newline, and the letter b, with no newline after the b, so wc -l on the file reports 1. You run grep with an empty pattern on the file and pipe its output into wc -l. What does wc report? |
+| challenge-grep | 2.2 | predict | asks what the tool prints or reports | A file holds five lines: apple, berry, an empty line, banana and cherry. How many lines does grep -v with the pattern a print? |
+| challenge-grep | 3.1 | predict | asks what the tool prints or reports | A file holds five lines: a plus sign, the word ok, two dashes, a single underscore, and a question mark. How many lines does grep print for the word-character class, written as a backslash and a w? |
+| challenge-grep | 3.2 | predict | asks what the tool prints or reports | A file holds four lines: Banana, nachos, Ana and banana split. How many lines does grep print for the pattern n, a, then a dollar sign? |
+| challenge-grep | 3.3 | predict | asks what the tool prints or reports | A file holds ABBA, abba, Toto and a-ha, one per line. How many lines does grep print for the pattern A, and how many when -i is added? |
+| challenge-sort | 1.1 | predict | describes a made-up input | A file holds four lines: pear, apple, cherry and banana. After sorting, on which line of the output does cherry appear? Answer with one number. |
+| challenge-sort | 1.2 | predict | describes a made-up input | A file holds banana, Cherry with a capital C, and apple. You sort it with the locale set to C, so letters are compared by their byte values. On which line of the output does Cherry appear? Answer with one number. |
+| challenge-sort | 1.3 | trace | asks what the tool prints or reports | A first version reads all of its input, splits it at every newline and sorts the pieces. The input is pear, a newline, fig and a newline. How many lines does it print, counting any blank line? Answer with one number. |
+| challenge-sort | 2.1 | predict | asks what the tool prints or reports | A file holds pear, fig, pear and fig, one per line. You pipe it straight into uniq without sorting first. How many lines does uniq print? Answer with one number. |
+| challenge-sort | 2.2 | predict | asks what the tool prints or reports | A file holds pear, fig, pear, Fig with a capital F, and fig. Your tool sorts it with -u, comparing bytes as with the locale set to C. How many lines does it print? Answer with one number. |
+| challenge-wc | 1.3 | trace | asks what the tool prints or reports | The thumbs up with a medium skin tone is two code points, U+1F44D and U+1F3FD. JavaScript and Java store strings in UTF-16 and their length counts code units. What length does a string holding only this emoji report? Answer with one number. |
+| challenge-wc | 5.2 | explain | asks what the tool prints or reports | A script runs ccwc on three files, and the second one does not exist. What should ccwc print, on which stream, and with what exit status? Why does it matter to the script? |
+
 ## Concepts not yet reviewed
 
 | Concept | Area | Brief |
 |---|---|---|
+| explicit-charsets | text-encodings | Decoding bytes needs a named encoding. Relying on a platform default breaks when the tool runs elsewhere. |
+| decoding-across-chunks | text-encodings | A chunk of bytes can end in the middle of a character, so a decoder keeps the leftover bytes for the next chunk. |
+| streaming-constant-memory | streams-io | Read input in fixed-size chunks and keep running totals, so memory does not grow with the input. |
+| stdin-vs-file | streams-io | A file and standard input can be treated as the same kind of byte stream, so one loop serves both. |
+| stream-read-contract | streams-io | A read can return fewer bytes than the buffer holds. The returned count says how many are valid, and -1 means the end. |
 | line-endings | text-encodings | A line is the text up to and including a newline byte, so tools count lines by counting newlines. A last line with no newline after it is not counted. Files written on Windows end each line with a carriage return and a newline, and the carriage return is an extra byte that line counting ignores but byte counting sees. |
 | word-state-machine | formats-parsing | A word counter walks the text once and remembers one thing: whether it is inside a word. A word starts when a non-space character follows a space or the start of input, so runs of spaces never make empty words. The remembered state has to survive from one chunk of input to the next. |
 | differential-testing | process-testing | Run your tool and a trusted reference on the same inputs and compare the outputs. Your own expected values only test what you already believe, while the reference exposes cases you did not think of, such as odd whitespace or line endings. Pin the reference version and settings, since they can change its answers. |
@@ -3300,3 +3236,9 @@ Source: https://codingchallenges.fyi/challenges/challenge-webserver. Proofs: `co
 | tombstones | data-stores | In an append-only store a delete cannot remove the old record, so it appends a tombstone, a record that says the key is gone. Reads and rebuilds treat the tombstone as the latest word on that key, and compaction drops both the tombstone and the old values. |
 | log-compaction | data-stores | An append-only log keeps growing with stale values and tombstones. Compaction, which Bitcask calls merging, rewrites the closed files keeping only the latest live value of each key, can write a small hint file listing where each key now lives, and then deletes the old files. |
 | crash-recovery | state-storage | After a crash a store rebuilds its in-memory state from what is on disk, by replaying the log from the start or by reading smaller hint files. Records that fail their checksum, usually a half-written last one, are dropped, so the store comes back with every write that fully reached the disk. |
+| text-encoding-utf8 | text-encodings | Unicode gives every character a number, its code point. UTF-8 stores each code point in one to four bytes, with plain ASCII in one byte, so the byte count and the character count of the same text often differ. |
+| utf16-code-units | text-encodings | UTF-16 stores code points in 16-bit units: one unit for most characters and a surrogate pair of two units for the rest, including most emoji. Java, JavaScript, C# and Windows use it, so their string length counts units, not characters. |
+| grapheme-clusters | text-encodings | A grapheme cluster is what a reader sees as one character, and it can be several code points: a letter and a combining accent, an emoji and a skin tone, or emoji joined into a family. The same visible text can also be stored as different code points, which normalisation makes comparable. |
+| io-buffering | streams-io | Every read from the operating system is a system call with a fixed cost, so reading one byte at a time is slow even though the data is the same. Reading into a buffer of some kilobytes and working from memory spreads that cost over many bytes. |
+| malformed-input | formats-parsing | Real input breaks its format: invalid UTF-8 bytes, a truncated last record, a value out of range. A tool must decide whether to reject it, replace the bad part or skip it, and say clearly where the problem was. |
+| locale-settings | text-encodings | A locale is a set of environment settings, such as LANG and LC_ALL, that tells programs which encoding, character classes and sorting rules to use. The same command can give different answers under two locales, so tests must set it. |

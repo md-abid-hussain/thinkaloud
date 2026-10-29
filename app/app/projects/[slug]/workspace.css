@@ -225,3 +225,36 @@
 .pg-ws .ask .unlocked { margin-bottom: 8px; color: var(--accent); }
 .pg-ws .who .pill.soft { text-transform: none; letter-spacing: 0.04em; }
 .pg-ws .tabs .new { display: inline-block; }
+
+/* Concept lesson before a milestone's checks (CONTENT_FORMAT v2) */
+.pg-ws .lesson { border: 1.5px solid var(--ink); border-radius: 10px; background: var(--surface); margin: 0 0 24px; overflow: hidden; }
+.pg-ws .lesson-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; background: transparent; border: 0; cursor: pointer; color: var(--ink); text-align: left; }
+.pg-ws .lesson-body { padding: 4px 18px 18px; border-top: 1px solid var(--rule); }
+.pg-ws .lesson-body h2 { font: 700 22px/1.2 var(--f-display); margin: 14px 0 4px; }
+.pg-ws .lesson-sec { margin-top: 14px; }
+.pg-ws .lesson-sec p:not(.label), .pg-ws .lesson-sec li { font-size: 17px; line-height: 1.55; max-width: 40em; }
+.pg-ws .lesson-sec p:not(.label) { margin: 6px 0 0; }
+.pg-ws .lesson-sec ul { margin: 6px 0 0; padding-left: 20px; }
+
+/* Learn before the checks: language notes and references */
+.pg-ws .learn { display: grid; gap: 16px; margin: 0 0 24px; }
+.pg-ws .lang { border: 1.5px solid var(--ink); border-radius: 10px; background: var(--surface); padding: 0 18px; }
+.pg-ws .lang > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 0; }
+.pg-ws .lang > summary::-webkit-details-marker { display: none; }
+.pg-ws .lang[open] > summary { border-bottom: 1px solid var(--rule); }
+.pg-ws .lang > .fine:last-child { padding: 12px 0 16px; }
+.pg-ws .lang-note { padding: 16px 0 4px; border-bottom: 1px dashed var(--rule); }
+.pg-ws .lang-note h3 { font: 700 20px/1.2 var(--f-display); margin: 0 0 6px; }
+.pg-ws .lang-note > p:not(.label):not(.fine) { margin: 0 0 10px; font-size: 17px; line-height: 1.55; max-width: 40em; }
+.pg-ws .apis { margin: 0 0 12px; display: grid; gap: 8px; }
+.pg-ws .apis > div { display: grid; grid-template-columns: minmax(0, 15em) minmax(0, 1fr); gap: 4px 16px; align-items: baseline; }
+.pg-ws .apis dt { font: 500 14px/1.45 var(--f-mono); overflow-wrap: anywhere; }
+.pg-ws .apis dd { margin: 0; font-size: 16px; line-height: 1.5; }
+.pg-ws .lang-note ul { margin: 4px 0 10px; padding-left: 20px; font-size: 16px; }
+.pg-ws .lang-note .docs { margin: 0 0 12px; }
+.pg-ws .refs { border-top: 1px solid var(--rule); padding-top: 12px; }
+.pg-ws .refs ul { margin: 6px 0 0; padding-left: 20px; font-size: 17px; }
+.pg-ws .preparing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0; font-size: 17px; }
+.pg-ws .wave-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--wave); animation: ta-blink 1.4s infinite ease-in-out; }
+@media (max-width: 640px) { .pg-ws .apis > div { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .pg-ws .wave-dot { animation: none; } }

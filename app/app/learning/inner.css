@@ -41,3 +41,12 @@
 @media (max-width: 600px) {
   .pg-inner .list > li { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Concept lesson (same markup as the workspace's) */
+.pg-inner .lesson { border: 1.5px solid var(--ink); border-radius: 10px; background: var(--surface); overflow: hidden; max-width: 46em; }
+.pg-inner .lesson-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; background: transparent; border: 0; cursor: pointer; color: var(--ink); text-align: left; }
+.pg-inner .lesson-body { padding: 4px 18px 18px; border-top: 1px solid var(--rule); }
+.pg-inner .lesson-sec { margin-top: 14px; }
+.pg-inner .lesson-sec p:not(.label), .pg-inner .lesson-sec li { font-size: 17px; line-height: 1.55; }
+.pg-inner .lesson-sec p:not(.label) { margin: 6px 0 0; }
+.pg-inner .lesson-sec ul { margin: 6px 0 0; padding-left: 20px; }

@@ -12,6 +12,54 @@ content/
   REVIEW_SHEET.md                     generated: every key, its derivation and its proof, for a person to check
 ```
 
+## Concept-first (v2, 29 Oct 2026): this section overrides anything below that conflicts with it
+
+The user rejected the v1 content. It followed the challenge page step by step and asked trivia about the tool on toy inputs ("hi plus a newline: how many bytes does ccwc -c report?"). That tests whether someone can run the tool in their head, not whether they learned anything. ThinkAloud exists to teach **the concepts a developer learns by building the project**, in enough depth to carry them to other work.
+
+**1. Start from the concepts, not from the challenge's steps.**
+- For each project, list the 3 to 5 big ideas it really teaches: what a good senior engineer would say "you learn X by building this".
+- Go beyond what the challenge page mentions when the idea needs it. For wc, "bytes vs characters" is not enough. The real idea is **how text is encoded**:
+  - code points
+  - UTF-8 as a variable-length encoding and why it is designed that way
+  - UTF-16 code units and surrogate pairs (why `length` of an emoji is 2 in Java and JavaScript)
+  - UTF-32
+  - byte order marks
+  - grapheme clusters (an emoji with a skin tone, or a family emoji, is one visible character but several code points)
+  - normalisation (é as one code point or as e plus a combining accent)
+  - why a decoder must carry a half-finished character across a chunk boundary
+- **Milestones are concepts** (or a tight group of them), ordered the way they should be learned, not the order of the challenge's steps. Each challenge step still appears as a Build task, attached to the milestone whose concept it applies.
+
+**2. Teach before you test.** Every concept gets a **lesson**, not just a 2 to 3 sentence brief:
+- how it works underneath
+- one or two concrete real-world examples (emoji in a username, a CSV from Excel with a BOM, a 20 GB log)
+- the usual misconceptions
+- where else it shows up (databases, APIs, other languages)
+
+Lessons are in words and small worked examples. The no-code rule still holds.
+
+**3. Questions test the concept in the real world, not the tool on a toy input.**
+- Good:
+  - "😀 is U+1F600. How many bytes does it take in UTF-8, and why can't it take fewer?"
+  - "In Java, the length of a string holding 😀 is 2. What is being counted, and why?"
+  - "👍🏽 looks like one character. What is it made of, and what should a character count report?"
+  - "You decode a UTF-8 file in 4 KB chunks, each chunk on its own. What breaks, and where?"
+  - "Why does a streaming counter use the same memory for 2 KB and 20 GB, and what changes if it reads the whole file first?"
+- Bad, and no longer allowed:
+  - "A file holds h, i and a newline. What does ccwc -c report?"
+  - "hello world arrives as hel and lo world. How many words does the buggy counter report?"
+  - Any count of a made-up input whose only lesson is "you ran the tool in your head".
+- A `predict` or `trace` key is allowed only when the number or fact **is** a fact about the concept (4 bytes for U+1F600, 2 UTF-16 code units, 3 bytes for a BOM). Prefer `explain` with a rubric that asks for the reasoning, and pair a keyed fact with a "why".
+- Questions must be answerable by someone who understood the lesson, without having built the tool yet.
+
+**4. The teach-back joins the milestone's concept into one explanation, out loud.** For example: "Explain to a teammate why counting characters in a UTF-8 file is harder than counting bytes, and what your tool does about it."
+
+**5. Concepts are shared and named for the idea, not the tool.**
+- Use `text-encoding-utf8`, not `bytes-vs-characters`, and `constant-memory-streaming`, not `read-in-chunks`.
+- One concept lesson serves every project that uses it.
+- Merge near-duplicates (`lexical-analysis` and `lexer-states`, `checksums` and `content-digests`).
+
+**6. Process.** Rewrite `wc` first as the worked example and show it to the user. Rewrite the other projects only after the user accepts it, in the same shape.
+
 ## Settled choices
 
 - **YAML.** A person has to read and fix these files, and YAML allows comments. JSON would be stricter but harder to review.
@@ -202,7 +250,7 @@ by 8,192".
 | On the page | In the file |
 |---|---|
 | Step 0, environment setup | Dropped. Choosing a language belongs to the Start box |
-| Numbered steps | Grouped into 2 to 4 milestones, each step's work appears in at least one Build prompt |
+| Numbered steps | Each step's work appears in at least one Build prompt, attached to the milestone whose concept it applies. Milestones are concepts, not the page's steps (see "Concept-first") |
 | Expected outputs on the page, such as 342190 bytes | Used in Build prompts, where the learner checks them on their own machine |
 | "Going further" ideas | Left out. Extras belong to the side lane |
 | Tags such as `beginner` | `level` |
@@ -210,8 +258,8 @@ by 8,192".
 
 Rules of thumb:
 
-1. Group the challenge steps into 2 to 4 milestones of 30 to 60 minutes, each split into steps of 10 to 20 minutes.
-2. A Think task tests the idea behind a step, not whether the learner remembers the page. Ask why, what happens if, or how many on a small case.
+1. List the project's 3 to 5 big concepts first. Each becomes a milestone of 30 to 60 minutes with a lesson and steps of 10 to 20 minutes.
+2. A Think task tests the concept in a real-world situation, not the tool's output on a toy input. Ask why, what happens if, or compare, and pair any keyed fact with its reason.
 3. Do not write a step check that repeats the teach-back. The teach-back joins the milestone's ideas into one explanation.
 4. Reuse a concept from `concepts.yaml` whenever one fits. Concepts that recur across projects, such as stdin-vs-file, are what make "already explained in wc" possible.
 5. Everything is written in our own words. Link to the source, do not copy it.
@@ -249,6 +297,9 @@ Write content/projects/<source>/<slug>.yaml and content/proofs/<slug>.mjs for th
 content/concepts.yaml. If one you need is missing, add it as a new entry, and never add a near-duplicate.
 
 RULES
+- Follow the "Concept-first" section of CONTENT_FORMAT.md before anything else. Start by listing the 3 to 5 big
+  concepts the project teaches, going beyond the source page where the idea needs it. Each becomes a milestone with a
+  full lesson. Questions test the concept in real-world situations, never the tool's output on a made-up input.
 - Write everything in your own words. Do not copy sentences from the source page.
 - Drop environment-setup steps and "going further" ideas. Every other challenge step appears in a Build prompt.
 - Write a primer for a newcomer that never gives away a Think answer.

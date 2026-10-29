@@ -38,7 +38,9 @@ Both were briefed fresh (not forked). Both ask the user before changing a decisi
   - Cut from the hackathon version: By concept, Repo check, Content review, Project generator.
   - New rule: one comment round per page; anything later goes to the polish list.
 - **Stack.** Next.js with TypeScript in one app, plain CSS tokens (no Tailwind), the mentor as a Claude API tool loop over SSE, `claude-opus-5-5` for the mentor and `claude-sonnet-5-5` for grading with a daily spend cap. **Hosting: Zerops** (one long-running Node server plus Zerops Postgres), chosen by the user on 29 Oct over Vercel + Neon, because agent runs take time and the learner must be able to leave the page. Every grading and mentor call is a durable run stored in Postgres and followed over a resumable SSE stream.
-- **Content.** 21 projects pass the checker; 135 keys are proven; answer matching handles dictation; 52 tests pass. Everything stays "generated" until the user reviews `content/REVIEW_SHEET.md`.
+- **Content is concept-first (29 Oct, user rejected v1 as tool trivia).** The rules are the "Concept-first (v2)" section of `CONTENT_FORMAT.md`: milestones are concepts with lessons, and questions test the concept in real situations. Order: wc first as the example, the user approves it, then a concept plan for the other 20, the user approves that, then the rewrite. ta-build shows the lessons; ta-design adds a Lesson state to the workspace.
+- **Git:** a repo since 29 Oct, snapshot `9ac1f7f`. `.env` files are ignored, and the sessions don't run git; the orchestrator commits at checkpoints.
+- **Content (v1, superseded):** 21 projects pass the checker; 135 keys are proven; answer matching handles dictation; 52 tests pass. Everything stays "generated" until the user reviews `content/REVIEW_SHEET.md`.
 - **John Crickett.** No public email. The user is messaging him on X.
 
 ## Artifacts

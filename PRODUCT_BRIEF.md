@@ -3,6 +3,7 @@
 Status: draft for review. Owner: Abid. Date: 2026-10-29.
 Target: a working prototype for the No Hands challenge (Builders track), built so it can grow into the final product.
 v0.3: the command layer is removed (input is plain typing or Wispr Flow), completion is logic-first with an optional language, and the whole brief was checked for conflicts. The data model is in `DATA_MODEL.md`.
+v0.5 (29 Oct): content is **concept-first**. Each project is taught through the 3 to 5 deep concepts it builds, for example text encoding (UTF-8, UTF-16 surrogates, grapheme clusters) and constant-memory streaming for wc. Each concept gets a lesson, and questions test it in real situations, not the tool's output on toy inputs. The rules are in the "Concept-first" section of `CONTENT_FORMAT.md`.
 v0.4: the product must not be rigid for newcomers. A support level (Guided, Standard or Independent) is chosen at Start, every project opens with a plain-language primer, and the app never suggests code. Implementation of v0.4 is queued in `HANDOFF.md`.
 
 ## 1. Problem and idea

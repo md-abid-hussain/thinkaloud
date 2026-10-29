@@ -18,8 +18,32 @@ Storing every word takes a lot of space. A Bloom filter takes a fraction of it a
 
 **Where it shows up here.** Your spell checker keeps a compact filter instead of the whole dictionary. It can wrongly accept a misspelling, but it never flags a real word.
 
+**How it works.** A Bloom filter answers one question, have I seen this item, using far less memory than storing the items. It is an array of m bits, all zero at first, and k hash functions that each map an item to one bit position.
+
+To add an item, compute its k positions and set those bits to one. To look an item up, compute the same k positions. If any of those bits is zero, the item was definitely never added, because adding it would have set them all. If all of them are one, the item was probably added, but those bits may also have been set by other items.
+
+So a Bloom filter has no false negatives and some false positives. It never says no to something that is there, and it sometimes says yes to something that is not. You cannot list the items from the bits, and in the basic form you cannot remove one, because clearing its bits could clear bits that other items share.
+
+The filter does not store the items at all, so its size depends only on how many items it holds and the false positive rate you accept, not on how long the items are. About 9.6 bits per item gives a 1 in 100 false positive rate, whatever the items are.
+
+**Examples.**
+- A spell checker ships a small filter instead of a whole dictionary; a misspelling is occasionally missed, but a real word is never flagged.
+- A database checks a Bloom filter before reading a file from disk, and skips the read when the filter says the key is definitely absent.
+- A web browser once checked a local filter of known bad sites before asking a server, so most safe sites needed no network call.
+
+**Misconceptions.**
+- A Bloom filter can say an item is missing when it was added. That never happens; errors only go the other way.
+- You can delete from a Bloom filter. Clearing bits can remove other items too; counting filters exist for that.
+- Longer items need a bigger filter. The size depends on the number of items and the error rate, not their length.
+
+**Elsewhere.**
+- Databases such as Cassandra and RocksDB keep a Bloom filter per data file to avoid needless disk reads.
+- Content networks use them to avoid caching pages that are only ever requested once.
+- Distributed systems use them to compare large sets cheaply before sending the differences.
+
 **Read.**
-- [Bloom filter (Wikipedia)](https://en.wikipedia.org/wiki/Bloom_filter) (not opened)
+- [Bloom filter (Wikipedia)](https://en.wikipedia.org/wiki/Bloom_filter)
+- [Bloom filter calculator (hur.st)](https://hur.st/bloomfilter/)
 
 **Explain it back.** A user complains that your spell checker missed a typo, and another asks whether it could ever flag a correctly spelt dictionary word. Answer both, using how a Bloom filter adds and looks up a word.
 
@@ -28,11 +52,36 @@ Storing every word takes a lot of space. A Bloom filter takes a fraction of it a
 - [ ] A typo can find all its bits already set by other words, so the filter wrongly says it is probably a word: a false positive
 - [ ] The filter stores no words, only bits, so it cannot tell which case it is in
 
-### 2. false-positive-rate
+### 2. Sizing a filter for a false positive rate
 
 **Where it shows up here.** You size the filter from the number of dictionary words and the error rate you accept, which fixes the bit count and the number of hash functions.
 
+**How it works.** Each added item sets up to k bits. As more items are added, more of the m bits are one, and a lookup for an item that was never added is more likely to find all of its k bits already set. That chance is the false positive rate.
+
+For n items and a target rate p, the best number of bits is about n times the natural log of p, made positive, divided by the square of the natural log of 2. That works out to about 9.6 bits per item for 1 in 100, and about 14.4 bits per item for 1 in 1,000. The best number of hash functions is the bits per item times the natural log of 2, so about 7 for 1 in 100 and about 10 for 1 in 1,000. For 100,000 words at 1 in 100 that is about 958,500 bits, under 120 kilobytes.
+
+More hash functions are not always better. Too few leave too many items matching by chance, and too many fill the array with ones faster. The formula balances the two.
+
+The rate holds only if the filter holds about the number of items it was sized for. Put in twice as many and the rate is far worse than twice as bad. Measure the rate you actually get, by looking up many items you know were never added.
+
+**Examples.**
+- A team sized a filter for 1 million keys, then loaded 5 million, and the filter answered probably present for almost everything.
+- Halving the false positive rate from 1 in 100 to 1 in 200 costs only about 1.4 more bits per item.
+- A spell checker tested with random strings measured close to the 1 percent rate its sizing promised.
+
+**Misconceptions.**
+- More hash functions always lower the error. Past the best number they raise it.
+- The false positive rate is fixed once chosen. It depends on how many items have actually been added.
+- Halving the error rate doubles the size. The size grows with the logarithm of the rate, so it grows much more slowly.
+
+**Elsewhere.**
+- Cache filters in databases are sized per data file from the number of keys in that file.
+- Capacity planning for hash tables uses the same idea of a load factor beyond which performance falls.
+- Probabilistic counters such as HyperLogLog trade memory for a known error in the same way.
+
 **Read.**
+- [Bloom filter (Wikipedia), probability of false positives and optimal number of hash functions](https://en.wikipedia.org/wiki/Bloom_filter)
+- [Bloom filter calculator (hur.st)](https://hur.st/bloomfilter/)
 
 **Explain it back.** A teammate sized your filter for 100,000 words at 1 in 100, then loaded a dictionary of 500,000 words into it. Explain what happens to the false positive rate and how you would size it properly.
 
@@ -45,8 +94,33 @@ Storing every word takes a lot of space. A Bloom filter takes a fraction of it a
 
 **Where it shows up here.** Each word must map to the same k bit positions every time, spread evenly over the whole filter. You implement FNV-1a and derive k positions from it.
 
+**How it works.** A hash function turns any input, such as a word or a file, into a fixed-size number. The same input always gives the same number, and a good function spreads different inputs evenly across all possible numbers, so similar inputs such as cat and cats get unrelated results.
+
+Hash functions come in two families. Non-cryptographic ones, such as FNV-1a or MurmurHash, are built for speed and even spread. They are right for hash tables and Bloom filters, but an attacker can easily find two inputs with the same hash. Cryptographic ones, such as SHA-256, are slower but designed so that nobody can find a collision or work backwards from the output. MD5 and SHA-1 used to be in this family but are broken for that purpose.
+
+To pick one of m slots, the hash is reduced to the range 0 to m minus 1, usually with the remainder after dividing by m. A Bloom filter needs k different positions per item. Rather than k separate functions, it is common to compute two hashes and combine them as the first plus i times the second, for i from 0 to k minus 1, which is known to work about as well.
+
+A hash is a fingerprint, not a unique id. Different inputs can share a hash, so the code that uses it must allow for that.
+
+**Examples.**
+- A hash table puts a key in the slot its hash points to, so a lookup goes straight there instead of searching every entry.
+- A Bloom filter derives seven bit positions for a word from two FNV-1a hashes instead of running seven separate functions.
+- A website that used a weak hash for its tables was slowed to a crawl by requests crafted to collide.
+
+**Misconceptions.**
+- Equal hashes mean equal inputs. Different inputs can share a hash; only the inputs themselves can prove equality.
+- Any hash is fine for security. Fast hashes such as FNV-1a are easy to attack on purpose.
+- A hash of a small input is smaller. The output always has the same fixed size.
+
+**Elsewhere.**
+- Git names every file and commit by a cryptographic hash of its content.
+- Load balancers hash a client id to pick a server, so the same client keeps reaching the same one.
+- Passwords are stored as slow, salted hashes, never as fast ones.
+
 **Read.**
-- [Fowler-Noll-Vo hash function (Wikipedia)](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function) (not opened)
+- [Hash function (Wikipedia)](https://en.wikipedia.org/wiki/Hash_function)
+- [FNV Hash (Landon Curt Noll)](http://www.isthe.com/chongo/tech/comp/fnv/index.html)
+- [IETF draft, The FNV Non-Cryptographic Hash Algorithm](https://datatracker.ietf.org/doc/html/draft-eastlake-fnv)
 
 **Explain it back.** Your filter uses one hash function and takes k positions from it by adding 1, 2, 3 and so on to the first position. The measured false positive rate is far above what you sized for. Explain why, and a better way to get k positions.
 
@@ -55,12 +129,37 @@ Storing every word takes a lot of space. A Bloom filter takes a fraction of it a
 - [ ] A standard approach combines two different hashes as the first plus i times the second, or uses differently seeded hashes
 - [ ] The same word must always give the same positions, so the hashes must not depend on anything but the word
 
-### 4. Packing bits into bytes
+### 4. Packing flags into bits
 
 **Where it shows up here.** The filter holds millions of bits, so you store eight bits per byte and find each bit by its byte and its position inside that byte.
 
+**How it works.** A byte has 8 bits and a 16-bit field has 16, and a format can give each bit, or each small group of bits, its own meaning. The DNS header's flags field is an example. Its top bit says whether the message is a query or a response. The next four bits hold the operation code. Then come single bits for an authoritative answer, a truncated message, recursion desired and recursion available, three reserved bits, and finally four bits for the response code.
+
+To work with such a field, a program uses masks. A mask is a number with ones only in the positions it cares about. Combining the field with a mask using AND keeps only those bits, which tests a flag or extracts a group. Combining with OR sets bits without touching the rest. Shifting moves a group of bits down to the low end so it can be read as a small number, or up into its place before it is combined. For example, recursion desired is bit 8 counting from zero at the low end, the mask 0x0100, and setting it on an otherwise empty field gives the flags bytes 01 00.
+
+Mistakes are silent: setting the wrong bit produces a valid-looking message that means something else, such as a query marked as a response. Writing each mask once, with a name and a comment pointing at the specification, and testing against known bytes catches them.
+
+Packing saves space and bandwidth, which mattered when these formats were designed, and still matters for hardware, network headers and dense storage.
+
+**Examples.**
+- A teammate sets the top bit of the DNS flags instead of the recursion-desired bit, and servers ignore the query because it now claims to be a response.
+- File permissions on Unix pack read, write and execute for owner, group and others into nine bits, which is why permissions are written as numbers like 644.
+- A TCP header packs its SYN, ACK, FIN and other flags into single bits of one byte.
+
+**Misconceptions.**
+- Each flag needs its own byte. Flags usually share bits of one field.
+- Setting a flag means writing a number into the field. Writing replaces the other flags; OR with a mask sets one and keeps the rest.
+- Bit positions are obvious. Specifications number bits differently, from the top or from the bottom, so check against known bytes.
+
+**Elsewhere.**
+- Bloom filters and bitmaps store millions of yes or no facts as single bits.
+- Image and audio formats pack colour channels and samples into bit fields.
+- Feature flags and permission systems often store sets of options as bits in one integer.
+
 **Read.**
-- [Bit array (Wikipedia)](https://en.wikipedia.org/wiki/Bit_array) (not opened)
+- [Bit field (Wikipedia)](https://en.wikipedia.org/wiki/Bit_field)
+- [Mask (computing) (Wikipedia)](https://en.wikipedia.org/wiki/Mask_(computing))
+- [RFC 1035 (header section format)](https://www.rfc-editor.org/rfc/rfc1035)
 
 **Explain it back.** Your first filter used one byte per bit and the saved file was eight times bigger than expected. Explain how to store and find bit number 21 when bits are packed eight to a byte.
 
@@ -73,8 +172,33 @@ Storing every word takes a lot of space. A Bloom filter takes a fraction of it a
 
 **Where it shows up here.** words.bf starts with the identifier CCBF and a version, then the hash count and bit count the loader needs before reading the bits.
 
+**How it works.** A file that another program, or a later version of your own, must read needs to describe itself. A header at the start does that. It usually begins with a magic number, a few fixed bytes such as the letters PNG or CCBF, so a reader can tell at once whether it was handed the right kind of file. Then comes a version number, so the format can change later without old files being misread.
+
+After that come the fields the reader needs before the data: counts, sizes, table lengths, and the parameters used to write the data, such as a hash count or a frequency table. Each field has a fixed size and a fixed byte order, so the reader knows exactly where every field starts.
+
+A careful reader checks everything before trusting it. It checks the magic and the version first and refuses anything it does not recognise. It checks that sizes are plausible and that the file is long enough to hold what the header promises. A header that says the data is four gigabytes long should not make the program try to allocate four gigabytes.
+
+The header is a contract between the writer and every reader. Write it down, so that the format outlives the program that made it.
+
+**Examples.**
+- Every PNG file starts with the same eight bytes, which also catch a file damaged by a transfer that changed line endings.
+- A compressed file stores its frequency table in the header, so the decoder can rebuild the same Huffman tree.
+- A program that skips the version check reads a newer file as garbage, instead of saying the file is too new.
+
+**Misconceptions.**
+- The file extension says what the file is. Anyone can rename a file; the magic number is the real evidence.
+- If the program wrote it, the program can read it. A later version, another platform or a damaged file may not match.
+- Header values can be trusted. A damaged or hostile file can claim any size, so check before allocating.
+
+**Elsewhere.**
+- The file command on Unix identifies files by their magic numbers, not their names.
+- Network packets carry headers with versions and lengths for the same reasons.
+- Database files start with a header holding the page size and format version.
+
 **Read.**
-- [List of file signatures (Wikipedia)](https://en.wikipedia.org/wiki/List_of_file_signatures) (not opened)
+- [File format, magic numbers (Wikipedia)](https://en.wikipedia.org/wiki/File_format)
+- [List of file signatures (Wikipedia)](https://en.wikipedia.org/wiki/List_of_file_signatures)
+- [PNG Specification (Third Edition), the PNG signature](https://www.w3.org/TR/png-3/)
 
 **Explain it back.** Someone passes your spell checker an old filter file built with a different hash count, and another person passes it a text file. Explain what your header must contain and what the loader must check before trusting any bits.
 
@@ -82,12 +206,37 @@ Storing every word takes a lot of space. A Bloom filter takes a fraction of it a
 - [ ] It also stores the hash count and the bit count used to build the filter, so lookups use the same settings
 - [ ] The loader checks the identifier and version first and refuses a file that does not match, and checks the file holds as many bytes as the bit count needs
 
-### 6. Byte order of numbers
+### 6. Byte order
 
 **Where it shows up here.** The header numbers are written big-endian, as the format says, so a hex dump shows them most significant byte first.
 
+**How it works.** Memory and files hold bytes, but many values need more than one byte: a 16-bit number spans two bytes and a 32-bit number four. There are two common ways to lay them out. Big-endian puts the most significant byte first, the way we write numbers, so 22 as a 16-bit number is the bytes 00 16 in hexadecimal. Little-endian puts the least significant byte first, so the same number is 16 00.
+
+Most desktop and phone processors are little-endian, while internet protocols such as IP, TCP, UDP and DNS specify big-endian, which is therefore called network byte order. A program that copies a number from memory straight onto the wire sends it in the machine's order, which is wrong on most machines. The other side then reads a different number: the bytes 16 00 read as big-endian are 5632.
+
+The safe habit is to build and read every multi-byte field explicitly in the order the format specifies, byte by byte or with the conversion functions every language provides, and never to depend on the machine's own order. Formats define their order and stick to it: some file formats are little-endian, some big-endian, and a few, like UTF-16 text, mark the order with a byte order mark at the start.
+
+Byte order only applies to values wider than a byte. A sequence of single bytes, such as ASCII text, reads the same either way.
+
+**Examples.**
+- A DNS client writes its query ID 22 in the machine's order, the server echoes back the bytes it received, and the client reads them as 5632 and rejects the reply as a mismatch.
+- A file written by a program on one machine and read on another with a different byte order gives nonsense numbers unless the format fixes the order.
+- Network packet captures show port 53 as the bytes 00 35, because 53 is 0x35 in big-endian order.
+
+**Misconceptions.**
+- Byte order affects every byte. It affects only values wider than one byte.
+- The machine handles it for you. Only if you use the conversion explicitly, or build the bytes yourself.
+- Big-endian is the norm everywhere. Most processors are little-endian; networks use big-endian.
+
+**Elsewhere.**
+- Binary file formats such as images, archives and databases each state their byte order.
+- UTF-16 text uses a byte order mark to say which order its 16-bit units are in.
+- Hash and checksum outputs are defined as byte sequences so that every machine gets the same result.
+
 **Read.**
-- [Endianness (Wikipedia)](https://en.wikipedia.org/wiki/Endianness) (not opened)
+- [Endianness (Wikipedia)](https://en.wikipedia.org/wiki/Endianness)
+- [Beej's Guide to Network Programming (byte order)](https://beej.us/guide/bgnet/html/)
+- [RFC 1035 (data transmission order)](https://www.rfc-editor.org/rfc/rfc1035)
 
 **Explain it back.** A hex dump of your words.bf shows 01 00 where the version should be, and the challenge author's file shows 00 01. Explain what your writer did wrong, and why your own loader did not notice.
 
@@ -131,7 +280,9 @@ code must not treat that piece as a real line.
 - Diff tools show a whole file as changed when only its line endings changed.
 
 **Read.**
-- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline) (not opened)
+- [Newline (Wikipedia)](https://en.wikipedia.org/wiki/Newline)
+- [RFC 5198: Unicode Format for Network Interchange (line endings in text)](https://www.rfc-editor.org/rfc/rfc5198)
+- [Git, gitattributes: end-of-line conversion](https://git-scm.com/docs/gitattributes)
 
 **Explain it back.** After building the filter from a dictionary downloaded on Windows, your checker flags almost every word as misspelt, even hello. Explain the likely cause and the fix.
 
@@ -143,8 +294,32 @@ code must not treat that piece as a real line.
 
 **Where it shows up here.** You check the saved file by saving a filter, loading it back, and confirming every dictionary word is still found.
 
+**How it works.** Many programs come in pairs that undo each other: compress and decompress, encode and decode, save and load, serialise and parse. A round-trip test runs the pair one after the other and checks that the output equals the input exactly, byte for byte.
+
+The strength of the test is that you do not need to know what the middle step should produce. You do not have to predict the compressed bytes; you only check that decompressing them gives back the original. That lets you test many inputs cheaply, including generated ones.
+
+The inputs are where the bugs hide. Try an empty input, a single symbol repeated many times, every byte value once, very large inputs, and inputs whose length lands exactly on a boundary such as a multiple of 8 bits. Property-based testing generates hundreds of random inputs automatically and shrinks any failure down to the smallest input that still breaks.
+
+A round trip proves the pair is consistent, not that each half is correct. A compressor that writes the input unchanged and a decompressor that copies it back pass every round trip but compress nothing. So add a few checks on the middle result too, such as that the output is smaller or that a known file decodes to a known text.
+
+**Examples.**
+- Compressing and decompressing a novel and comparing the result with the original catches a padding bug that only shows when the bit count is not a multiple of 8.
+- Saving a document and loading it again shows that dates lost their time zone in between.
+- A JSON library is tested by parsing what it printed and checking the values match.
+
+**Misconceptions.**
+- If the round trip passes, both halves are right. Both halves can be wrong in matching ways.
+- A few hand-picked inputs are enough. Edge cases such as empty or single-symbol input are where the bugs are.
+- Looking at the output is a test. Only an exact byte comparison catches a single changed bit.
+
+**Elsewhere.**
+- Database backups are trusted only after a restore has been tried.
+- Translation tools are checked by translating back and comparing meaning, the same idea for human language.
+- Network protocol code is tested by encoding a message and decoding it on the other side.
+
 **Read.**
-- [Round-trip format conversion (Wikipedia)](https://en.wikipedia.org/wiki/Round-trip_format_conversion) (not opened)
+- [Hypothesis, What is property-based testing?](https://hypothesis.works/articles/what-is-property-based-testing/)
+- [OpenDSA, Huffman Coding Trees (encoding and decoding)](https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html)
 
 **Explain it back.** Your save and load functions both run without errors. Explain how you would prove the saved file is right, and what number you would measure besides.
 

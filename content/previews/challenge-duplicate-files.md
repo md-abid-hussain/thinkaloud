@@ -18,8 +18,33 @@ Copies pile up from downloads, backups and photo imports and waste disk space. R
 
 **Where it shows up here.** ccdupe must find every file under a folder at any depth, without looping through links or stopping at the first folder it cannot read.
 
+**How it works.** A folder holds files and other folders, which hold more, so the file system is a tree. Visiting every file means a traversal: list a folder, handle each file, and do the same for each subfolder. It can be written with recursion, where a function calls itself for each subfolder, or with an explicit list of folders still to visit. The explicit list avoids running out of call stack on very deep trees.
+
+Real file systems are not quite trees. A symbolic link can point to a folder higher up, so a walker that follows links can loop forever. Walkers usually skip links, or remember which folders they have visited. A hard link makes one file appear under two names, so two paths that look different can be the very same file on disk, not a copy of it.
+
+A walk over thousands of folders will meet entries it cannot read, because of permissions, files deleted while the walk runs, or names that are not valid text. A robust walker reports the problem and moves on, so one bad entry does not stop the whole scan.
+
+The order in which a folder lists its entries is not promised. If the output must be stable, sort it.
+
+**Examples.**
+- A backup tool that followed a link from a folder to its own parent filled a disk copying the same tree again and again.
+- A duplicate finder reported two hard links to one file as duplicates, and deleting one would have freed no space.
+- A scan of a home folder stopped halfway at a protected system folder, until it was changed to report and skip errors.
+
+**Misconceptions.**
+- The file system is a tree. Links make cycles and shared files possible.
+- Every entry can be read. Permissions and files that vanish mid-walk are normal.
+- Folders list files in name order. The order depends on the file system; sort it if you need it.
+
+**Elsewhere.**
+- Build tools walk source folders to find files that changed.
+- Search tools such as find and grep with a recursive option use the same traversal.
+- Garbage collectors walk a graph of objects with the same cycle problem, solved by marking visited nodes.
+
 **Read.**
-- [Depth-first search (Wikipedia)](https://en.wikipedia.org/wiki/Depth-first_search) (not opened)
+- [Tree traversal (Wikipedia)](https://en.wikipedia.org/wiki/Tree_traversal)
+- [ftw(3), Linux manual page (file tree walk)](https://man7.org/linux/man-pages/man3/nftw.3.html)
+- [Symbolic link (Wikipedia)](https://en.wikipedia.org/wiki/Symbolic_link)
 
 **Explain it back.** Your duplicate finder ran for hours on a home folder and reported the same files thousands of times, and on another machine it stopped at a protected folder. Explain what went wrong in each case and how a walker should behave.
 
@@ -31,8 +56,33 @@ Copies pile up from downloads, backups and photo imports and waste disk space. R
 
 **Where it shows up here.** Files can only be duplicates if they have the same size, so you group by size first and hash only files that share a size.
 
+**How it works.** When a check is expensive, run cheap checks first to rule most candidates out. Each stage throws away the items that cannot possibly match, so the expensive stage only runs on the few that remain.
+
+Finding duplicate files is the classic case. Two files can only be identical if they have the same size, and the size is free to read from the file system. Grouping by size removes every file with a unique size without reading a single byte. Within each group of equal sizes, hashing the first few kilobytes removes most of the rest cheaply. Only files that still match get a full hash, and only files with equal full hashes get a final byte-by-byte comparison.
+
+The order matters: each stage must be cheaper than the next and must never throw away a true match. Size and partial hashes are safe because identical files always agree on them. A stage that could reject a real duplicate would make the whole method wrong, however fast it is.
+
+Comparing every file with every other file costs time in proportion to the square of the number of files: 10,000 files make almost 50 million pairs. Grouping turns that into work in proportion to the number of files, plus small groups.
+
+**Examples.**
+- Of 200,000 photos, only a few hundred share a size with another photo, so only those few hundred are ever hashed.
+- A login system checks that a username exists before running a slow password hash.
+- Spam filters run cheap blocklist checks before expensive content analysis.
+
+**Misconceptions.**
+- Hashing everything is simplest, so it is best. Reading every byte of every file is the slow part that filtering avoids.
+- Any cheap check will do. A cheap check that can reject a real match makes the result wrong.
+- A match on the cheap check is a match. It only means the item survives to the next stage.
+
+**Elsewhere.**
+- Database query planners apply the most selective, cheapest conditions first.
+- Bloom filters are a cheap first check before a disk read.
+- Image search compares small thumbnails before comparing full images.
+
 **Read.**
-- [Data deduplication (Wikipedia)](https://en.wikipedia.org/wiki/Data_deduplication) (not opened)
+- [rmlint documentation (how a duplicate finder narrows candidates)](https://rmlint.readthedocs.io/en/latest/)
+- [fdupes (size, partial hash, full hash, then byte comparison)](https://github.com/adrianlopezroche/fdupes)
+- [Data deduplication (Wikipedia)](https://en.wikipedia.org/wiki/Data_deduplication)
 
 **Explain it back.** A first version hashes every file on a disk of 200,000 photos and takes an hour. Explain how checking sizes first changes the work, and why it can never miss a real duplicate.
 
@@ -45,8 +95,32 @@ Copies pile up from downloads, backups and photo imports and waste disk space. R
 
 **Where it shows up here.** With thousands of files, comparing every file with every other is far too slow, while grouping keeps the work close to one pass over the files.
 
+**How it works.** Complexity describes how the cost of a program grows as its input grows, ignoring the constant details of one machine. Big O notation names the growth: linear, written O(n), means twice the input takes about twice the time. Quadratic, O(n squared), means twice the input takes four times as long. Logarithmic, O(log n), barely grows at all.
+
+The same idea applies to memory. A program that keeps one buffer uses constant memory, whatever the input. A program that keeps every item uses memory in proportion to the input, and will eventually run out.
+
+Growth matters more than speed on small tests. Comparing every pair of 100 files is 4,950 comparisons and feels instant. Comparing every pair of 100,000 files is almost 5 billion. A method that groups files first does work roughly in proportion to the number of files, and stays fast.
+
+To reason about it, ask what happens when the input is ten times bigger: which loop runs ten times more, which runs a hundred times more, and what is kept in memory. Then test with an input much larger than your test data, because the slow part often hides until then.
+
+**Examples.**
+- A duplicate check that compared every pair of files worked on a test folder and ran for days on a real disk.
+- A report that loaded every row into memory crashed once the table passed a few million rows.
+- Looking up a name in a sorted list of a million by halving takes about 20 steps instead of a million.
+
+**Misconceptions.**
+- Fast on my test data means fast. Quadratic code is fast until the input grows.
+- Big O is the exact running time. It describes growth and hides constants that still matter.
+- Memory is only a concern for big servers. Any program that keeps all its input fails on large enough input.
+
+**Elsewhere.**
+- Database indexes turn linear scans into logarithmic lookups.
+- Streaming tools such as wc keep constant memory for any input size.
+- Interview questions about algorithms are mostly about this kind of growth.
+
 **Read.**
-- [Big O notation (Wikipedia)](https://en.wikipedia.org/wiki/Big_O_notation) (not opened)
+- [Time complexity (Wikipedia)](https://en.wikipedia.org/wiki/Time_complexity)
+- [Big O notation (Wikipedia)](https://en.wikipedia.org/wiki/Big_O_notation)
 
 **Explain it back.** A teammate suggests comparing every file with every other file byte by byte. It works on a test folder of 20 files. Explain what happens on a folder of 10,000 files, and why grouping is better.
 
@@ -58,8 +132,33 @@ Copies pile up from downloads, backups and photo imports and waste disk space. R
 
 **Where it shows up here.** Within a size group, an MD5 digest of each file separates most different files cheaply, and a byte-by-byte check confirms real duplicates.
 
+**How it works.** A content digest is a fixed-size fingerprint of a file's bytes, made by a hash function. If two files have different digests, they are certainly different. If they have the same digest, they are almost certainly the same, and how almost depends on the hash.
+
+Cryptographic digests such as SHA-256 make an accidental match vanishingly unlikely, and no one knows how to make one on purpose. MD5 is still fast and fine for spotting accidental duplicates, but since 2004 people have been able to build two different files with the same MD5 on purpose. So MD5 must not be trusted when someone might benefit from fooling it, for example when deciding which uploaded file to delete or which download is genuine.
+
+A digest is computed by feeding the file to the hash in chunks, so a file of any size needs only a small buffer. The cost is reading every byte, which is why digests are used only after cheaper filters.
+
+When a wrong answer is costly, such as before deleting a file, confirm equal digests with a direct byte-by-byte comparison. It costs one more read of both files, and it turns almost certainly into certainly.
+
+**Examples.**
+- Download pages publish a SHA-256 digest so you can check the file arrived unchanged.
+- Researchers produced two different certificates with the same MD5 and used the collision to forge a trusted one.
+- A duplicate finder hashes only files that share a size, then compares matching files byte by byte before offering to delete one.
+
+**Misconceptions.**
+- Equal digests prove equal files. They make it very likely, and with a broken hash an attacker can fake it.
+- MD5 is useless. It still detects accidental changes well; it fails only against deliberate attacks.
+- Hashing a big file needs it all in memory. The file can be fed to the hash in small chunks.
+
+**Elsewhere.**
+- Git and other version control systems store content under its digest, so identical files are stored once.
+- Backup and sync tools compare digests to decide what to copy.
+- Package managers check the digest of every downloaded package before installing it.
+
 **Read.**
-- [Cryptographic hash function (Wikipedia)](https://en.wikipedia.org/wiki/Cryptographic_hash_function) (not opened)
+- [Cryptographic hash function (Wikipedia)](https://en.wikipedia.org/wiki/Cryptographic_hash_function)
+- [RFC 6151: Updated Security Considerations for MD5](https://www.rfc-editor.org/rfc/rfc6151)
+- [MD5 (Wikipedia), collision vulnerabilities](https://en.wikipedia.org/wiki/MD5)
 
 **Explain it back.** Your tool reports two files as duplicates because their MD5 digests match, and offers to delete one. Explain when a matching MD5 is enough, when it is not, and what the tool should do before deleting.
 
@@ -118,8 +217,32 @@ between tools work.
 
 **Where it shows up here.** Hashing is slow, so you cache each file's digest between runs, together with the size and modification time it was computed for.
 
+**How it works.** A cache keeps the result of an expensive computation so it does not have to be done again. The hard part is knowing when the stored result is no longer true. A cache that serves stale answers is worse than no cache, because it is wrong quickly.
+
+The usual approach is to store, next to each result, the facts it depends on, and to check them before reusing it. For a cached file digest, those facts are the file's path, size and modification time. If any of them changed, compute the digest again. The check is cheap because the file system already knows those facts.
+
+The check can still be fooled. A program can change a file and set its modification time back. Some file systems record time only to the second, so a change within the same second can be missed. Copying a file can keep or reset the time, depending on the tool. When a stale answer would be dangerous, such as before deleting a file, verify directly instead of trusting the cache.
+
+Other strategies are expiry after a fixed time, and telling the cache explicitly when the source changes. Each trades freshness against cost.
+
+**Examples.**
+- A build tool rebuilds only files whose modification time is newer than their output, and occasionally misses a change made within the same second.
+- A duplicate finder caches digests by path, size and modification time, and rehashes a file that was edited.
+- A website showed an old price for an hour because its cache expired only after a fixed time.
+
+**Misconceptions.**
+- A cache only makes things faster. A stale cache makes them wrong.
+- Modification time always changes when content changes. Tools can preserve or reset it.
+- Caching the result alone is enough. You also need to store what the result depended on.
+
+**Elsewhere.**
+- Web browsers revalidate cached pages using headers such as ETag and Last-Modified.
+- Content delivery networks purge cached copies when a site publishes changes.
+- Processors keep their caches consistent across cores with invalidation protocols.
+
 **Read.**
-- [Cache invalidation (Wikipedia)](https://en.wikipedia.org/wiki/Cache_invalidation) (not opened)
+- [Martin Fowler, Two Hard Things](https://martinfowler.com/bliki/TwoHardThings.html)
+- [Cache invalidation (Wikipedia)](https://en.wikipedia.org/wiki/Cache_invalidation)
 
 **Explain it back.** Your cached digests make the second run fast, but after a user edits a file the tool still reports it as a duplicate of its old copy. Explain what the cache must store and check, and when you should not trust it.
 
@@ -131,8 +254,32 @@ between tools work.
 
 **Where it shows up here.** ccdupe can delete files, so it shows each duplicate set, asks which file to delete, and keeps everything unless the answer is a listed number.
 
+**How it works.** Some actions cannot be undone: deleting a file, dropping a table, overwriting a backup. A program that performs them must make the safe outcome the default and the dangerous outcome deliberate.
+
+In practice: show exactly what will be destroyed before doing it, by full path or name rather than a vague description. Ask for an explicit answer, and treat anything other than a clear yes, including an empty line, a typo or the end of input, as no. Never pick the target automatically when a mistake would lose data the user wanted. Offer a dry run that only reports what would happen.
+
+Check the facts just before acting, not only at the start. A file can change between the scan and the delete, so confirm it is still identical to the copy being kept. Prefer reversible steps when possible, such as moving to a trash folder or replacing a duplicate with a link.
+
+When the program is used in scripts, there is no person to ask. Destructive actions then need an explicit option, and the program should refuse rather than guess.
+
+**Examples.**
+- A duplicate finder lists each set with numbers and deletes only when the user types a listed number; pressing Enter keeps everything.
+- A cleanup script ran with an empty variable as the folder name and deleted from the wrong place, because nothing checked the target.
+- Database tools ask you to type the table name before dropping it, rather than just yes.
+
+**Misconceptions.**
+- A confirmation prompt is enough. A prompt that accepts Enter as yes protects nothing.
+- The scan result is still true when the user answers. Files can change while the user thinks.
+- Power users do not need safeguards. Mistakes in bulk operations happen to everyone.
+
+**Elsewhere.**
+- Cloud consoles require typing a resource name before deleting it.
+- Version control keeps deleted work recoverable for a while, so mistakes can be undone.
+- The Command Line Interface Guidelines recommend confirmation and a force option for dangerous commands.
+
 **Read.**
-- [Command Line Interface Guidelines](https://clig.dev/) (not opened)
+- [Command Line Interface Guidelines (confirming dangerous actions)](https://clig.dev/)
+- [Nielsen Norman Group, Confirmation Dialogs Can Prevent User Errors](https://www.nngroup.com/articles/confirmation-dialog/)
 
 **Explain it back.** A user presses Enter by accident at the prompt, and another runs your tool from a script with no keyboard at all. Explain how the delete prompt should behave in both cases, and what must be checked just before deleting.
 

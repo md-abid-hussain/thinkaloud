@@ -321,6 +321,13 @@ concepts:
     resources:
       - title: Newline (Wikipedia)
         url: https://en.wikipedia.org/wiki/Newline
+        opened: true
+      - title: "RFC 5198: Unicode Format for Network Interchange (line endings in text)"
+        url: https://www.rfc-editor.org/rfc/rfc5198
+        opened: true
+      - title: "Git, gitattributes: end-of-line conversion"
+        url: https://git-scm.com/docs/gitattributes
+        opened: true
 
   - slug: word-state-machine
     name: Counting words with a state machine
@@ -765,8 +772,50 @@ concepts:
       way. The order entries come back in is not guaranteed, symbolic links can form loops, and some folders cannot be
       read, so a walker needs a rule for each.
     resources:
-      - title: Depth-first search (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Depth-first_search
+      - title: Tree traversal (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Tree_traversal
+        opened: true
+      - title: ftw(3), Linux manual page (file tree walk)
+        url: https://man7.org/linux/man-pages/man3/nftw.3.html
+        opened: true
+      - title: Symbolic link (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Symbolic_link
+        opened: true
+    lesson:
+      how_it_works: >-
+        A folder holds files and other folders, which hold more, so the file system is a tree. Visiting every file
+        means a traversal: list a folder, handle each file, and do the same for each subfolder. It can be written with
+        recursion, where a function calls itself for each subfolder, or with an explicit list of folders still to
+        visit. The explicit list avoids running out of call stack on very deep trees.
+
+
+        Real file systems are not quite trees. A symbolic link can point to a folder higher up, so a walker that
+        follows links can loop forever. Walkers usually skip links, or remember which folders they have visited. A
+        hard link makes one file appear under two names, so two paths that look different can be the very same file on
+        disk, not a copy of it.
+
+
+        A walk over thousands of folders will meet entries it cannot read, because of permissions, files deleted while
+        the walk runs, or names that are not valid text. A robust walker reports the problem and moves on, so one bad
+        entry does not stop the whole scan.
+
+
+        The order in which a folder lists its entries is not promised. If the output must be stable, sort it.
+      examples:
+        - A backup tool that followed a link from a folder to its own parent filled a disk copying the same tree again
+          and again.
+        - A duplicate finder reported two hard links to one file as duplicates, and deleting one would have freed no
+          space.
+        - A scan of a home folder stopped halfway at a protected system folder, until it was changed to report and
+          skip errors.
+      misconceptions:
+        - The file system is a tree. Links make cycles and shared files possible.
+        - Every entry can be read. Permissions and files that vanish mid-walk are normal.
+        - Folders list files in name order. The order depends on the file system; sort it if you need it.
+      elsewhere:
+        - Build tools walk source folders to find files that changed.
+        - Search tools such as find and grep with a recursive option use the same traversal.
+        - Garbage collectors walk a graph of objects with the same cycle problem, solved by marking visited nodes.
 
   - slug: case-folding
     name: Comparing text without case
@@ -1039,6 +1088,45 @@ concepts:
     resources:
       - title: Priority queue (Wikipedia)
         url: https://en.wikipedia.org/wiki/Priority_queue
+        opened: true
+      - title: Binary heap (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Binary_heap
+        opened: true
+    lesson:
+      how_it_works: >-
+        A priority queue holds items with priorities and always hands back the one with the smallest priority first.
+        Unlike a plain queue, the order of insertion does not matter. The two main operations are insert and
+        remove-the-minimum.
+
+
+        The usual implementation is a binary heap: a complete binary tree stored in an array, where every parent is no
+        larger than its children. The smallest item is always at the root. Inserting adds the item at the end and
+        swaps it up while it is smaller than its parent. Removing the minimum moves the last item to the root and
+        swaps it down past its smaller child. Both take time proportional to the height of the tree, which grows with
+        the logarithm of the number of items.
+
+
+        The alternative, keeping a list and searching it, costs time in proportion to the whole list for every
+        removal. Re-sorting the whole list after every insert is worse still. For an algorithm that removes and
+        inserts thousands of times, such as building a Huffman tree or finding shortest paths, that difference decides
+        whether it finishes in milliseconds or minutes.
+
+
+        When two items share a priority, a heap does not promise which comes out first. If the order matters, add a
+        tie-breaker, such as an insertion counter.
+      examples:
+        - Building a Huffman tree removes the two lightest nodes and inserts their parent, over and over, which is
+          exactly the work a heap is fast at.
+        - A hospital triage system sees the most urgent patient next, not the one who arrived first.
+        - Route planners use a priority queue of places ordered by distance so far to find the shortest route.
+      misconceptions:
+        - A priority queue keeps everything sorted. A heap only guarantees that the smallest item is on top.
+        - Items with equal priority come out in arrival order. A heap gives no such guarantee without a tie-breaker.
+        - Sorting once is enough. New items keep arriving, and a sorted list is slow to keep sorted.
+      elsewhere:
+        - Operating system schedulers pick the next task to run from a priority queue.
+        - Timers in servers and event loops are kept in a heap ordered by when they fire.
+        - Merging many sorted files keeps the next line from each file in a heap.
 
   - slug: huffman-coding
     name: Huffman coding
@@ -1051,8 +1139,53 @@ concepts:
       for example 0 for left and 1 for right.
     prerequisites: [ frequency-map, priority-queue ]
     resources:
+      - title: OpenDSA, Huffman Coding Trees
+        url: https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html
+        opened: true
       - title: Huffman coding (Wikipedia)
         url: https://en.wikipedia.org/wiki/Huffman_coding
+        opened: true
+      - title: "RFC 1951: DEFLATE Compressed Data Format"
+        url: https://www.rfc-editor.org/rfc/rfc1951
+        opened: true
+    lesson:
+      how_it_works: >-
+        Huffman coding builds the best prefix-free code for a given set of symbol frequencies. Best means no other
+        prefix-free code that assigns whole bits to each symbol gives a shorter total.
+
+
+        The algorithm is greedy. Make a leaf for every symbol, weighted by its count. Repeatedly take the two lightest
+        nodes, join them under a new parent whose weight is their sum, and put the parent back. When one node remains,
+        it is the root. Rare symbols are merged early and end up deep in the tree with long codes, and frequent
+        symbols are merged late and stay near the root with short codes.
+
+
+        Ties can be broken in different ways, and each way gives a different but equally short code. So a decoder can
+        only rebuild exactly the same tree if it uses the same tie-breaking rule, or if the encoder sends the code
+        lengths or the tree itself.
+
+
+        Some cases need care. A file with one distinct symbol makes a tree with a single leaf, which still needs a
+        code at least one bit long. An empty file has no symbols at all.
+
+
+        Huffman coding cannot beat the entropy, and because each symbol costs a whole number of bits, it wastes up to
+        almost one bit per symbol when one symbol is very common. Arithmetic coding avoids that, and most real
+        compressors first find repeated strings and then Huffman-code what remains.
+      examples:
+        - With frequencies 45, 13, 12, 16, 9 and 5, Huffman gives the commonest symbol a 1-bit code and the two rarest
+          4-bit codes, averaging 2.24 bits instead of 3.
+        - gzip combines repeated-string matching with Huffman codes for the literals and lengths that remain.
+        - A text where one character makes up 99 percent of the file still costs at least 1 bit per character with
+          Huffman, far above its entropy.
+      misconceptions:
+        - There is one Huffman code for a text. Ties give several codes of the same total length.
+        - Huffman reaches the entropy exactly. It can be up to almost one bit per symbol above it.
+        - Huffman alone is how zip works. Zip first replaces repeated strings, then uses Huffman codes on the result.
+      elsewhere:
+        - JPEG and MP3 use Huffman codes for the final step of their encoders.
+        - HTTP/2 compresses header text with a fixed Huffman code tuned to typical headers.
+        - Fax machines used fixed Huffman-style codes for runs of black and white pixels.
 
   - slug: prefix-codes
     name: Prefix-free codes
@@ -1067,6 +1200,50 @@ concepts:
     resources:
       - title: Prefix code (Wikipedia)
         url: https://en.wikipedia.org/wiki/Prefix_code
+        opened: true
+      - title: Kraft-McMillan inequality (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Kraft%E2%80%93McMillan_inequality
+        opened: true
+      - title: "RFC 1951: DEFLATE Compressed Data Format, section 3.2 on prefix codes"
+        url: https://www.rfc-editor.org/rfc/rfc1951
+        opened: true
+    lesson:
+      how_it_works: >-
+        A variable-length code gives frequent symbols short bit strings and rare symbols long ones. The danger is
+        ambiguity: if a is 0 and b is 01, then the bits 01 could be b, or a followed by the start of something else. A
+        code is prefix-free when no code word is the beginning of another one. Then a decoder can read bits one at a
+        time and stop the moment the bits so far match a code word, because no longer code word starts the same way.
+
+
+        A prefix-free code is exactly a binary tree with the symbols at the leaves. Each left turn adds a 0 and each
+        right turn a 1, and the path from the root to a leaf is that symbol's code. Because symbols sit only at
+        leaves, no code word can be the start of another.
+
+
+        The Kraft inequality says which sets of code lengths are possible: the sum of 2 to the power of minus the
+        length, over all code words, must be at most 1. Short codes are expensive, since one code of length 1 uses up
+        half of the whole budget.
+
+
+        Because the code words are self-delimiting, the stream needs no separators between symbols. The decoder still
+        needs to know where the data ends, because the last byte is usually padded with extra bits.
+      examples:
+        - "Phone numbers work as a prefix code: no valid number is the start of another, which is how the exchange
+          knows when you have finished dialling."
+        - Morse code is not prefix-free, so it needs pauses between letters; without them, dot dash could be A or E
+          followed by T.
+        - "UTF-8 is a prefix code over bytes: the first byte of a character says how many bytes follow."
+      misconceptions:
+        - Any table of short codes can be decoded. Without the prefix-free property the same bits can mean several
+          different texts.
+        - Every symbol can have a short code. The Kraft inequality limits how many short codes can exist at once.
+        - The decoder knows where the data stops. Padding in the last byte can look like extra symbols unless the
+          length is stored.
+      elsewhere:
+        - DEFLATE, used by zip, gzip and PNG, describes its Huffman tables as prefix codes defined by code lengths.
+        - Network protocols use prefix codes for compact headers, such as the Huffman code in HTTP/2 header
+          compression.
+        - Instruction sets with variable-length instructions decode them the same way, one prefix at a time.
 
   - slug: bit-packing
     name: Packing flags into bits
@@ -1139,8 +1316,50 @@ concepts:
       the numbers a reader needs before the data, such as sizes or a table. Reading checks the identifier and version
       first, so a wrong or newer file is rejected instead of misread, and the header says where the data starts.
     resources:
+      - title: File format, magic numbers (Wikipedia)
+        url: https://en.wikipedia.org/wiki/File_format
+        opened: true
       - title: List of file signatures (Wikipedia)
         url: https://en.wikipedia.org/wiki/List_of_file_signatures
+        opened: true
+      - title: PNG Specification (Third Edition), the PNG signature
+        url: https://www.w3.org/TR/png-3/
+        opened: true
+    lesson:
+      how_it_works: >-
+        A file that another program, or a later version of your own, must read needs to describe itself. A header at
+        the start does that. It usually begins with a magic number, a few fixed bytes such as the letters PNG or CCBF,
+        so a reader can tell at once whether it was handed the right kind of file. Then comes a version number, so the
+        format can change later without old files being misread.
+
+
+        After that come the fields the reader needs before the data: counts, sizes, table lengths, and the parameters
+        used to write the data, such as a hash count or a frequency table. Each field has a fixed size and a fixed
+        byte order, so the reader knows exactly where every field starts.
+
+
+        A careful reader checks everything before trusting it. It checks the magic and the version first and refuses
+        anything it does not recognise. It checks that sizes are plausible and that the file is long enough to hold
+        what the header promises. A header that says the data is four gigabytes long should not make the program try
+        to allocate four gigabytes.
+
+
+        The header is a contract between the writer and every reader. Write it down, so that the format outlives the
+        program that made it.
+      examples:
+        - Every PNG file starts with the same eight bytes, which also catch a file damaged by a transfer that changed
+          line endings.
+        - A compressed file stores its frequency table in the header, so the decoder can rebuild the same Huffman tree.
+        - A program that skips the version check reads a newer file as garbage, instead of saying the file is too new.
+      misconceptions:
+        - The file extension says what the file is. Anyone can rename a file; the magic number is the real evidence.
+        - If the program wrote it, the program can read it. A later version, another platform or a damaged file may
+          not match.
+        - Header values can be trusted. A damaged or hostile file can claim any size, so check before allocating.
+      elsewhere:
+        - The file command on Unix identifies files by their magic numbers, not their names.
+        - Network packets carry headers with versions and lengths for the same reasons.
+        - Database files start with a header holding the page size and format version.
 
   - slug: byte-order
     name: Byte order
@@ -1209,8 +1428,47 @@ concepts:
       empty file, a single repeated symbol and every possible byte value.
     related: [ differential-testing ]
     resources:
-      - title: Round-trip format conversion (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Round-trip_format_conversion
+      - title: Hypothesis, What is property-based testing?
+        url: https://hypothesis.works/articles/what-is-property-based-testing/
+        opened: true
+      - title: OpenDSA, Huffman Coding Trees (encoding and decoding)
+        url: https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        Many programs come in pairs that undo each other: compress and decompress, encode and decode, save and load,
+        serialise and parse. A round-trip test runs the pair one after the other and checks that the output equals the
+        input exactly, byte for byte.
+
+
+        The strength of the test is that you do not need to know what the middle step should produce. You do not have
+        to predict the compressed bytes; you only check that decompressing them gives back the original. That lets you
+        test many inputs cheaply, including generated ones.
+
+
+        The inputs are where the bugs hide. Try an empty input, a single symbol repeated many times, every byte value
+        once, very large inputs, and inputs whose length lands exactly on a boundary such as a multiple of 8 bits.
+        Property-based testing generates hundreds of random inputs automatically and shrinks any failure down to the
+        smallest input that still breaks.
+
+
+        A round trip proves the pair is consistent, not that each half is correct. A compressor that writes the input
+        unchanged and a decompressor that copies it back pass every round trip but compress nothing. So add a few
+        checks on the middle result too, such as that the output is smaller or that a known file decodes to a known
+        text.
+      examples:
+        - Compressing and decompressing a novel and comparing the result with the original catches a padding bug that
+          only shows when the bit count is not a multiple of 8.
+        - Saving a document and loading it again shows that dates lost their time zone in between.
+        - A JSON library is tested by parsing what it printed and checking the values match.
+      misconceptions:
+        - If the round trip passes, both halves are right. Both halves can be wrong in matching ways.
+        - A few hand-picked inputs are enough. Edge cases such as empty or single-symbol input are where the bugs are.
+        - Looking at the output is a test. Only an exact byte comparison catches a single changed bit.
+      elsewhere:
+        - Database backups are trusted only after a restore has been tried.
+        - Translation tools are checked by translating back and comparing meaning, the same idea for human language.
+        - Network protocol code is tested by encoding a message and decoding it on the other side.
 
   - slug: hash-functions
     name: Hash functions
@@ -1222,8 +1480,52 @@ concepts:
       good non-cryptographic hash such as FNV-1a spreads similar inputs across the whole range. Different inputs can
       still collide, so code that uses hashes has to decide what a collision means.
     resources:
-      - title: Fowler-Noll-Vo hash function (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+      - title: Hash function (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Hash_function
+        opened: true
+      - title: FNV Hash (Landon Curt Noll)
+        url: http://www.isthe.com/chongo/tech/comp/fnv/index.html
+        opened: true
+      - title: IETF draft, The FNV Non-Cryptographic Hash Algorithm
+        url: https://datatracker.ietf.org/doc/html/draft-eastlake-fnv
+        opened: true
+    lesson:
+      how_it_works: >-
+        A hash function turns any input, such as a word or a file, into a fixed-size number. The same input always
+        gives the same number, and a good function spreads different inputs evenly across all possible numbers, so
+        similar inputs such as cat and cats get unrelated results.
+
+
+        Hash functions come in two families. Non-cryptographic ones, such as FNV-1a or MurmurHash, are built for speed
+        and even spread. They are right for hash tables and Bloom filters, but an attacker can easily find two inputs
+        with the same hash. Cryptographic ones, such as SHA-256, are slower but designed so that nobody can find a
+        collision or work backwards from the output. MD5 and SHA-1 used to be in this family but are broken for that
+        purpose.
+
+
+        To pick one of m slots, the hash is reduced to the range 0 to m minus 1, usually with the remainder after
+        dividing by m. A Bloom filter needs k different positions per item. Rather than k separate functions, it is
+        common to compute two hashes and combine them as the first plus i times the second, for i from 0 to k minus 1,
+        which is known to work about as well.
+
+
+        A hash is a fingerprint, not a unique id. Different inputs can share a hash, so the code that uses it must
+        allow for that.
+      examples:
+        - A hash table puts a key in the slot its hash points to, so a lookup goes straight there instead of searching
+          every entry.
+        - A Bloom filter derives seven bit positions for a word from two FNV-1a hashes instead of running seven
+          separate functions.
+        - A website that used a weak hash for its tables was slowed to a crawl by requests crafted to collide.
+      misconceptions:
+        - Equal hashes mean equal inputs. Different inputs can share a hash; only the inputs themselves can prove
+          equality.
+        - Any hash is fine for security. Fast hashes such as FNV-1a are easy to attack on purpose.
+        - A hash of a small input is smaller. The output always has the same fixed size.
+      elsewhere:
+        - Git names every file and commit by a cryptographic hash of its content.
+        - Load balancers hash a client id to pick a server, so the same client keeps reaching the same one.
+        - Passwords are stored as slow, salted hashes, never as fast ones.
 
   - slug: bloom-filter
     name: Bloom filters
@@ -1240,6 +1542,48 @@ concepts:
     resources:
       - title: Bloom filter (Wikipedia)
         url: https://en.wikipedia.org/wiki/Bloom_filter
+        opened: true
+      - title: Bloom filter calculator (hur.st)
+        url: https://hur.st/bloomfilter/
+        opened: true
+    lesson:
+      how_it_works: >-
+        A Bloom filter answers one question, have I seen this item, using far less memory than storing the items. It
+        is an array of m bits, all zero at first, and k hash functions that each map an item to one bit position.
+
+
+        To add an item, compute its k positions and set those bits to one. To look an item up, compute the same k
+        positions. If any of those bits is zero, the item was definitely never added, because adding it would have set
+        them all. If all of them are one, the item was probably added, but those bits may also have been set by other
+        items.
+
+
+        So a Bloom filter has no false negatives and some false positives. It never says no to something that is
+        there, and it sometimes says yes to something that is not. You cannot list the items from the bits, and in the
+        basic form you cannot remove one, because clearing its bits could clear bits that other items share.
+
+
+        The filter does not store the items at all, so its size depends only on how many items it holds and the false
+        positive rate you accept, not on how long the items are. About 9.6 bits per item gives a 1 in 100 false
+        positive rate, whatever the items are.
+      examples:
+        - A spell checker ships a small filter instead of a whole dictionary; a misspelling is occasionally missed,
+          but a real word is never flagged.
+        - A database checks a Bloom filter before reading a file from disk, and skips the read when the filter says
+          the key is definitely absent.
+        - A web browser once checked a local filter of known bad sites before asking a server, so most safe sites
+          needed no network call.
+      misconceptions:
+        - A Bloom filter can say an item is missing when it was added. That never happens; errors only go the other
+          way.
+        - You can delete from a Bloom filter. Clearing bits can remove other items too; counting filters exist for
+          that.
+        - Longer items need a bigger filter. The size depends on the number of items and the error rate, not their
+          length.
+      elsewhere:
+        - Databases such as Cassandra and RocksDB keep a Bloom filter per data file to avoid needless disk reads.
+        - Content networks use them to avoid caching pages that are only ever requested once.
+        - Distributed systems use them to compare large sets cheaply before sending the differences.
 
   # ---- added for wave 1: networking (echo server, web server) ----
   - slug: tcp-sockets
@@ -2251,8 +2595,44 @@ concepts:
       factors. An order n squared algorithm that is fine for a hundred lines can be hopeless for a million, so the
       question to ask is what happens when the input is ten times bigger.
     resources:
+      - title: Time complexity (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Time_complexity
+        opened: true
       - title: Big O notation (Wikipedia)
         url: https://en.wikipedia.org/wiki/Big_O_notation
+        opened: true
+    lesson:
+      how_it_works: >-
+        Complexity describes how the cost of a program grows as its input grows, ignoring the constant details of one
+        machine. Big O notation names the growth: linear, written O(n), means twice the input takes about twice the
+        time. Quadratic, O(n squared), means twice the input takes four times as long. Logarithmic, O(log n), barely
+        grows at all.
+
+
+        The same idea applies to memory. A program that keeps one buffer uses constant memory, whatever the input. A
+        program that keeps every item uses memory in proportion to the input, and will eventually run out.
+
+
+        Growth matters more than speed on small tests. Comparing every pair of 100 files is 4,950 comparisons and
+        feels instant. Comparing every pair of 100,000 files is almost 5 billion. A method that groups files first
+        does work roughly in proportion to the number of files, and stays fast.
+
+
+        To reason about it, ask what happens when the input is ten times bigger: which loop runs ten times more, which
+        runs a hundred times more, and what is kept in memory. Then test with an input much larger than your test
+        data, because the slow part often hides until then.
+      examples:
+        - A duplicate check that compared every pair of files worked on a test folder and ran for days on a real disk.
+        - A report that loaded every row into memory crashed once the table passed a few million rows.
+        - Looking up a name in a sorted list of a million by halving takes about 20 steps instead of a million.
+      misconceptions:
+        - Fast on my test data means fast. Quadratic code is fast until the input grows.
+        - Big O is the exact running time. It describes growth and hides constants that still matter.
+        - Memory is only a concern for big servers. Any program that keeps all its input fails on large enough input.
+      elsewhere:
+        - Database indexes turn linear scans into logarithmic lookups.
+        - Streaming tools such as wc keep constant memory for any input size.
+        - Interview questions about algorithms are mostly about this kind of growth.
 
   - slug: longest-common-subsequence
     name: Longest common subsequence
@@ -2569,8 +2949,50 @@ concepts:
       files whose hashes match.
     related: [ time-space-complexity ]
     resources:
+      - title: rmlint documentation (how a duplicate finder narrows candidates)
+        url: https://rmlint.readthedocs.io/en/latest/
+        opened: true
+      - title: fdupes (size, partial hash, full hash, then byte comparison)
+        url: https://github.com/adrianlopezroche/fdupes
+        opened: true
       - title: Data deduplication (Wikipedia)
         url: https://en.wikipedia.org/wiki/Data_deduplication
+        opened: true
+    lesson:
+      how_it_works: >-
+        When a check is expensive, run cheap checks first to rule most candidates out. Each stage throws away the
+        items that cannot possibly match, so the expensive stage only runs on the few that remain.
+
+
+        Finding duplicate files is the classic case. Two files can only be identical if they have the same size, and
+        the size is free to read from the file system. Grouping by size removes every file with a unique size without
+        reading a single byte. Within each group of equal sizes, hashing the first few kilobytes removes most of the
+        rest cheaply. Only files that still match get a full hash, and only files with equal full hashes get a final
+        byte-by-byte comparison.
+
+
+        The order matters: each stage must be cheaper than the next and must never throw away a true match. Size and
+        partial hashes are safe because identical files always agree on them. A stage that could reject a real
+        duplicate would make the whole method wrong, however fast it is.
+
+
+        Comparing every file with every other file costs time in proportion to the square of the number of files:
+        10,000 files make almost 50 million pairs. Grouping turns that into work in proportion to the number of files,
+        plus small groups.
+      examples:
+        - Of 200,000 photos, only a few hundred share a size with another photo, so only those few hundred are ever
+          hashed.
+        - A login system checks that a username exists before running a slow password hash.
+        - Spam filters run cheap blocklist checks before expensive content analysis.
+      misconceptions:
+        - Hashing everything is simplest, so it is best. Reading every byte of every file is the slow part that
+          filtering avoids.
+        - Any cheap check will do. A cheap check that can reject a real match makes the result wrong.
+        - A match on the cheap check is a match. It only means the item survives to the next stage.
+      elsewhere:
+        - Database query planners apply the most selective, cheapest conditions first.
+        - Bloom filters are a cheap first check before a disk read.
+        - Image search compares small thumbnails before comparing full images.
 
   - slug: content-digests
     name: Content digests
@@ -2585,6 +3007,47 @@ concepts:
     resources:
       - title: Cryptographic hash function (Wikipedia)
         url: https://en.wikipedia.org/wiki/Cryptographic_hash_function
+        opened: true
+      - title: "RFC 6151: Updated Security Considerations for MD5"
+        url: https://www.rfc-editor.org/rfc/rfc6151
+        opened: true
+      - title: MD5 (Wikipedia), collision vulnerabilities
+        url: https://en.wikipedia.org/wiki/MD5
+        opened: true
+    lesson:
+      how_it_works: >-
+        A content digest is a fixed-size fingerprint of a file's bytes, made by a hash function. If two files have
+        different digests, they are certainly different. If they have the same digest, they are almost certainly the
+        same, and how almost depends on the hash.
+
+
+        Cryptographic digests such as SHA-256 make an accidental match vanishingly unlikely, and no one knows how to
+        make one on purpose. MD5 is still fast and fine for spotting accidental duplicates, but since 2004 people have
+        been able to build two different files with the same MD5 on purpose. So MD5 must not be trusted when someone
+        might benefit from fooling it, for example when deciding which uploaded file to delete or which download is
+        genuine.
+
+
+        A digest is computed by feeding the file to the hash in chunks, so a file of any size needs only a small
+        buffer. The cost is reading every byte, which is why digests are used only after cheaper filters.
+
+
+        When a wrong answer is costly, such as before deleting a file, confirm equal digests with a direct
+        byte-by-byte comparison. It costs one more read of both files, and it turns almost certainly into certainly.
+      examples:
+        - Download pages publish a SHA-256 digest so you can check the file arrived unchanged.
+        - Researchers produced two different certificates with the same MD5 and used the collision to forge a trusted
+          one.
+        - A duplicate finder hashes only files that share a size, then compares matching files byte by byte before
+          offering to delete one.
+      misconceptions:
+        - Equal digests prove equal files. They make it very likely, and with a broken hash an attacker can fake it.
+        - MD5 is useless. It still detects accidental changes well; it fails only against deliberate attacks.
+        - Hashing a big file needs it all in memory. The file can be fed to the hash in small chunks.
+      elsewhere:
+        - Git and other version control systems store content under its digest, so identical files are stored once.
+        - Backup and sync tools compare digests to decide what to copy.
+        - Package managers check the digest of every downloaded package before installing it.
 
   - slug: cache-invalidation
     name: Knowing when a cache is stale
@@ -2595,8 +3058,45 @@ concepts:
       A cache saves work by remembering results, but it must know when a result no longer holds. Store what the result
       depended on, such as a file's size and modification time, next to it, and recompute when either has changed.
     resources:
+      - title: Martin Fowler, Two Hard Things
+        url: https://martinfowler.com/bliki/TwoHardThings.html
+        opened: true
       - title: Cache invalidation (Wikipedia)
         url: https://en.wikipedia.org/wiki/Cache_invalidation
+        opened: true
+    lesson:
+      how_it_works: >-
+        A cache keeps the result of an expensive computation so it does not have to be done again. The hard part is
+        knowing when the stored result is no longer true. A cache that serves stale answers is worse than no cache,
+        because it is wrong quickly.
+
+
+        The usual approach is to store, next to each result, the facts it depends on, and to check them before reusing
+        it. For a cached file digest, those facts are the file's path, size and modification time. If any of them
+        changed, compute the digest again. The check is cheap because the file system already knows those facts.
+
+
+        The check can still be fooled. A program can change a file and set its modification time back. Some file
+        systems record time only to the second, so a change within the same second can be missed. Copying a file can
+        keep or reset the time, depending on the tool. When a stale answer would be dangerous, such as before deleting
+        a file, verify directly instead of trusting the cache.
+
+
+        Other strategies are expiry after a fixed time, and telling the cache explicitly when the source changes. Each
+        trades freshness against cost.
+      examples:
+        - A build tool rebuilds only files whose modification time is newer than their output, and occasionally misses
+          a change made within the same second.
+        - A duplicate finder caches digests by path, size and modification time, and rehashes a file that was edited.
+        - A website showed an old price for an hour because its cache expired only after a fixed time.
+      misconceptions:
+        - A cache only makes things faster. A stale cache makes them wrong.
+        - Modification time always changes when content changes. Tools can preserve or reset it.
+        - Caching the result alone is enough. You also need to store what the result depended on.
+      elsewhere:
+        - Web browsers revalidate cached pages using headers such as ETag and Last-Modified.
+        - Content delivery networks purge cached copies when a site publishes changes.
+        - Processors keep their caches consistent across cores with invalidation protocols.
 
   - slug: safe-destructive-actions
     name: Confirming destructive actions
@@ -2609,8 +3109,45 @@ concepts:
       removed, makes a mistake recoverable.
     related: [ cli-subcommands ]
     resources:
-      - title: Command Line Interface Guidelines
+      - title: Command Line Interface Guidelines (confirming dangerous actions)
         url: https://clig.dev/
+        opened: true
+      - title: Nielsen Norman Group, Confirmation Dialogs Can Prevent User Errors
+        url: https://www.nngroup.com/articles/confirmation-dialog/
+        opened: true
+    lesson:
+      how_it_works: >-
+        Some actions cannot be undone: deleting a file, dropping a table, overwriting a backup. A program that
+        performs them must make the safe outcome the default and the dangerous outcome deliberate.
+
+
+        In practice: show exactly what will be destroyed before doing it, by full path or name rather than a vague
+        description. Ask for an explicit answer, and treat anything other than a clear yes, including an empty line, a
+        typo or the end of input, as no. Never pick the target automatically when a mistake would lose data the user
+        wanted. Offer a dry run that only reports what would happen.
+
+
+        Check the facts just before acting, not only at the start. A file can change between the scan and the delete,
+        so confirm it is still identical to the copy being kept. Prefer reversible steps when possible, such as moving
+        to a trash folder or replacing a duplicate with a link.
+
+
+        When the program is used in scripts, there is no person to ask. Destructive actions then need an explicit
+        option, and the program should refuse rather than guess.
+      examples:
+        - A duplicate finder lists each set with numbers and deletes only when the user types a listed number;
+          pressing Enter keeps everything.
+        - A cleanup script ran with an empty variable as the folder name and deleted from the wrong place, because
+          nothing checked the target.
+        - Database tools ask you to type the table name before dropping it, rather than just yes.
+      misconceptions:
+        - A confirmation prompt is enough. A prompt that accepts Enter as yes protects nothing.
+        - The scan result is still true when the user answers. Files can change while the user thinks.
+        - Power users do not need safeguards. Mistakes in bulk operations happen to everyone.
+      elsewhere:
+        - Cloud consoles require typing a resource name before deleting it.
+        - Version control keeps deleted work recoverable for a while, so mistakes can be undone.
+        - The Command Line Interface Guidelines recommend confirmation and a force option for dangerous commands.
 
   # ---- added for wave 2: network clients (curl, DNS resolver) ----
   - slug: url-parsing
@@ -3052,8 +3589,48 @@ concepts:
       end of the active file. Appending is fast and a crash can only damage the last record. The latest record for a
       key wins, and old ones are cleaned up later.
     resources:
-      - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data (Sheehy and Smith)"
         url: https://riak.com/assets/bitcask-intro.pdf
+        opened: true
+      - title: Log-structured file system (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Log-structured_file_system
+        opened: true
+      - title: Write-ahead logging (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Write-ahead_logging
+        opened: true
+    lesson:
+      how_it_works: >-
+        An append-only log stores data by only ever adding records to the end of a file. An update does not change the
+        old value in place; it appends a new record with the new value. The latest record for a key wins.
+
+
+        This makes writes fast and simple. Appending to the end of a file is sequential writing, the fastest thing a
+        disk can do, and it never needs to find and rewrite a block in the middle. It also makes crashes easier to
+        survive: a crash can only damage the last record being written, never data written earlier, because earlier
+        bytes are never touched again.
+
+
+        The cost is space and reads. Every update leaves the old value behind as dead data, so the file keeps growing,
+        and something must eventually reclaim the space by compaction. Finding a key's latest value in a long log
+        would mean scanning it, so log stores keep an index that points straight at the latest record.
+
+
+        To keep files manageable, the active file is closed when it reaches a size limit and a new one is started.
+        Closed files are never written again, which makes them easy to back up, copy and merge.
+      examples:
+        - Bitcask writes every set and delete as a new record at the end of the active file and closes it at a size
+          limit.
+        - Database write-ahead logs record every change before it is applied, so the change can be replayed after a
+          crash.
+        - Event-sourced systems store every event that happened, and rebuild the current state by replaying them.
+      misconceptions:
+        - An update overwrites the old value. In a log it is a new record; the old one stays until compaction.
+        - A log grows forever. Compaction rewrites it with only the live values.
+        - Logs are slow to read. With an index pointing at the latest record, a read is one seek.
+      elsewhere:
+        - Kafka stores messages as append-only logs on disk.
+        - Log-structured merge trees in databases such as RocksDB and Cassandra build on the same idea.
+        - Log-structured file systems write all changes sequentially for the same speed advantage.
 
   - slug: checksums
     name: Checksums for stored records
@@ -3067,6 +3644,47 @@ concepts:
     resources:
       - title: Cyclic redundancy check (Wikipedia)
         url: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+        opened: true
+      - title: Checksum (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Checksum
+        opened: true
+      - title: "RFC 1952: GZIP file format, CRC-32 of the data"
+        url: https://www.rfc-editor.org/rfc/rfc1952
+        opened: true
+    lesson:
+      how_it_works: >-
+        A checksum is a small number computed from a block of data and stored with it. When the data is read back, the
+        reader computes the number again and compares. If they differ, the data was damaged, by a bad disk sector, a
+        torn write during a crash, or a bug.
+
+
+        CRC-32 is the common choice for stored records and network frames. It is fast, needs only 4 bytes, and is
+        designed to catch the typical damage: any single flipped bit, any burst of flipped bits up to 32 long, and
+        nearly all other random changes. It is not a security measure; anyone who changes data on purpose can fix up
+        the CRC too.
+
+
+        What the checksum covers matters. In a log record it should cover every byte after it: the timestamp, the
+        sizes, the key and the value. If the size fields are not covered, a damaged size can make the reader jump to
+        the wrong place and misread everything after.
+
+
+        A checksum only detects damage. The program decides what to do: refuse the record, stop at the first bad
+        record in a log, or fall back to an older copy. For a record cut short by a crash at the end of a log, the
+        usual answer is to drop it, because the write never finished.
+      examples:
+        - After a power cut, a log store finds that its last record's CRC does not match, drops that half-written
+          record and keeps everything before it.
+        - Ethernet frames and zip files both carry a CRC-32 to catch corrupted bytes.
+        - A disk returned slowly rotting data for months, and only checksummed file systems noticed.
+      misconceptions:
+        - A checksum prevents corruption. It only detects it; the program must decide what to do.
+        - A CRC protects against tampering. Anyone can recompute it; use a cryptographic signature for that.
+        - Covering the value is enough. Damaged length fields can make the reader misread everything after them.
+      elsewhere:
+        - File systems such as ZFS and Btrfs checksum every block.
+        - TCP and IP headers carry simple checksums against transmission errors.
+        - Database pages store a checksum that is checked whenever the page is read.
 
   - slug: hash-index
     name: An in-memory index into log files
@@ -3080,8 +3698,45 @@ concepts:
     prerequisites: [ append-only-log ]
     related: [ key-value-store ]
     resources:
-      - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data, the keydir"
         url: https://riak.com/assets/bitcask-intro.pdf
+        opened: true
+      - title: Hash table (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Hash_table
+        opened: true
+    lesson:
+      how_it_works: >-
+        A log store keeps every value in files on disk, in the order it was written. To read a key without scanning,
+        it keeps an in-memory hash table, the index, that maps each key to the location of its latest record: which
+        file, at what position, and how many bytes. In Bitcask this table is called the keydir.
+
+
+        A read is then one lookup in memory and one read from disk: open the file the index names, seek to the
+        position and read that many bytes. A write appends the record to the active file and then points the key's
+        entry at the new record. The old record stays in its file but is no longer reachable.
+
+
+        The index holds every key, so all the keys must fit in memory, though the values do not have to. That suits
+        workloads with a moderate number of keys and large or numerous values. It does not suit range queries such as
+        all keys between a and c, because a hash table has no order.
+
+
+        The index lives only in memory, so it must be rebuilt when the program starts, by reading the data files or
+        small hint files written for that purpose.
+      examples:
+        - A store with 10 million short keys keeps its index in a few hundred megabytes while the values fill hundreds
+          of gigabytes on disk.
+        - After an update, the index points at the new record, so the old value is never returned even though it is
+          still in an older file.
+        - A sorted index would let a store answer give me all keys starting with user, which a hash index cannot.
+      misconceptions:
+        - The index stores the values. It stores where the values are.
+        - Values must fit in memory. Only the keys and their locations must.
+        - A hash index can answer range queries. It has no order between keys.
+      elsewhere:
+        - Many caches and session stores use the same in-memory index over data held elsewhere.
+        - Database storage engines keep page maps that work the same way.
+        - Search engines keep an index from words to the documents that contain them.
 
   - slug: tombstones
     name: Deleting with tombstones
@@ -3096,6 +3751,45 @@ concepts:
     resources:
       - title: Tombstone (data store) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Tombstone_(data_store)
+        opened: true
+      - title: Apache Cassandra documentation, Tombstones
+        url: https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/tombstones.html
+        opened: true
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data, deletion"
+        url: https://riak.com/assets/bitcask-intro.pdf
+        opened: true
+    lesson:
+      how_it_works: >-
+        In an append-only store a delete cannot remove the old record, because nothing is ever changed in place.
+        Instead the store appends a special record, a tombstone, that says this key is deleted. Readers that find a
+        tombstone as the latest record treat the key as missing.
+
+
+        The tombstone has to stay until every older record for the key is gone. If compaction removed the tombstone
+        but left an older value in another file, the next restart would rebuild the index from that older value and
+        the deleted key would come back to life. That is the classic tombstone bug.
+
+
+        So compaction removes a key's old values and its tombstone together, only when it is sure no older copy of the
+        key remains anywhere. Until then tombstones take space, and a store with many deletes can be slowed down by
+        them.
+
+
+        In systems spread over many machines the problem grows: a machine that was offline when the delete happened
+        may still hold the old value, so tombstones are kept for a grace period long enough for every machine to hear
+        about the delete.
+      examples:
+        - "After set a 1, then del a, the log holds two records for a: the value and the tombstone."
+        - A store that merged away tombstones too early saw deleted keys reappear after a restart.
+        - Cassandra keeps tombstones for a configured grace period so offline replicas cannot resurrect deleted rows.
+      misconceptions:
+        - Deleting a key frees its space. Space is freed only when compaction removes the records.
+        - A tombstone can be dropped as soon as it is written. It must outlive every older record of the key.
+        - Deleted means gone from disk. The old value stays on disk until compaction, which matters for privacy.
+      elsewhere:
+        - Distributed databases replicate tombstones so every copy learns about the delete.
+        - Sync services keep deletion markers so a delete on one device reaches the others.
+        - Privacy rules about erasing data have to account for values still on disk before compaction.
 
   - slug: log-compaction
     name: Compacting a log
@@ -3108,8 +3802,45 @@ concepts:
       where each key now lives, and then deletes the old files.
     prerequisites: [ append-only-log, tombstones ]
     resources:
-      - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data, merging and hint files"
         url: https://riak.com/assets/bitcask-intro.pdf
+        opened: true
+      - title: Log-structured merge-tree (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Log-structured_merge-tree
+        opened: true
+    lesson:
+      how_it_works: >-
+        An append-only log grows with every update and delete, while most of its records become dead: values that were
+        later overwritten, and keys that were deleted. Compaction, called merging in Bitcask, reclaims that space by
+        writing new files that hold only the live data.
+
+
+        It reads the closed files, keeps only the latest live record for each key, writes those records to new files,
+        and points the index at the new copies. Only after the new files and the index are safely in place does it
+        delete the old files. Doing it in that order means a crash at any moment leaves either the old files or the
+        new ones complete, never neither.
+
+
+        Compaction never touches the active file, which is still being written. It runs in the background while reads
+        and writes continue, so it must coordinate with them: a key written after compaction read the old files must
+        not be overwritten by the older value compaction copies.
+
+
+        Along with the new data files, Bitcask writes hint files: the key, position and size of every record, without
+        the values. On startup, reading the hint files rebuilds the index far faster than reading all the data.
+      examples:
+        - A store where every key was updated a hundred times shrank to about a hundredth of its size after merging.
+        - Kafka's compacted topics keep only the latest message for each key, so new consumers can catch up quickly.
+        - A merge that deleted old files before syncing the new ones lost data when the power failed between the two
+          steps.
+      misconceptions:
+        - Compaction can run on the active file. The active file is still being written; only closed files are merged.
+        - The order of steps does not matter. Delete old files only after the new ones and the index are safe.
+        - Compaction is just cleanup. It also makes startup and reads faster by shortening what must be scanned.
+      elsewhere:
+        - Log-structured merge trees in RocksDB and Cassandra compact sorted files in levels.
+        - Garbage collectors that copy live objects and drop the rest follow the same pattern.
+        - Version control systems pack loose objects into compact files in the background.
 
   - slug: crash-recovery
     name: Recovering after a crash
@@ -3122,8 +3853,51 @@ concepts:
       so the store comes back with every write that fully reached the disk.
     related: [ checksums, hash-index ]
     resources:
+      - title: SQLite, Atomic Commit In SQLite
+        url: https://www.sqlite.org/atomiccommit.html
+        opened: true
       - title: Write-ahead logging (Wikipedia)
         url: https://en.wikipedia.org/wiki/Write-ahead_logging
+        opened: true
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data, crash friendliness"
+        url: https://riak.com/assets/bitcask-intro.pdf
+        opened: true
+    lesson:
+      how_it_works: >-
+        A storage program can stop at any instant: a crash, a kill, a power cut. Crash recovery is what it does on the
+        next start to get back to a correct state from whatever is on disk.
+
+
+        An append-only log makes this simpler than most designs. Data written before the crash is never touched again,
+        so only the record being written at the moment of the crash can be damaged. On startup the store reads the
+        files and rebuilds its index, checking every record's checksum. A record that is cut short or fails its
+        checksum at the end of the active file is a write that never finished, so it is dropped, and the store
+        continues with everything before it.
+
+
+        A damaged record in the middle of a file is different: it points to disk damage rather than a crash, and the
+        safe response is to report it rather than silently skip it.
+
+
+        Recovery is only as good as what reached the disk. A write the program believed finished may still have been
+        sitting in the operating system's cache when the power went. Whether the store syncs after every write, every
+        few writes or never decides how much recent data a power cut can lose.
+      examples:
+        - After a power cut, a log store dropped a half-written record at the end of the active file and served every
+          earlier value correctly.
+        - A store that trusted the size field of a torn record tried to read past the end of the file and refused to
+          start.
+        - Databases replay their write-ahead log on startup to redo changes that were logged but not yet applied.
+      misconceptions:
+        - If the program said done, the data is on disk. It may still be in a cache until the file is synced.
+        - Recovery means repairing every damaged record. A torn last record is simply dropped; there is nothing to
+          repair.
+        - Crashes are rare enough to ignore. Power cuts, kills and full disks are everyday events at scale.
+      elsewhere:
+        - SQLite uses a journal or write-ahead log so a transaction is either fully applied or not at all after a
+          crash.
+        - Journaling file systems recover quickly by replaying their journal.
+        - Message queues recover delivered-but-unacknowledged messages after a restart.
 
   # ---- added for content v2 (concept-first), wc ----
   - slug: text-encoding-utf8
@@ -4321,4 +5095,108 @@ concepts:
         opened: true
       - title: Time to live (Wikipedia)
         url: https://en.wikipedia.org/wiki/Time_to_live
+        opened: true
+  - slug: information-entropy
+    name: Information and entropy
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: Entropy measures how unpredictable each symbol of a source is, in bits. It sets the lower limit on how small
+      any lossless code can make the data on average, and it is why skewed text compresses and random bytes do not.
+    lesson:
+      how_it_works: >-
+        A symbol that is very likely carries little information when it appears, and a rare one carries a lot.
+        Information theory makes this exact: a symbol with probability p carries minus log base 2 of p bits of
+        information. Entropy is the average of that over all symbols, weighted by how often each one appears.
+
+
+        If every one of 256 byte values is equally likely, the entropy is 8 bits per byte, and no lossless code can
+        beat plain bytes on average. Real text is far from uniform: spaces and the letter e are common, and q and z
+        are rare, so its entropy is well under 8 bits per character. That gap between 8 bits and the entropy is the
+        room a compressor has to work in.
+
+
+        Shannon's source coding theorem says no lossless code can use fewer bits per symbol, on average, than the
+        entropy of the source, and that codes can come close to it. A classic example has six symbols with frequencies
+        45, 13, 12, 16, 9 and 5 out of 100. A fixed code needs 3 bits for each of them, the entropy is about 2.22
+        bits, and a Huffman code reaches 2.24.
+
+
+        Entropy depends on the model of the data. Counting single bytes ignores that th is common in English.
+        Compressors that look at pairs, words or repeated strings model the data better, and so find a lower entropy
+        to approach.
+      examples:
+        - Compressing an already compressed file, such as a JPEG or a zip, barely shrinks it, because its bytes are
+          close to uniformly random.
+        - A log file full of repeated timestamps and field names compresses to a small fraction of its size, because
+          its symbols are highly predictable.
+        - Encrypted data looks random by design, so a backup tool that compresses after encrypting saves almost
+          nothing.
+      misconceptions:
+        - A good enough algorithm can compress any file. Counting arguments show that no lossless method can shrink
+          every input; some must grow.
+        - Entropy is a property of the file alone. It depends on the model used to predict the symbols, so a better
+          model finds a lower entropy.
+        - Compression ratio is the same for every text. It depends on how skewed and repetitive that particular text
+          is.
+      elsewhere:
+        - Password strength is measured in bits of entropy, the same idea applied to guessing.
+        - Decision trees in machine learning pick splits that reduce entropy the most.
+        - Video and audio codecs spend more bits where the signal is less predictable.
+    resources:
+      - title: Entropy (information theory) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Entropy_(information_theory)
+        opened: true
+      - title: Shannon's source coding theorem (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Shannon%27s_source_coding_theorem
+        opened: true
+  - slug: false-positive-rate
+    name: Sizing a filter for a false positive rate
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: A Bloom filter trades memory for accuracy. Given the number of items and the false positive rate you accept,
+      standard formulas give the number of bits and hash functions, and the rate rises sharply if the filter holds
+      more items than it was sized for.
+    lesson:
+      how_it_works: >-
+        Each added item sets up to k bits. As more items are added, more of the m bits are one, and a lookup for an
+        item that was never added is more likely to find all of its k bits already set. That chance is the false
+        positive rate.
+
+
+        For n items and a target rate p, the best number of bits is about n times the natural log of p, made positive,
+        divided by the square of the natural log of 2. That works out to about 9.6 bits per item for 1 in 100, and
+        about 14.4 bits per item for 1 in 1,000. The best number of hash functions is the bits per item times the
+        natural log of 2, so about 7 for 1 in 100 and about 10 for 1 in 1,000. For 100,000 words at 1 in 100 that is
+        about 958,500 bits, under 120 kilobytes.
+
+
+        More hash functions are not always better. Too few leave too many items matching by chance, and too many fill
+        the array with ones faster. The formula balances the two.
+
+
+        The rate holds only if the filter holds about the number of items it was sized for. Put in twice as many and
+        the rate is far worse than twice as bad. Measure the rate you actually get, by looking up many items you know
+        were never added.
+      examples:
+        - A team sized a filter for 1 million keys, then loaded 5 million, and the filter answered probably present
+          for almost everything.
+        - Halving the false positive rate from 1 in 100 to 1 in 200 costs only about 1.4 more bits per item.
+        - A spell checker tested with random strings measured close to the 1 percent rate its sizing promised.
+      misconceptions:
+        - More hash functions always lower the error. Past the best number they raise it.
+        - The false positive rate is fixed once chosen. It depends on how many items have actually been added.
+        - Halving the error rate doubles the size. The size grows with the logarithm of the rate, so it grows much
+          more slowly.
+      elsewhere:
+        - Cache filters in databases are sized per data file from the number of keys in that file.
+        - Capacity planning for hash tables uses the same idea of a load factor beyond which performance falls.
+        - Probabilistic counters such as HyperLogLog trade memory for a known error in the same way.
+    resources:
+      - title: Bloom filter (Wikipedia), probability of false positives and optimal number of hash functions
+        url: https://en.wikipedia.org/wiki/Bloom_filter
+        opened: true
+      - title: Bloom filter calculator (hur.st)
+        url: https://hur.st/bloomfilter/
         opened: true

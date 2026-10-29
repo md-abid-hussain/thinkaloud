@@ -91,6 +91,11 @@ create table challenge (
                       'bits', 'hash', 'net', 'bucket', 'log', 'kv', 'short', 'pages')),
   content_status    text not null default 'listed'
                     check (content_status in ('listed', 'generated', 'reviewed')),
+  -- Format 3 (CONTENT_FORMAT v3): a learning map and a build plan. 1 and 2 are the older shapes.
+  content_format    int  not null default 1 check (content_format between 1 and 3),
+  reference_tool    text,                         -- what to compare against, if a real tool exists
+  done_when         text,                         -- the project's completion criteria
+  open_checks       text[] not null default '{}', -- facts to settle by experiment while building
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   unique (source, slug)
@@ -181,6 +186,7 @@ create table step (
   position     int  not null check (position > 0),
   title        text not null,
   est_minutes  int  not null check (est_minutes between 5 and 60),
+  outcome      text,  -- format 3: the one checkable outcome; the learner ticks it when met
   unique (milestone_id, position)
 );
 
@@ -281,6 +287,7 @@ create table resource (
   framework   text check (framework is null or framework = lower(framework)),
   http_status int,
   verified_at timestamptz,
+  opened      boolean not null default false,  -- someone read it and confirmed it teaches the concept
   unique (concept_id, url),
   check (framework is null or language is not null)
 );
@@ -297,6 +304,29 @@ create table language_note (
   created_at     timestamptz not null default now(),
   primary key (concept_id, language, framework)
 );
+
+-- Format 3 learning map: the concepts a project teaches, in learning order, each with where it shows up in
+-- this project and one explain-back (the only graded check for a concept).
+create table project_concept (
+  id              uuid primary key default gen_random_uuid(),
+  challenge_id    uuid not null references challenge (id) on delete cascade,
+  concept_id      uuid not null references concept (id),
+  position        int  not null check (position > 0),
+  where_text      text not null,
+  explain_prompt  text not null,
+  explain_rubric  jsonb not null check (is_rubric(explain_rubric)),
+  unique (challenge_id, concept_id),
+  unique (challenge_id, position)
+);
+create index project_concept_concept_idx on project_concept (concept_id);
+
+-- Format 3 build plan: the concepts each build step uses (1 to 3, each on the project's learning map).
+create table step_concept (
+  step_id    uuid not null references step (id) on delete cascade,
+  concept_id uuid not null references concept (id),
+  primary key (step_id, concept_id)
+);
+create index step_concept_concept_idx on step_concept (concept_id);
 
 -- ---------------------------------------------------------------------------
 -- Learners
@@ -387,9 +417,10 @@ create index concept_state_concept_idx on concept_state (concept_id);
 create table answer (
   id            uuid primary key default gen_random_uuid(),
   enrollment_id uuid not null references enrollment (id) on delete cascade,
-  kind          text not null check (kind in ('restate', 'think', 'gate', 'reflection')),
+  kind          text not null check (kind in ('restate', 'think', 'gate', 'reflection', 'explain_back')),
   task_id       uuid references task (id),
   question_id   uuid references question (id),
+  project_concept_id uuid references project_concept (id),
   attempt       int  not null default 1 check (attempt > 0),
   body          text not null check (length(btrim(body)) > 0),
   grade         text not null default 'ungraded'
@@ -402,9 +433,10 @@ create table answer (
   dispute_note  text,
   created_at    timestamptz not null default now(),
   check (
-    (kind = 'think' and task_id is not null and question_id is null) or
-    (kind = 'gate'  and question_id is not null and task_id is null) or
-    (kind in ('restate', 'reflection') and task_id is null and question_id is null)
+    (kind = 'think' and task_id is not null and question_id is null and project_concept_id is null) or
+    (kind = 'gate'  and question_id is not null and task_id is null and project_concept_id is null) or
+    (kind = 'explain_back' and project_concept_id is not null and task_id is null and question_id is null) or
+    (kind in ('restate', 'reflection') and task_id is null and question_id is null and project_concept_id is null)
   ),
   check (kind <> 'reflection' or grade = 'ungraded'),
   check (grade = 'ungraded' or graded_by is not null),
@@ -413,11 +445,12 @@ create table answer (
 );
 create unique index answer_attempt_uniq on answer (
   enrollment_id, kind,
-  coalesce(task_id, question_id, '00000000-0000-0000-0000-000000000000'::uuid),
+  coalesce(task_id, question_id, project_concept_id, '00000000-0000-0000-0000-000000000000'::uuid),
   attempt
 );
 create index answer_question_idx on answer (question_id) where question_id is not null;
 create index answer_task_idx on answer (task_id) where task_id is not null;
+create index answer_project_concept_idx on answer (project_concept_id) where project_concept_id is not null;
 create index answer_followup_idx on answer (followup_of) where followup_of is not null;
 
 -- Model grading must agree with the rubric, and every point it claims as met must be backed by
@@ -447,7 +480,7 @@ begin
     if task_kind in ('explain', 'spot_bug') and new.graded_by <> 'model' then
       raise exception '% tasks are graded by rubric, not by key', task_kind;
     end if;
-  elsif new.kind in ('gate', 'restate') and new.graded_by = 'key' then
+  elsif new.kind in ('gate', 'restate', 'explain_back') and new.graded_by = 'key' then
     raise exception '% answers are graded by rubric, not by key', new.kind;
   end if;
 
@@ -458,6 +491,7 @@ begin
   rubric := case new.kind
     when 'think'   then (select t.rubric from task t where t.id = new.task_id)
     when 'gate'    then (select q.rubric from question q where q.id = new.question_id)
+    when 'explain_back' then (select pc.explain_rubric from project_concept pc where pc.id = new.project_concept_id)
     when 'restate' then (select c.restate_rubric
                            from enrollment e join challenge c on c.id = e.challenge_id
                           where e.id = new.enrollment_id)
@@ -668,26 +702,41 @@ create view v_milestone_estimate as
   left join step s on s.milestone_id = m.id
   group by m.id;
 
--- A milestone is understood when every step is done and its teach-back (or every gate question) has a 'met' answer.
+-- Formats 1 and 2: a milestone is understood when every step is done and its teach-back (or every gate
+-- question) has a 'met' answer.
+-- Format 3: a milestone is understood when every concept its steps use is explained by this learner (in any
+-- project), and built when all its steps are done. gate_total and gate_met then count those concepts.
 create view v_milestone_progress as
-  select p.*,
-         (p.steps_total > 0 and p.steps_done = p.steps_total
-            and p.gate_total > 0 and p.gate_met = p.gate_total) as understood
+  select p.enrollment_id, p.milestone_id, p.steps_total, p.steps_done, p.gate_total, p.gate_met,
+         case when p.content_format >= 3 then (p.gate_total > 0 and p.gate_met = p.gate_total)
+              else (p.steps_total > 0 and p.steps_done = p.steps_total and p.gate_total > 0 and p.gate_met = p.gate_total)
+         end as understood,
+         (p.steps_total > 0 and p.steps_done = p.steps_total) as built
   from (
     select en.id as enrollment_id,
            m.id  as milestone_id,
+           c.content_format,
            (select count(*) from step s where s.milestone_id = m.id)::int as steps_total,
            (select count(*) from step s
               join step_state ss on ss.step_id = s.id and ss.enrollment_id = en.id
              where s.milestone_id = m.id and ss.status = 'done')::int as steps_done,
-           (select count(*) from question q where q.milestone_id = m.id)::int as gate_total,
-           (select count(*) from question q
-             where q.milestone_id = m.id
-               and exists (select 1 from answer a
-                            where a.enrollment_id = en.id
-                              and a.question_id = q.id
-                              and a.grade = 'met'))::int as gate_met
+           case when c.content_format >= 3
+                then (select count(*) from milestone_concept mc where mc.milestone_id = m.id)::int
+                else (select count(*) from question q where q.milestone_id = m.id)::int
+           end as gate_total,
+           case when c.content_format >= 3
+                then (select count(*) from milestone_concept mc
+                        join concept_state cs on cs.concept_id = mc.concept_id and cs.learner_id = en.learner_id
+                       where mc.milestone_id = m.id and cs.explained_at is not null)::int
+                else (select count(*) from question q
+                       where q.milestone_id = m.id
+                         and exists (select 1 from answer a
+                                      where a.enrollment_id = en.id
+                                        and a.question_id = q.id
+                                        and a.grade = 'met'))::int
+           end as gate_met
     from enrollment en
+    join challenge c on c.id = en.challenge_id
     join milestone m on m.challenge_id = en.challenge_id
   ) p;
 

@@ -1,9 +1,8 @@
 "use client";
-// The Wispr-ready answer box. A large ordinary textarea: typing works for everything, and Wispr Flow (or any
-// dictation tool) types into it. A burst of text in one input event that isn't a paste shows "Dictated" for a
-// moment and adds to the dictated seconds. Ctrl/Cmd+Enter submits.
+// The answer box: a large ordinary textarea. Typing works for everything, and any dictation tool types into it.
+// A burst of text in one input event that isn't a paste counts towards the "spoke for" time. Ctrl/Cmd+Enter submits.
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useWisprKeys, words } from "./hooks";
+import { words } from "./hooks";
 
 /** Submit on its own a few seconds after dictation stops. Undecided, so it stays off. Typed answers never auto-check. */
 export const AUTO_CHECK_AFTER_DICTATION = false;
@@ -11,16 +10,6 @@ const BURST_CHARS = 25;
 const AUTO_CHECK_IDLE_MS = 4000;
 const AUTO_CHECK_COUNT = 4;
 const WORDS_PER_SECOND = 2.5; // about 150 words a minute, for the "spoke for" estimate
-
-export function Keys() {
-  const keys = useWisprKeys();
-  if (!keys) return <span className="keys" />;
-  return (
-    <span className="keys">
-      {keys.map((k, i) => <span key={k}>{i > 0 && " + "}<span className="kc">{k}</span></span>)}
-    </span>
-  );
-}
 
 export function Wave({ heights = [6, 12, 14, 8, 11] }: { heights?: number[] }) {
   return <span className="wave" aria-hidden="true">{heights.map((h, i) => <i key={i} style={{ height: h }} />)}</span>;
@@ -106,7 +95,6 @@ export default function AnswerBox({ id, label, value, onChange, onSubmit, placeh
   const n = words(value);
   const status = (
     <>
-      {dictated && <span className="dict" role="status"><Wave heights={[5, 10, 13, 7, 10]} />Dictated</span>}
       {count !== null && (
         <span className="auto" role="status">Checking in {count}s · <button type="button" className="linkbtn" onClick={() => { setCount(null); setBurstAt(null); }}>Cancel</button></span>
       )}
@@ -130,12 +118,9 @@ export default function AnswerBox({ id, label, value, onChange, onSubmit, placeh
       />
       <div className="ans-bar">
         {variant === "answer" ? (
-          <p className="cue">
-            Hold <Keys /> <span>to dictate with <a href="https://wisprflow.ai/r?MD13753" rel="sponsored noopener">Wispr Flow</a>, or type · {n} {n === 1 ? "word" : "words"}</span>
-            {status}
-          </p>
+          <p className="cue"><span>{n} {n === 1 ? "word" : "words"}</span>{status}</p>
         ) : (
-          <p className="cue">Hold <Keys /> <span>to speak</span>{status}</p>
+          <p className="cue">{status}</p>
         )}
         {actions && <div className="acts">{actions}</div>}
       </div>

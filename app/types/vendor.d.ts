@@ -14,6 +14,8 @@ declare module "@/vendor/db/support/recipes.mjs" {
     thinkAnswer(l: string, e: string, stepId: string, body: string, o?: Record<string, unknown>): Promise<string>;
     refreshMilestone(l: string, e: string, milestoneId: string): Promise<boolean>;
     reflect(l: string, e: string, body: string): Promise<boolean>;
+    explainBack(l: string, e: string, projectConceptId: string, body: string, o?: Record<string, unknown>): Promise<{ grade: "met" | "partial" | "not_yet"; answerId: string; attempt: number; conceptId: string; understood: string[] }>;
+    outcomeMet(l: string, e: string, stepId: string): Promise<{ built: boolean }>;
   };
 }
 declare module "@/vendor/db/support/matching.mjs" {

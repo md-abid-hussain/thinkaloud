@@ -1,18 +1,20 @@
 // Grade runs: the background job that grades an explain, spot-the-bug, restate or teach-back answer and then
 // applies the app's rules. Keyed answers never come here (see keyedThink in progress.ts).
 import "server-only";
-import { one } from "@/lib/db";
+import { one, tx } from "@/lib/db";
+import { recipes } from "@/vendor/db/support/recipes.mjs";
 import { gradeAnswer, type RubricPoint } from "@/lib/grader";
 import { recordGate, recordModelThink, recordRestate } from "@/lib/progress";
 import { registerHandler, type RunContext } from "@/lib/runs";
 
 const json = <T,>(v: unknown): T => (typeof v === "string" ? JSON.parse(v) : v) as T;
 
-export type GradeTarget = "think" | "gate" | "restate";
+export type GradeTarget = "think" | "gate" | "restate" | "explain_back";
 export interface GradeInput {
   target: GradeTarget;
   body: string;
   followupOf?: string | null;
+  projectConceptId?: string;
 }
 
 async function context(ctx: RunContext) {
@@ -23,6 +25,13 @@ async function context(ctx: RunContext) {
       `select kind, prompt, snippet, rubric from task where step_id = $1 and role = 'think'`, [run.step_id]
     );
     return { what: t!.kind === "spot_bug" ? "a spot-the-bug task" : "a step's explain task", prompt: t!.prompt, snippet: t!.snippet, rubric: json<RubricPoint[]>(t!.rubric) };
+  }
+  if (input.target === "explain_back") {
+    const pc = await one<{ prompt: string; rubric: unknown; name: string; lesson: unknown }>(
+      `select pc.explain_prompt as prompt, pc.explain_rubric as rubric, c.name from project_concept pc join concept c on c.id = pc.concept_id where pc.id = $1`,
+      [input.projectConceptId]
+    );
+    return { what: `the explain-back for the concept "${pc!.name}", where the learner explains the idea in a real situation`, prompt: pc!.prompt, snippet: null, rubric: json<RubricPoint[]>(pc!.rubric) };
   }
   if (input.target === "gate") {
     const q = await one<{ prompt: string; rubric: unknown }>(`select prompt, rubric from question where id = $1`, [run.question_id]);
@@ -50,7 +59,10 @@ async function gradeRun(ctx: RunContext) {
   await ctx.emit("trace", { label: `Checked ${g.points.filter((p) => p.met).length} quote(s) against your words` });
 
   let saved: { answerId: string; attempt: number; explained?: string[]; understood?: boolean };
-  if (input.target === "think") saved = await recordModelThink(run.learner_id, run.enrollment_id!, run.step_id!, input.body, g);
+  if (input.target === "explain_back") {
+    const r = await tx((q) => recipes(q).explainBack(run.learner_id, run.enrollment_id!, input.projectConceptId!, input.body, { points: g.points, model: g.model }));
+    saved = { answerId: r.answerId, attempt: r.attempt, explained: r.grade === "met" ? [r.conceptId] : [], understood: r.understood.length > 0 };
+  } else if (input.target === "think") saved = await recordModelThink(run.learner_id, run.enrollment_id!, run.step_id!, input.body, g);
   else if (input.target === "gate") saved = await recordGate(run.learner_id, run.enrollment_id!, run.question_id!, input.body, g, input.followupOf ?? null);
   else saved = await recordRestate(run.learner_id, run.enrollment_id!, input.body, g);
 

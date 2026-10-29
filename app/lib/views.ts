@@ -29,18 +29,18 @@ async function project(slug: string) {
 
 /** Every milestone with its steps and the learner's step states, for the rail and the project home. */
 export async function milestonesFor(challengeId: string, enrollmentId: string | null) {
-  const ms = await rows<{ id: string; position: number; title: string; summary: string; est_minutes: number; question_id: string | null; understood: boolean }>(
-    `select m.id, m.position, m.title, m.summary, e.est_minutes, q.id as question_id, coalesce(mp.understood, false) as understood
+  const ms = await rows<{ id: string; position: number; title: string; summary: string; est_minutes: number; question_id: string | null; understood: boolean; built: boolean }>(
+    `select m.id, m.position, m.title, m.summary, e.est_minutes, q.id as question_id, coalesce(mp.understood, false) as understood, coalesce(mp.built, false) as built
        from milestone m join v_milestone_estimate e on e.milestone_id = m.id
        left join question q on q.milestone_id = m.id and q.position = 1
        left join v_milestone_progress mp on mp.milestone_id = m.id and mp.enrollment_id = $2
       where m.challenge_id = $1 order by m.position`,
     [challengeId, enrollmentId]
   );
-  const steps = await rows<{ id: string; milestone_id: string; position: number; title: string; est_minutes: number; kind: string; status: string; help_level: string; checking: boolean }>(
-    `select s.id, s.milestone_id, s.position, s.title, s.est_minutes, t.kind, coalesce(ss.status, 'not_started') as status, coalesce(ss.help_level, 'none') as help_level,
+  const steps = await rows<{ id: string; milestone_id: string; position: number; title: string; est_minutes: number; kind: string | null; outcome: string | null; status: string; help_level: string; checking: boolean }>(
+    `select s.id, s.milestone_id, s.position, s.title, s.est_minutes, t.kind, s.outcome, coalesce(ss.status, 'not_started') as status, coalesce(ss.help_level, 'none') as help_level,
             exists (select 1 from run r where r.enrollment_id = $2 and r.step_id = s.id and r.kind = 'grade' and r.status in ('queued', 'running')) as checking
-       from step s join milestone m on m.id = s.milestone_id join task t on t.step_id = s.id and t.role = 'think'
+       from step s join milestone m on m.id = s.milestone_id left join task t on t.step_id = s.id and t.role = 'think'
        left join step_state ss on ss.step_id = s.id and ss.enrollment_id = $2
       where m.challenge_id = $1 order by m.position, s.position`,
     [challengeId, enrollmentId]
@@ -109,7 +109,7 @@ export async function languageLayer(enrollmentId: string, language: string | nul
       )
     : [];
   const refs = await rows<{ concept_id: string; title: string; url: string }>(
-    `select concept_id, title, url from resource where concept_id = any($1) and http_status = 200 and verified_at is not null and language is null order by verified_at`,
+    `select concept_id, title, url from resource where concept_id = any($1) and language is null and (opened or (http_status = 200 and verified_at is not null)) order by opened desc, title`,
     [conceptIds]
   );
   const runs = await rows<{ id: string; kind: string; status: string }>(

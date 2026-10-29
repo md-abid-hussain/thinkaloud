@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { guestOn, one, stepsOf } from "./setup";
 import { _runTool, looksLikeCode, toolsFor } from "@/lib/mentor";
 
+
 test("show_code is only in the tool list after the learner pressed Show me code", () => {
   assert.ok(!toolsFor(false).some((t) => t.name === "show_code"));
   assert.ok(toolsFor(true).some((t) => t.name === "show_code"));
@@ -31,15 +32,17 @@ test("show_code refuses when code is locked, and logs code help when unlocked", 
   assert.equal(ss!.help_level, "code");
 });
 
-test("mentor tools read context, keep memory and never change status", async () => {
+test("mentor tools read the build step with its concepts' lessons, keep memory and never change status", async () => {
   const { l, e } = await guestOn();
-  const step = (await stepsOf()).find((s) => s.kind === "predict" || s.kind === "trace")!;
+  const step = (await stepsOf())[1];
   const ctx = { learnerId: l, enrollmentId: e, stepId: step.id, language: null, showCode: false };
   const sc = await _runTool(ctx, "get_step_context", {});
-  assert.match(sc.label, /concept briefs/);
-  const dry = await _runTool(ctx, "check_answer", { text: "maybe forty two" });
-  assert.equal((dry.result as any).dry_run.would_match_key, false);
-  await _runTool(ctx, "note_misconception", { concept: "line-endings", text: "Thinks the last line counts without a newline" });
+  const r = sc.result as any;
+  assert.equal(r.outcome_to_check, step.outcome);
+  assert.ok(r.concepts_this_step_uses.length > 0 && r.concepts_this_step_uses.every((c: any) => c.lesson && c.where_in_this_project));
+  const check = await _runTool(ctx, "check_answer", {});
+  assert.equal((check.result as any).latest, null);
+  await _runTool(ctx, "note_misconception", { concept: "stream-read-contract", text: "Thinks a short read means the input ended" });
   await _runTool(ctx, "save_for_later", { text: "How do pipes work in the kernel?" });
   const hist = await _runTool(ctx, "get_learner_history", {});
   assert.equal((hist.result as any).misconceptions.length, 1);

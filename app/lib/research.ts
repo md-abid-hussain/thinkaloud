@@ -250,7 +250,7 @@ async function referencesRun(ctx: RunContext) {
   const concepts = await conceptsOf(run.enrollment_id!);
   let done = 0;
   for (const c of concepts) {
-    const have = await one<{ n: number }>(`select count(*)::int as n from resource where concept_id = $1 and language is null and http_status = 200 and verified_at is not null`, [c.id]);
+    const have = await one<{ n: number }>(`select count(*)::int as n from resource where concept_id = $1 and language is null and (opened or (http_status = 200 and verified_at is not null))`, [c.id]);
     if ((have?.n ?? 0) >= 2) continue;
     if (!(await claim(c.id, REFS, ""))) continue;
     await ctx.emit("trace", { label: `Finding references: ${c.name}`, concept: c.slug });
@@ -296,7 +296,7 @@ export async function startReferencesRun(learnerId: string, enrollmentId: string
   if (active) return null;
   const thin = await one<{ n: number }>(
     `select count(*)::int as n from enrollment en join milestone m on m.challenge_id = en.challenge_id join milestone_concept mc on mc.milestone_id = m.id
-      where en.id = $1 and (select count(*) from resource r where r.concept_id = mc.concept_id and r.language is null and r.http_status = 200) < 2
+      where en.id = $1 and (select count(*) from resource r where r.concept_id = mc.concept_id and r.language is null and (r.opened or r.http_status = 200)) < 2
         and not exists (select 1 from concept_language cl where cl.concept_id = mc.concept_id and cl.language = '${REFS}' and cl.status in ('running', 'done'))`,
     [enrollmentId]
   );

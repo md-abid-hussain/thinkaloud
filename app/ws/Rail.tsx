@@ -63,12 +63,14 @@ export default function Rail({ slug, short, title, milestones, current, ideas, m
                     </li>
                   );
                 })}
-                <li className={`tb ${tbState}`}>
-                  <Link href={`/projects/${slug}/m/${m.position}/explain`} aria-current={tbCur ? "step" : undefined}>
-                    <span className="ic" aria-hidden="true" />
-                    <span>Explain it back<span className="m">{tbMeta}</span></span>
-                  </Link>
-                </li>
+                {m.question_id && (
+                  <li className={`tb ${tbState}`}>
+                    <Link href={`/projects/${slug}/m/${m.position}/explain`} aria-current={tbCur ? "step" : undefined}>
+                      <span className="ic" aria-hidden="true" />
+                      <span>Explain it back<span className="m">{tbMeta}</span></span>
+                    </Link>
+                  </li>
+                )}
               </ol>
             </div>
           );

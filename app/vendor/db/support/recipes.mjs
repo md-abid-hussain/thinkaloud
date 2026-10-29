@@ -23,20 +23,23 @@ export function recipes(db) {
     const { n } = await one(
       `select coalesce(max(attempt), 0) + 1 as n from answer
         where enrollment_id = $1 and kind = $2
-          and task_id is not distinct from $3::uuid and question_id is not distinct from $4::uuid`,
-      [e, kind, taskId, questionId]
+          and task_id is not distinct from $3::uuid and question_id is not distinct from $4::uuid
+          and project_concept_id is not distinct from $5::uuid`,
+      [e, kind, taskId, questionId, o.projectConceptId ?? null]
     );
     return one(
-      `insert into answer (enrollment_id, kind, task_id, question_id, attempt, body, grade, graded_by, model, points, followup_of)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id, attempt`,
+      `insert into answer (enrollment_id, kind, task_id, question_id, project_concept_id, attempt, body, grade, graded_by, model, points, followup_of)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id, attempt`,
       [
-        e, kind, taskId, questionId, n, o.body, o.grade ?? 'ungraded', o.gradedBy ?? null, o.model ?? null,
+        e, kind, taskId, questionId, o.projectConceptId ?? null, n, o.body, o.grade ?? 'ungraded', o.gradedBy ?? null, o.model ?? null,
         o.points ? JSON.stringify(o.points) : null, o.followupOf ?? null,
       ]
     );
   }
 
+  // o.points carries a real grader's points; without it, tests get stub points (the first metCount met).
   const rubricGrade = (rubric, body, o = {}) => {
+    if (o.points) return { grade: gradeFor(o.points.filter((p) => p.met).length, rubric.length), points: o.points };
     const met = o.metCount ?? rubric.length;
     const quote = o.quote ?? body.split(/\s+/).slice(0, 2).join(' ');
     return { grade: gradeFor(met, rubric.length), points: modelPoints(rubric, met, quote) };
@@ -119,13 +122,24 @@ export function recipes(db) {
         `select c.restate_rubric as rubric from enrollment en join challenge c on c.id = en.challenge_id where en.id = $1`, [e]
       );
       const g = rubricGrade(json(rubric), body, o);
-      const a = await addAnswer(e, 'restate', { body, grade: g.grade, gradedBy: 'model', model: 'stub', points: g.points });
+      const a = await addAnswer(e, 'restate', { body, grade: g.grade, gradedBy: 'model', model: o.model ?? 'stub', points: g.points });
       await log(l, e, 'answer_graded', { answer: a.id, payload: { grade: g.grade } });
       return g.grade;
     },
 
     async refreshMilestone(l, e, milestoneId) {
-      const p = await one(`select understood from v_milestone_progress where enrollment_id = $1 and milestone_id = $2`, [e, milestoneId]);
+      const p = await one(`select understood, built from v_milestone_progress where enrollment_id = $1 and milestone_id = $2`, [e, milestoneId]);
+      if (p.built) {
+        const st = await one(`select built_at from milestone_state where enrollment_id = $1 and milestone_id = $2`, [e, milestoneId]);
+        if (!st?.built_at) {
+          await db.query(
+            `insert into milestone_state (enrollment_id, milestone_id, status, built_at) values ($1, $2, 'in_progress', now())
+             on conflict (enrollment_id, milestone_id) do update set built_at = coalesce(milestone_state.built_at, now())`,
+            [e, milestoneId]
+          );
+          await log(l, e, 'milestone_built', { milestone: milestoneId });
+        }
+      }
       if (!p.understood) return false;
       const was = await one(`select status from milestone_state where enrollment_id = $1 and milestone_id = $2`, [e, milestoneId]);
       if (was?.status !== 'understood') {
@@ -195,6 +209,51 @@ export function recipes(db) {
       }
       if (g.grade === 'met') await app.refreshMilestone(l, e, q.milestone_id);
       return { grade: g.grade, answerId: a.id, explained: [...explained.keys()] };
+    },
+
+    // Format 3: a concept's explain-back. When met, the concept is explained (for this learner, in every
+    // project), with the met points' quotes as evidence, and every milestone using it is refreshed.
+    async explainBack(l, e, projectConceptId, body, o = {}) {
+      const pc = await one(`select concept_id, explain_rubric from project_concept where id = $1`, [projectConceptId]);
+      const g = rubricGrade(json(pc.explain_rubric), body, o);
+      const a = await addAnswer(e, 'explain_back', {
+        projectConceptId, body, grade: g.grade, gradedBy: 'model', model: o.model ?? 'stub', points: g.points,
+      });
+      await log(l, e, 'answer_graded', { concept: pc.concept_id, answer: a.id, payload: { grade: g.grade, kind: 'explain_back' } });
+      const understood = [];
+      if (g.grade === 'met') {
+        await upsertConcept(l, pc.concept_id, 'explained_at');
+        await log(l, e, 'concept_explained', { concept: pc.concept_id, answer: a.id });
+        const quote = g.points.filter((p) => p.met).map((p) => p.quote).join(' … ');
+        await db.query(
+          `insert into evidence (learner_id, concept_id, kind, answer_id, quote, confidence) values ($1, $2, 'answer', $3, $4, 'high')`,
+          [l, pc.concept_id, a.id, quote]
+        );
+        for (const m of await rows(
+          `select mc.milestone_id from milestone_concept mc join milestone m on m.id = mc.milestone_id
+             join enrollment en on en.challenge_id = m.challenge_id where en.id = $1 and mc.concept_id = $2`, [e, pc.concept_id]
+        )) if (await app.refreshMilestone(l, e, m.milestone_id)) understood.push(m.milestone_id);
+      }
+      return { grade: g.grade, answerId: a.id, attempt: a.attempt, conceptId: pc.concept_id, understood };
+    },
+
+    // Format 3: the learner ticks a build step's outcome as met. The step is done, its concepts are applied,
+    // and its milestone may now be built.
+    async outcomeMet(l, e, stepId) {
+      await db.query(
+        `insert into step_state (enrollment_id, step_id, status, started_at, done_at) values ($1, $2, 'done', now(), now())
+         on conflict (enrollment_id, step_id) do update set status = 'done', done_at = coalesce(step_state.done_at, now()), updated_at = now()`,
+        [e, stepId]
+      );
+      await log(l, e, 'step_done', { step: stepId, payload: { outcome_met: true } });
+      for (const c of await rows(`select concept_id from step_concept where step_id = $1`, [stepId])) {
+        await upsertConcept(l, c.concept_id, 'applied_at');
+        await log(l, e, 'concept_applied', { step: stepId, concept: c.concept_id });
+      }
+      const s = await one(`select milestone_id from step where id = $1`, [stepId]);
+      await app.refreshMilestone(l, e, s.milestone_id);
+      const p = await one(`select built from v_milestone_progress where enrollment_id = $1 and milestone_id = $2`, [e, s.milestone_id]);
+      return { built: p.built };
     },
 
     async reflect(l, e, body) {

@@ -120,3 +120,19 @@
 .pg-home .langpick .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 .pg-home .langpick label { display: grid; gap: 4px; font: 500 12px/1.3 var(--f-mono); color: var(--muted); }
 .pg-home .langpick input { font: 400 16px/1.2 var(--f-body); color: var(--ink); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 6px; min-height: 40px; padding: 0 10px; width: min(220px, 100%); }
+
+/* Format 3: learning map */
+.pg-home .map { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; }
+.pg-home .map > li { border-top: 1px solid var(--rule); }
+.pg-home .map a { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; padding: 14px 0; text-decoration: none; color: var(--ink); }
+.pg-home .map .n { font: 500 13px/1.4 var(--f-mono); color: var(--accent); grid-row: span 2; }
+.pg-home .map .t { font: 600 18px/1.3 var(--f-display); }
+.pg-home .map a:hover .t { text-decoration: underline; }
+.pg-home .map .w { grid-column: 2 / -1; font-size: 15px; line-height: 1.45; color: var(--muted); }
+.pg-home .map .st { font: 500 12px/1 var(--f-mono); padding: 5px 7px; border-radius: 4px; white-space: nowrap; color: var(--muted); }
+.pg-home .map .st.seen { color: var(--seen); }
+.pg-home .map .st.explained { color: var(--ok); background: var(--ok-bg); }
+.pg-home .map .st.applied { color: var(--applied); }
+@media (max-width: 860px) { .pg-home .map { grid-template-columns: minmax(0, 1fr); } }
+.pg-home .spec { margin-top: 24px; }
+.pg-home .spec ul { margin: 0; padding-left: 18px; }

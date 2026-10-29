@@ -11,6 +11,8 @@ import Restate from "./Restate";
 import Support from "./Support";
 import LanguagePick from "./LanguagePick";
 import Reflection from "./Reflection";
+import HomeV3 from "./HomeV3";
+import { projectFormat } from "@/lib/views3";
 import "../home.css";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,11 @@ function tbWord(m: { understood: boolean; teachBack: { best: string; checking: b
 export default async function ProjectHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const learner = await currentLearnerId();
+  if (learner && (await projectFormat(slug)) >= 3) {
+    const { enrollmentFor } = await import("@/lib/learner");
+    if (!(await enrollmentFor(learner, slug))) redirect(`/projects/${slug}`);
+    return <HomeV3 slug={slug} learner={learner} />;
+  }
   const h = await projectHome(learner, slug);
   if (!h || !h.enrollment) redirect(`/projects/${slug}`);
   const { project: p, enrollment: en, milestones } = h;

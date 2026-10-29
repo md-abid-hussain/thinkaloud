@@ -3,7 +3,7 @@ export default function Footer({ left }: { left?: React.ReactNode }) {
   return (
     <footer className="foot">
       <p className="fine">{left ?? "ThinkAloud · 2026"}</p>
-      <p className="fine">Voice input works with <a href="https://wisprflow.ai/r?MD13753" rel="sponsored noopener">Wispr Flow</a> (referral link)</p>
+      <p className="fine">Projects from <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett</p>
     </footer>
   );
 }

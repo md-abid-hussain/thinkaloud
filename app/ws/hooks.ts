@@ -9,18 +9,6 @@ export function useMounted() {
   return useSyncExternalStore(noop, () => true, () => false);
 }
 
-function detectMac() {
-  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-  const p = (nav.userAgentData?.platform || navigator.platform || navigator.userAgent || "").toLowerCase();
-  return /mac|iphone|ipad/.test(p);
-}
-
-/** Wispr Flow's default shortcut for this OS: Mac fn, Windows Ctrl + Win. Null until mounted. */
-export function useWisprKeys(): string[] | null {
-  const mac = useSyncExternalStore(noop, detectMac, () => null);
-  return mac === null ? null : mac ? ["fn"] : ["Ctrl", "Win"];
-}
-
 const EMPTY: RunState = { status: "idle", traces: [], text: "", result: null, error: null };
 type Ev = { type: string; data: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 

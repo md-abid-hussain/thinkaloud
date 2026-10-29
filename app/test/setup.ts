@@ -1,4 +1,4 @@
-// Test setup: an in-memory PGlite loaded with the shared schema and seeds, a guest on wc, and helpers.
+// Test setup: an in-memory PGlite loaded with the shared schema and seeds, a guest on a project, and helpers.
 process.env.PGLITE_DIR = "memory://";
 delete process.env.DATABASE_URL;
 delete process.env.ANTHROPIC_API_KEY;
@@ -17,11 +17,21 @@ export async function guestOn(slug = "challenge-wc") {
   });
 }
 
+/** The build steps of a project, in order. */
 export async function stepsOf(slug = "challenge-wc") {
-  return rows<{ id: string; milestone: number; position: number; kind: string; answer_key: any; rubric: any; prompt: string; snippet: string | null }>(
-    `select s.id, m.position as milestone, s.position, t.kind, t.answer_key, t.rubric, t.prompt, t.snippet
+  return rows<{ id: string; milestone: number; position: number; outcome: string }>(
+    `select s.id, m.position as milestone, s.position, s.outcome
        from step s join milestone m on m.id = s.milestone_id join challenge c on c.id = m.challenge_id
-       join task t on t.step_id = s.id and t.role = 'think' where c.slug = $1 order by m.position, s.position`,
+      where c.slug = $1 order by m.position, s.position`,
+    [slug]
+  );
+}
+
+/** The learning map of a project: one row per concept, with its explain-back rubric. */
+export async function mapOf(slug = "challenge-wc") {
+  return rows<{ id: string; slug: string; rubric: { id: string; point: string }[] }>(
+    `select pc.id, c.slug, pc.explain_rubric as rubric from project_concept pc join concept c on c.id = pc.concept_id
+       join challenge ch on ch.id = pc.challenge_id where ch.slug = $1 order by pc.position`,
     [slug]
   );
 }

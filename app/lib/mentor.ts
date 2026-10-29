@@ -99,6 +99,23 @@ async function verifiedHits(hits: SearchHit[], domains: string[], max: number) {
   return checked.filter((x) => x.url).slice(0, max).map(({ h, url }) => ({ title: h.title, url: url!, snippet: h.snippet.slice(0, 600) }));
 }
 
+// Format 3: the step's one checkable outcome and the concepts it uses, each with the lesson and where it shows up
+// in this project, so the mentor teaches from the same material the learner reads.
+async function v3Step(stepId: string) {
+  const s = await one<{ outcome: string | null; content_format: number; challenge_id: string }>(
+    `select s.outcome, ch.content_format, ch.id as challenge_id from step s join milestone m on m.id = s.milestone_id join challenge ch on ch.id = m.challenge_id where s.id = $1`,
+    [stepId]
+  );
+  if (!s || s.content_format < 3) return {};
+  const uses = await rows(
+    `select c.slug, c.name, pc.where_text as where_in_this_project, c.lesson
+       from step_concept sc join concept c on c.id = sc.concept_id join project_concept pc on pc.concept_id = c.id and pc.challenge_id = $2
+      where sc.step_id = $1 order by pc.position`,
+    [stepId, s.challenge_id]
+  );
+  return { outcome_to_check: s.outcome, concepts_this_step_uses: uses, note: "Format 3: the learner builds this step and ticks the outcome themselves; concepts are graded by their explain-backs." };
+}
+
 async function conceptBySlugOrName(s: string) {
   return one<{ id: string; slug: string; name: string; brief: string | null }>(
     `select id, slug, name, brief from concept where slug = $1 or lower(name) = lower($1) limit 1`, [s.trim()]
@@ -126,7 +143,8 @@ async function runTool(c: Ctx, name: string, input: any): Promise<{ result: unkn
         result: {
           project: s.project, milestone: `${s.milestone_position}. ${s.milestone}`, step: `${s.position}. ${s.title}`, est_minutes: s.est_minutes,
           think: t && { kind: t.kind, prompt: t.prompt, snippet: t.snippet, answer_key_for_steering_only: t.answer_key, rubric_for_steering_only: t.rubric },
-          build: c.language ? build?.prompt ?? null : "hidden: the learner works concept-only",
+          build: build?.prompt ?? null,
+          ...(await v3Step(c.stepId)),
           stored_help: hints, concepts: concepts.map(({ slug, name, brief, lesson }) => ({ slug, name, brief, lesson: lesson ?? undefined })), language: c.language, language_notes: notes,
         },
       };
@@ -178,7 +196,7 @@ async function runTool(c: Ctx, name: string, input: any): Promise<{ result: unkn
       const con = await conceptBySlugOrName(input.concept);
       const stored = con
         ? await rows<{ title: string; url: string }>(
-            `select title, url from resource where concept_id = $1 and http_status = 200 and verified_at is not null and (language is null or language = $2) order by verified_at desc limit 3`, [con.id, c.language]
+            `select title, url from resource where concept_id = $1 and (opened or (http_status = 200 and verified_at is not null)) and (language is null or language = $2) order by opened desc, verified_at desc limit 3`, [con.id, c.language]
           )
         : [];
       if (stored.length) return { label: `Found ${stored.length} verified link${stored.length === 1 ? "" : "s"} for ${con!.name}`, result: { links: stored } };

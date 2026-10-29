@@ -1,64 +1,138 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readContent, validate, check, checkContent, checkProofs, onlyProjects, summarise, codeSign, AREAS } from '../scripts/import-content.mjs';
+import { readContent, validate, checkContent, summarise, codeSign, AREAS, dropInvalidProjects } from '../scripts/import-content.mjs';
 import { recipes } from '../support/recipes.mjs';
-import { keyMatches, numbersIn } from '../support/matching.mjs';
 
-const base = await check();
+// Every project file is format 3 (CONTENT_FORMAT.md, The learning model): a learning map of concepts with lessons,
+// references and explain-backs, and a build plan of steps with one outcome each. Format 3 has no keyed quizzes,
+// so there are no answer keys and no proof scripts to run.
 const content = readContent();
+const { skipped } = dropInvalidProjects(content);
+const base = await checkContent(content);
 after(() => base.db?.close());
 
-// Most cases mutate the static site generator, the worked example in CONTENT_FORMAT.md.
-const ssgIndex = content.projects.findIndex((p) => p.data.project.slug === 'challenge-ssg');
 const copy = () => structuredClone(content);
 const errorsFor = (mutate) => {
   const c = copy();
   mutate(c);
   return validate(c).errors.join('\n');
 };
-const project = (c) => c.projects[ssgIndex].data;
-const milestone = (c, i = 0) => project(c).milestones[i];
-const step = (c, mi = 0, si = 0) => milestone(c, mi).steps[si];
-const teachBack = (c, i = 0) => milestone(c, i).teach_back;
+const projectOf = (c, slug) => c.projects.find((p) => p.data.project.slug === slug).data;
+const wc = (c) => projectOf(c, 'challenge-wc');
+const web = (c) => projectOf(c, 'challenge-webserver');
+const concept = (c, slug) => c.catalogue.concepts.find((x) => x.slug === slug);
 
-test('every content file validates, every key is proven, and everything loads into the database', () => {
+test('every content file validates as format 3 and everything loads into the database', () => {
+  assert.deepEqual(skipped, [], 'no project file is left out');
   assert.deepEqual(base.errors, []);
   assert.equal(base.ok, true);
-  assert.equal(base.warnings.length, 0, base.warnings.join('\n'));
+  assert.ok(content.projects.every((p) => p.data.format === 3), 'every project is format 3');
   const s = base.summary;
   assert.equal(s.generatedProjects + s.reviewedProjects, content.projects.length);
   assert.equal(s.concepts, content.catalogue.concepts.length);
-  assert.equal(s.thinkTasks, s.steps, 'one think task per step');
-  assert.equal(s.teachBacks, s.milestones, 'one teach-back per milestone');
-  assert.ok(base.keys.length > 0 && base.keys.every((k) => k.proof?.ok && k.derivation.length > 20));
+  assert.equal(s.thinkTasks, 0, 'no keyed quizzes');
+  assert.equal(s.teachBacks, 0, 'explain-backs live on the learning map');
+  assert.equal(s.buildTasks, s.steps, 'every step has a build');
+  assert.equal(base.keys.length, 0, 'no answer keys, so nothing to prove');
 });
 
-test('the worked example loads with the expected shape', async () => {
-  const r = await checkContent(onlyProjects(content, ['challenge-ssg']));
-  assert.deepEqual(r.errors, []);
-  const { concepts, ...rest } = r.summary;
-  assert.deepEqual(rest, {
-    reviewedProjects: 0,
-    generatedProjects: 1,
-    milestones: 3,
-    steps: 10,
-    thinkTasks: 10,
-    buildTasks: 10,
-    hints: 20,
-    teachBacks: 3,
-    resources: rest.resources,
-    languageNotes: 3,
-  });
-  assert.equal(r.keys.length, 6);
-  const { rows } = await r.db.query(
-    `select m.position, e.est_minutes, c.figure_kind, c.primer -> 'words' -> 0 ->> 'term' as first_word
-       from milestone m join v_milestone_estimate e on e.milestone_id = m.id
-       join challenge c on c.id = m.challenge_id and c.slug = 'challenge-ssg' order by m.position`
+test('every learning-map concept has a lesson and at least 2 references, and every step concept is on the map', () => {
+  const problems = [];
+  for (const { data } of content.projects) {
+    const slug = data.project.slug;
+    const map = new Set(data.learning_map.map((x) => x.concept));
+    for (const x of data.learning_map) {
+      const c = concept(content, x.concept);
+      if (!(c?.lesson?.how_it_works?.length > 400)) problems.push(`${slug}: ${x.concept} has no full lesson`);
+      if ((c?.resources ?? []).length < 2) problems.push(`${slug}: ${x.concept} has fewer than 2 references`);
+      if (!(x.explain_back.rubric.length >= 2 && x.explain_back.rubric.length <= 4)) problems.push(`${slug}: ${x.concept} rubric size`);
+    }
+    for (const m of data.milestones) for (const st of m.steps) {
+      for (const c of st.concepts) if (!map.has(c)) problems.push(`${slug}: step ${st.title} uses ${c}, not on the map`);
+      if (!st.outcome || !st.build) problems.push(`${slug}: step ${st.title} needs a build and an outcome`);
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('the worked examples, wc and the web server, load with the expected shape', async () => {
+  for (const slug of ['challenge-wc', 'challenge-webserver']) {
+    const d = projectOf(content, slug);
+    const q = async (sql) => (await base.db.query(sql, [slug])).rows[0];
+    const ch = await q(`select content_format, done_when, reference_tool, open_checks, primer -> 'words' -> 0 ->> 'term' as word from challenge where slug = $1`);
+    assert.equal(ch.content_format, 3);
+    assert.ok(ch.done_when.length > 20, `${slug} done_when`);
+    assert.equal(ch.word, d.project.primer.words[0].term);
+    assert.deepEqual(ch.open_checks, (d.project.open_checks ?? []).map((x) => x.trim()));
+    const map = await q(`select count(*)::int as n, min(position) as first from project_concept pc join challenge c on c.id = pc.challenge_id where c.slug = $1`);
+    assert.deepEqual([map.n, map.first], [d.learning_map.length, 1]);
+    const steps = await q(`select count(*)::int as n, count(*) filter (where s.outcome is not null)::int as with_outcome
+      from step s join milestone m on m.id = s.milestone_id join challenge c on c.id = m.challenge_id where c.slug = $1`);
+    const n = d.milestones.flatMap((m) => m.steps).length;
+    assert.deepEqual([steps.n, steps.with_outcome], [n, n]);
+    const links = await q(`select count(*)::int as n from step_concept sc join step s on s.id = sc.step_id join milestone m on m.id = s.milestone_id
+      join challenge c on c.id = m.challenge_id where c.slug = $1`);
+    assert.equal(links.n, d.milestones.flatMap((m) => m.steps).reduce((a, st) => a + st.concepts.length, 0));
+    const mc = await q(`select count(*)::int as n from milestone_concept mc join milestone m on m.id = mc.milestone_id join challenge c on c.id = m.challenge_id where c.slug = $1`);
+    assert.equal(mc.n, d.milestones.reduce((a, m) => a + new Set(m.steps.flatMap((st) => st.concepts)).size, 0), 'milestone concepts are the union of their steps');
+  }
+  const opened = (await base.db.query(`select count(*)::int as n from resource where opened`)).rows[0].n;
+  assert.ok(opened > 0, 'opened references are marked');
+});
+
+test('validation catches broken content, with a message that says where and what', () => {
+  const cases = [
+    [(c) => delete web(c).project.primer, /primer is required/],
+    [(c) => (web(c).project.primer.words = []), /1 to 6 terms/],
+    [(c) => (web(c).project.primer.example = 'Run `curl localhost`.'), /primer.example contains a backtick/],
+    [(c) => (web(c).project.figure = { kind: 'spiral' }), /figure.kind must be one of/],
+    [(c) => (web(c).milestones[0].steps[0].hints.hint = 'Try count = len(files) first.'), /hints.hint contains/],
+    [(c) => (web(c).learning_map[0].explain_back.rubric[1].id = web(c).learning_map[0].explain_back.rubric[0].id), /must be unique/],
+    [(c) => (web(c).milestones[0].steps[0].minutes = 90), /minutes must be a whole number from 5 to 60/],
+    [(c) => (web(c).milestones[0].steps[0].concepts = []), /concepts needs 1 to 3 slugs/],
+    [(c) => (web(c).learning_map = web(c).learning_map.slice(0, 2)), /learning_map needs 3 to 12 concepts/],
+    [(c) => (web(c).milestones[0].teach_back = { prompt: 'x' }), /explain-backs live on the learning map/],
+    [(c) => (web(c).project.open_checks = ['a', 'b', 'c', 'd', 'e', 'f', 'g']), /0 to 6 lines/],
+    [(c) => (concept(c, web(c).learning_map[0].concept).superseded_by = 'text-encoding-utf8'), /superseded by/],
+  ];
+  for (const [mutate, expected] of cases) assert.match(errorsFor(mutate), expected, String(mutate));
+});
+
+test('imported content drives the web server through the v3 rules: outcomes build it, explain-backs make it understood', async () => {
+  const r = await checkContent({ ...content, projects: content.projects.filter((p) => p.data.project.slug === 'challenge-webserver') });
+  const { db } = r;
+  const app = recipes(db);
+  const rows = async (sql, params) => (await db.query(sql, params)).rows;
+  const l = (await rows(`insert into learner (display_name) values ('Ada') returning id`))[0].id;
+  const e = await app.enroll(l, 'challenge-webserver', { language: 'java' });
+  const [m1] = await rows(`select m.id from milestone m join challenge c on c.id = m.challenge_id where c.slug = 'challenge-webserver' and m.position = 1`);
+  const steps = await rows(`select id from step where milestone_id = $1 order by position`, [m1.id]);
+  for (const st of steps) await app.outcomeMet(l, e, st.id);
+  let [p] = await rows(`select * from v_milestone_progress where enrollment_id = $1 and milestone_id = $2`, [e, m1.id]);
+  assert.deepEqual([p.built, p.understood], [true, false]);
+  const applied = await rows(`select count(*)::int as n from concept_state where learner_id = $1 and applied_at is not null`, [l]);
+  assert.ok(applied[0].n > 0, 'concepts used by done steps are applied');
+
+  const pcs = await rows(
+    `select pc.id, pc.explain_rubric from project_concept pc join milestone_concept mc on mc.concept_id = pc.concept_id
+      where mc.milestone_id = $1 and pc.challenge_id = (select challenge_id from milestone where id = $1)`, [m1.id]
   );
-  assert.deepEqual(rows.map((x) => x.est_minutes), [30, 60, 60]);
-  assert.equal(rows[0].figure_kind, 'pages');
-  assert.equal(rows[0].first_word, 'Markdown');
-  await r.db.close();
+  const body = 'A socket is accepted, the bytes are read until the request ends, and the server writes a response back.';
+  for (const pc of pcs) {
+    const rubric = typeof pc.explain_rubric === 'string' ? JSON.parse(pc.explain_rubric) : pc.explain_rubric;
+    const bad = rubric.map((x) => ({ id: x.id, met: true, quote: 'words that are not in the answer' }));
+    await assert.rejects(() => app.explainBack(l, e, pc.id, body, { points: bad }), /quote/, 'grading integrity applies to explain-backs');
+    const good = rubric.map((x) => ({ id: x.id, met: true, quote: 'the server writes a response back' }));
+    assert.equal((await app.explainBack(l, e, pc.id, body, { points: good, model: 'test' })).grade, 'met');
+  }
+  [p] = await rows(`select * from v_milestone_progress where enrollment_id = $1 and milestone_id = $2`, [e, m1.id]);
+  assert.deepEqual([p.built, p.understood], [true, true]);
+  const explained = await rows(`select count(*)::int as n from concept_state where learner_id = $1 and explained_at is not null`, [l]);
+  assert.equal(explained[0].n, pcs.length);
+
+  await assert.rejects(() => db.exec(r.sql), /frozen/, 'a project with learners keeps its curriculum');
+  await db.exec('rollback');
+  await db.close();
 });
 
 test('the area list in the importer matches the database', async () => {
@@ -91,145 +165,28 @@ test('code signs are caught in words meant for a learner, and ordinary prose pas
   }
 });
 
-test('validation catches broken content, with a message that says where and what', () => {
+test('content v3: validation enforces the learning map, outcomes and concept tags', () => {
   const cases = [
-    [(c) => delete milestone(c).teach_back, /teach_back is required/],
-    [(c) => (milestone(c).gate = []), /gate was replaced by teach_back/],
-    [(c) => teachBack(c).rubric.splice(2), /3 to 4 points/],
-    [(c) => (teachBack(c).rubric = [1, 2, 3, 4, 5].map((n) => ({ id: `t${n}`, concept: 'untrusted-paths', point: 'x' }))), /3 to 4 points/],
-    [(c) => (teachBack(c).rubric[1].id = 't1'), /must be unique/],
-    [(c) => delete teachBack(c).rubric[0].concept, /point t1 needs a concept/],
-    [(c) => (teachBack(c).rubric[0].concept = 'markup-to-html'), /tagged markup-to-html, which is not in the milestone's concepts/],
-    [(c) => (teachBack(c).rubric[0].concept = 'untrusted-paths'), /no point is tagged site-directory-layout/],
-    [(c) => milestone(c).concepts.push('no-such-concept'), /unknown concept no-such-concept/],
-    [(c) => delete project(c).project.primer, /primer is required/],
-    [(c) => delete project(c).project.primer.why, /primer.why is required/],
-    [(c) => (project(c).project.primer.words = []), /1 to 6 terms/],
-    [(c) => (project(c).project.primer.example = 'Run `init mysite`.'), /primer.example contains a backtick/],
-    [(c) => (project(c).project.figure = { kind: 'spiral' }), /figure.kind must be one of/],
-    [(c) => (step(c).hints.hint = 'Try count = len(files) first.'), /hints.hint contains/],
-    [(c) => (step(c).hints.example = 'if name == "x" then stop'), /hints.example contains a code operator/],
-    [(c) => (c.catalogue.concepts.find((x) => x.language_notes).language_notes[0].body = 'Call `Path.of("a")`.'), /java note contains/],
-    [(c) => delete step(c).think.key.derivation, /derivation is required/],
-    [(c) => (step(c).think.key.match = 'regex'), /key.match must be one of/],
-    [(c) => (step(c).think.key.expected = 'three'), /number_exact needs a number/],
-    [(c) => (step(c, 0, 1).think.key = { match: 'number_exact', expected: 1, derivation: 'x' }), /graded by rubric, so it has no key/],
-    [(c) => delete step(c, 0, 1).think.snippet, /needs a snippet/],
-    [(c) => (step(c).minutes = 90), /minutes must be a whole number from 5 to 60/],
-    [(c) => delete step(c).hints.hint, /hints.hint is required/],
-    [(c) => (project(c).project.status = 'reviewed'), /reviewed_by and reviewed_on/],
-    [(c) => (project(c).project.source_url = 'https://example.com/x'), /source_url must be/],
-    [(c) => (c.catalogue.concepts[0].area = 'security'), /area must be one of/],
-    [(c) => (c.catalogue.concepts[1].prerequisites = ['nope']), /unknown concept nope/],
-    [(c) => (c.catalogue.concepts.find((x) => x.kind === 'foundation').language = 'java'), /no language or framework|foundation/],
-  ];
-  for (const [mutate, expected] of cases) {
-    assert.match(errorsFor(mutate), expected, String(mutate));
-  }
-  assert.equal(errorsFor((c) => delete step(c).hints.example), '', 'the example hint is optional');
-});
-
-// Numbers as a learner might dictate them, up to 9999.
-const SMALL = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
-  'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
-const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
-const inWords = (n) => {
-  if (n < 20) return SMALL[n];
-  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? `-${SMALL[n % 10]}` : '');
-  if (n < 1000) return `${SMALL[Math.floor(n / 100)]} hundred${n % 100 ? ` and ${inWords(n % 100)}` : ''}`;
-  return `${inWords(Math.floor(n / 1000))} thousand${n % 1000 ? ` and ${inWords(n % 1000)}` : ''}`;
-};
-const spaced = (s) => s.toUpperCase().replace(/([,/])/g, ' $1 ');
-
-test('every key accepts natural correct answers and rejects an obvious guess list', () => {
-  const failures = [];
-  for (const k of base.keys) {
-    const context = `${k.prompt}\n${k.snippet ?? ''}`;
-    const restated = `Going by the question, which mentions ${numbersIn(context).map((n) => n.value).join(', ') || 'no numbers'}, `;
-    const expected = [].concat(k.expected);
-    let right;
-    let wrong;
-    if (k.match === 'text_ci') {
-      right = [`It is ${spaced(k.expected)}.`, `"${k.expected}"`];
-      wrong = [`${k.expected} or something else entirely`, 'I am not sure'];
-    } else if (k.match === 'number_exact') {
-      right = [`I think it is ${k.expected}.`, `I think it is ${inWords(k.expected)}.`, `${restated}my answer is ${k.expected}.`];
-      const top = Math.max(30, k.expected + 3);
-      wrong = [Array.from({ length: top + 1 }, (_, i) => i).join(', '), `${k.expected} or ${k.expected + 1}`];
-    } else {
-      right = [
-        `First ${expected.join(', then ')}.`,
-        `First ${expected.map(inWords).join(', then ')}.`,
-        `${restated}my answers are ${expected.join(' and ')}.`,
-      ];
-      const top = Math.max(30, ...expected) + 3;
-      wrong = [Array.from({ length: top + 1 }, (_, i) => i).join(' ')];
-      if (expected.length > 1 && new Set(expected).size === expected.length) wrong.push(`First ${[...expected].reverse().join(', then ')}.`);
-    }
-    for (const a of right) if (!keyMatches(k, a, context)) failures.push(`${k.where}: should pass: ${a}`);
-    for (const a of wrong) if (keyMatches(k, a, context)) failures.push(`${k.where}: should fail: ${a.slice(0, 80)}`);
-  }
-  assert.deepEqual(failures, []);
-  assert.ok(base.keys.length > 100, 'every project file was read');
-});
-
-// Content v2 (concept-first): the worked example is wc.
-const wcIndex = content.projects.findIndex((p) => p.data.project.slug === 'challenge-wc');
-const wc = (c) => c.projects[wcIndex].data;
-const concept = (c, slug) => c.catalogue.concepts.find((x) => x.slug === slug);
-
-test('content v2: wc is concept-first, and every concept it uses has a full lesson', () => {
-  assert.equal(wc(content).format, 2);
-  const used = new Set(wc(content).milestones.flatMap((m) => m.concepts));
-  for (const slug of used) {
-    const l = concept(content, slug).lesson;
-    assert.ok(l?.how_it_works?.length > 400, `${slug} has a lesson`);
-    for (const field of ['examples', 'misconceptions', 'elsewhere']) assert.ok(l[field].length >= 1, `${slug} ${field}`);
-  }
-  assert.ok(wc(content).milestones.some((m) => m.concepts.length < 3), 'a v2 milestone can be one tight group of concepts');
-});
-
-test('content v2: validation enforces lessons and superseded concepts, and flags made-up-input prompts', () => {
-  const cases = [
-    [(c) => delete concept(c, 'grapheme-clusters').lesson, /concept grapheme-clusters has no lesson/],
-    [(c) => (wc(c).milestones[0].concepts.push('bytes-vs-characters')), /superseded by text-encoding-utf8/],
-    [(c) => (concept(c, 'io-buffering').lesson.examples = []), /lesson.examples needs 1 to 5 entries/],
-    [(c) => (concept(c, 'io-buffering').lesson.misconceptions[0] = 'Call `read` once.'), /lesson.misconceptions 1 contains a backtick/],
-    [(c) => (concept(c, 'bytes-vs-characters').superseded_by = 'no-such-concept'), /superseded_by names unknown concept/],
-    [(c) => (wc(c).format = 3), /format must be 1 or 2/],
-    [(c) => (milestone(c).concepts = ['site-directory-layout']), /a milestone covers 3 to 4 concepts/],
+    [(c) => delete wc(c).milestones[0].steps[0].outcome, /outcome is required/],
+    [(c) => delete wc(c).milestones[0].steps[0].build, /build is required/],
+    [(c) => wc(c).milestones[0].steps[0].concepts.push('no-such-concept'), /concept no-such-concept is not on the learning map/],
+    [(c) => (wc(c).milestones[0].steps[0].think = { kind: 'explain' }), /format 3 has no Think tasks/],
+    [(c) => (wc(c).learning_map[0].explain_back.rubric = [{ id: 'e1', point: 'x' }]), /2 to 4 points/],
+    [(c) => delete wc(c).project.done_when, /done_when is required/],
+    [(c) => wc(c).learning_map.push({ ...wc(c).learning_map[0] }), /appears twice/],
+    [(c) => (wc(c).format = 4), /format must be 1, 2 or 3/],
+    [(c) => delete concept(c, 'grapheme-clusters').lesson, /has no lesson/],
   ];
   for (const [mutate, expected] of cases) assert.match(errorsFor(mutate), expected, String(mutate));
-
-  const c = copy();
-  wc(c).milestones[0].steps[0].think.prompt = 'A file holds h, i and a newline. What does ccwc -c report?';
-  const flags = validate(c).flags.filter((f) => f.project === 'challenge-wc');
-  assert.ok(flags.some((f) => f.id === '1.1'), 'the rejected v1 style of question is flagged for a person');
 });
 
-test('content v2: lessons load into the database with a shape check', async () => {
+test('lessons load into the database with a shape check', async () => {
   const { rows } = await base.db.query(`select lesson -> 'misconceptions' ->> 0 as first from concept where slug = 'utf16-code-units'`);
   assert.match(rows[0].first, /UTF-16/);
   await assert.rejects(
     () => base.db.query(`update concept set lesson = '{"how_it_works": "x", "examples": []}' where slug = 'utf16-code-units'`),
     /check/i
   );
-});
-
-test('a key that its proof does not support fails the check, and so does a key with no proof', async () => {
-  const { keys } = validate(copy());
-  const ssgKeys = keys.filter((k) => k.project === 'challenge-ssg');
-  assert.deepEqual(await checkProofs({ keys: ssgKeys, dir: content.dir }), []);
-
-  const wrong = structuredClone(ssgKeys);
-  wrong[0].expected = 4;
-  assert.match((await checkProofs({ keys: wrong, dir: content.dir })).join('\n'), /proof returned 3 but the key expects 4/);
-
-  const extra = [...structuredClone(ssgKeys), { ...ssgKeys[0], id: '9.9', where: 'x' }];
-  assert.match((await checkProofs({ keys: extra, dir: content.dir })).join('\n'), /no proof for step 9.9/);
-
-  const unknown = [{ ...ssgKeys[0], project: 'challenge-nothing' }];
-  assert.match((await checkProofs({ keys: unknown, dir: content.dir })).join('\n'), /challenge-nothing.mjs: missing/);
 });
 
 test('the database rejects what the validator cannot see, such as a prerequisite cycle', async () => {
@@ -247,41 +204,4 @@ test('importing the same files twice changes nothing', async () => {
   const before = JSON.stringify(await summarise(base.db));
   await base.db.exec(base.sql);
   assert.equal(JSON.stringify(await summarise(base.db)), before);
-});
-
-test('imported content drives a milestone through the write recipes, and the teach-back explains its concepts', async () => {
-  const r = await checkContent(onlyProjects(content, ['challenge-ssg']));
-  const { db } = r;
-  const app = recipes(db);
-  const learner = (await db.query(`insert into learner (display_name) values ('Ada') returning id`)).rows[0].id;
-  const e = await app.enroll(learner, 'challenge-ssg', { language: 'java' });
-  const ids = async (sql) => (await db.query(sql)).rows.map((x) => x.id);
-  const steps = await ids(
-    `select s.id from step s join milestone m on m.id = s.milestone_id
-       join challenge c on c.id = m.challenge_id and c.slug = 'challenge-ssg' where m.position = 1 order by s.position`
-  );
-  const [question] = await ids(
-    `select q.id from question q join milestone m on m.id = q.milestone_id
-       join challenge c on c.id = m.challenge_id and c.slug = 'challenge-ssg' where m.position = 1`
-  );
-
-  assert.equal(await app.thinkAnswer(learner, e, steps[0], '3 files in total'), 'met', 'a predict task graded by its key');
-  assert.equal(await app.thinkAnswer(learner, e, steps[1], 'The page name escapes the folder, and an unknown command still exits with success.'), 'met');
-  const result = await app.gateAnswer(learner, e, question,
-    'Content holds what the author writes, an unknown command exits non-zero, and the page path is checked to stay inside the folder.');
-  assert.equal(result.grade, 'met');
-  const explained = (await db.query(
-    `select c.slug from concept_state cs join concept c on c.id = cs.concept_id where cs.learner_id = $1 and cs.status = 'explained' order by 1`,
-    [learner]
-  )).rows.map((x) => x.slug);
-  assert.deepEqual(explained, ['cli-subcommands', 'site-directory-layout', 'untrusted-paths']);
-  const p = (await db.query(`select * from v_milestone_progress where enrollment_id = $1 and steps_total = 2`, [e])).rows[0];
-  assert.equal(p.understood, true);
-
-  const hints = (await db.query(`select h.level, h.language from hint h where h.step_id = $1 order by h.level`, [steps[0]])).rows;
-  assert.deepEqual(hints, [{ level: 'example', language: '' }, { level: 'hint', language: '' }]);
-
-  await assert.rejects(() => db.exec(r.sql), /frozen/);
-  await db.exec('rollback');
-  await db.close();
 });

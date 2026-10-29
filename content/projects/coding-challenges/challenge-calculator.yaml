@@ -1,0 +1,392 @@
+# Coding Challenges, Build your own calculator.
+# Source: https://codingchallenges.fyi/challenges/challenge-calculator
+# Written in our own words. The page has no level tag, so level is left empty.
+# Every predict and trace key is proven by content/proofs/challenge-calculator.mjs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-calculator
+  title: Build your own calculator
+  source_url: https://codingchallenges.fyi/challenges/challenge-calculator
+  level:
+  status: generated
+  figure:
+    kind: tokens
+  summary: >-
+    A calculator that reads an arithmetic expression as text, with plus, minus, times, divide and brackets, splits it
+    into tokens, rearranges it into postfix order with the shunting yard algorithm, and evaluates it with a stack,
+    respecting precedence and reporting invalid input.
+  requirements:
+    - Read an expression such as 2 * 3 + 4 and print its value
+    - Read numbers with several digits as one number, and reject characters that are not part of an expression
+    - Apply times and divide before plus and minus, work equal operators from left to right, and honour brackets
+    - Decide between whole-number and floating-point results, and print whole results without a decimal part
+    - Convert the expression to postfix order with the shunting yard algorithm and evaluate it with a stack
+    - Report invalid input, such as unmatched brackets or a missing number, instead of crashing
+    - Keep an automated set of tests that runs on every change
+  restate_rubric:
+    - id: r1
+      point: "The calculator takes an arithmetic expression as text and prints its value"
+    - id: r2
+      point: "It respects precedence and brackets, so times and divide happen before plus and minus unless brackets say otherwise"
+    - id: r3
+      point: "It turns the expression into tokens, converts it to postfix order and evaluates that with a stack"
+  reflection_prompt: >-
+    In your own words, how does your calculator decide the order of operations, and what would you change to add a
+    power operator or functions such as sin?
+  primer:
+    what: >-
+      A calculator program takes an expression written as text, a few numbers joined by plus, minus, times and divide
+      signs, perhaps with brackets, and prints its value. The hard part is not the arithmetic but the order: times
+      and divide happen before plus and minus, and brackets override both. You will build one that splits the text
+      into tokens, rearranges them so the order is explicit, and evaluates the result with a stack.
+    why: >-
+      The same three steps, reading tokens, sorting out the order of operators and evaluating with a stack, sit at
+      the heart of every interpreter and compiler. A calculator is the smallest program that needs all three.
+    example: >-
+      Take 7 minus 2 times 3. The tokens are 7, minus, 2, times and 3. Times binds tighter than minus, so 2 times 3
+      is worked out first, giving 6, and 7 minus 6 gives 1. Working strictly from left to right would give 15,
+      which is wrong.
+    words:
+      - term: token
+        meaning: One meaningful piece of the expression, such as a whole number or an operator sign.
+      - term: precedence
+        meaning: The rule for which operator is applied first. Times and divide come before plus and minus.
+      - term: associativity
+        meaning: The rule for which of two operators with the same precedence, such as two minus signs in a row, is applied first.
+      - term: postfix notation
+        meaning: Writing each operator after the two numbers it works on, so 2 plus 3 becomes 2, 3, plus. It needs no brackets.
+      - term: stack
+        meaning: A pile where you only add to the top or take from the top.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Tokens and a first expression
+    summary: Split the input into tokens, get the expression past the shell, and decide how division works.
+    concepts: [lexical-analysis, cli-subcommands, floating-point-numbers]
+    steps:
+      - title: Split into tokens
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            The expression 10+25 is typed with no spaces at all. How many tokens should your tokenizer produce?
+            Answer with one number.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              Digits that follow each other make one number, so 10 is one token and 25 is another, and the plus sign
+              is a third. Spaces only separate tokens and are not needed here. That gives 3. Proof script output: 3.
+        build:
+          prompt: >-
+            Read the later steps first, since they will shape your design, as the page advises. Then write tests
+            before the code: 2 * 3 should become the tokens 2, times and 3, and the calculator should print 6 for
+            it. Write a tokenizer that skips spaces and reads a number with several digits, such as 22, as one token.
+        hints:
+          hint: A token is one meaningful piece. Is the 1 in 10 a piece on its own?
+          example: In a date written as 12 slash 05, the 1 and the 2 together form one number, the day.
+
+      - title: Get the star past the shell
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            You type calc 2 * 3 in bash, without quotes, in a folder holding exactly three ordinary files whose names
+            do not start with a dot. How many arguments does your program receive, not counting its own name? Answer
+            with one number.
+          key:
+            match: number_exact
+            expected: 5
+            derivation: >-
+              Before the program starts, bash replaces an unquoted lone star with the names of the files in the
+              folder. The program receives 2, the three file names and 3, so 1 + 3 + 1 = 5. Running set -- 2 * 3
+              in a folder of three files in Git Bash also gives 5 arguments. Proof script output: 5.
+        build:
+          prompt: >-
+            Take the expression as one quoted argument, as the page shows with calc and 2 * 3 in single quotes, and
+            print the result on standard output. If the program receives more than one argument, or an argument it
+            cannot read, print a clear message on the error stream and exit with a non-zero status.
+        hints:
+          hint: Before your program starts, the shell looks at each word you typed. What does it do with a lone star?
+          example: >-
+            Ordering a pizza with everything lets the kitchen expand that word into every topping it has. Asking for
+            a topping literally called everything would need quotes around the word.
+
+      - title: Whole numbers and fractions
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            Your first version stores numbers as integers, where dividing one integer by another drops the remainder.
+            It works through 7 / 2 * 2 from left to right. What does it print? Answer with one number.
+          key:
+            match: number_exact
+            expected: 6
+            derivation: >-
+              7 divided by 2 is 3 with the remainder dropped, and 3 times 2 is 6. With floating-point numbers the
+              division would give 3.5 and the answer would be 7, so the choice of number type changes the result.
+              Python's whole-number division gives the same 6. Proof script output: 6.
+        build:
+          prompt: >-
+            Decide how your calculator divides, since the page asks you to handle the difference between integer and
+            floating-point results: keep whole numbers and say so, or use floating-point numbers and print 2 rather
+            than 2.0 when a result is whole. Decide what dividing by zero prints, and add tests for each decision.
+        hints:
+          hint: Do the division first and write down exactly what an integer can hold after it.
+          example: >-
+            Sharing 9 sweets between 4 children gives each child 2 whole sweets, and the one left over is lost if you
+            only write down the shares.
+
+      - title: A tokenizer that misses things
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This tokenizer passes the test for 2 * 3 but gives wrong answers or silent nonsense on other input. Find
+            the two problems and say how to fix each.
+          snippet: |-
+            tokens = []
+            for ch in text:
+                if is_digit(ch):
+                    tokens.append(number(ch))
+                elif ch in "+-*/()":
+                    tokens.append(ch)
+            return tokens
+          rubric:
+            - id: p1
+              point: "Each digit becomes its own number, so 22 turns into two numbers, 2 and 2. It should keep reading while digits follow and build one number from them"
+            - id: p2
+              point: "Any other character, such as a letter, a dollar sign or a decimal point, is silently skipped, so bad input gives a wrong answer. It should be reported as invalid input"
+        build:
+          prompt: >-
+            Make the tokenizer reject any character it does not recognise with a message saying where it was found,
+            and read decimal numbers such as 2.5 if you chose floating point. Check that 1 + 22 tokenizes into three
+            tokens.
+        hints:
+          hint: Feed it 22 and then 2 dollar 3, and write down the tokens it returns.
+          example: >-
+            A cashier who rings up a 25 note as a 2 and a 5 gets the total badly wrong, and one who ignores a foreign
+            coin should have handed it back instead.
+    teach_back:
+      prompt: >-
+        Explain how your calculator gets from what the user types to a list of numbers and operators, what kind of
+        number a division gives, and what happens with bad input.
+      rubric:
+        - id: t1
+          concept: lexical-analysis
+          point: "The tokenizer reads characters and groups digits that follow each other into one number token, so 22 is one number, and it skips spaces"
+        - id: t2
+          concept: floating-point-numbers
+          point: "Integer division drops the remainder while floating-point division keeps the fraction, so the calculator chooses one and prints a whole result such as 2 without a decimal part"
+        - id: t3
+          concept: cli-subcommands
+          point: "The expression is passed as one quoted argument so the shell does not expand the star, and bad input gives a message on the error stream and a non-zero exit status"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Precedence and the shunting yard
+    summary: Apply operators in the right order by converting the expression to postfix, brackets included.
+    concepts: [operator-precedence, shunting-yard, bracket-matching]
+    steps:
+      - title: Equal operators
+        minutes: 15
+        think:
+          kind: predict
+          prompt: What should your calculator print for 8 / 4 / 2? Answer with one number.
+          key:
+            match: number_exact
+            expected: 1
+            derivation: >-
+              Division groups from the left, so 8 / 4 is worked out first, giving 2, and 2 / 2 gives 1. Grouping from
+              the right would give 8 / 2, which is 4, and is wrong. Python gives 1.0. Proof script output: 1.
+        build:
+          prompt: >-
+            Support expressions that mix operators. 1 + 1 * 5 should give 6, 2 * 3 + 4 should give 10, and the
+            page's longer example 1 + 22 - 12 * 33 / 2 should give -175. Add a test where a run of minus signs or a
+            run of divide signs must be worked from the left.
+        hints:
+          hint: When two operators have the same precedence, which one does a person reading the expression meet first?
+          example: In a queue of people holding the same kind of ticket, the one who arrived first is served first.
+
+      - title: Run the shunting yard
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            Convert 1 + 2 * 3 + 4 * 5 to postfix with the shunting yard algorithm, treating plus and times as
+            left-associative. What is the largest number of operators waiting on the operator stack at any one
+            time? Answer with one number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              The first plus waits, then the first times waits above it because it binds tighter: 2 waiting. The
+              second plus moves the times and then the first plus to the output, since both have higher or equal
+              precedence, and waits alone. The second times waits above it: 2 again. At the end both leave. The most
+              at once is 2. Forgetting to move the equal plus would reach 3. Proof script output: 2.
+        build:
+          prompt: >-
+            Convert infix to postfix with the shunting yard algorithm before evaluating. Check that the page's
+            example, 1 times 2 in brackets minus 3 times 4 in brackets, becomes 1 2 * 3 4 * - in postfix, and add a
+            debug option that prints the postfix form so you can see it.
+        hints:
+          hint: When the second plus arrives, ask which waiting operators have higher or equal precedence and must leave first.
+          example: >-
+            At a single-lane bridge, a car already waiting goes before a newcomer of the same priority, and only an
+            ambulance may push in ahead.
+
+      - title: Brackets that do not match
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This shunting yard handles brackets in good input, but bad input makes it crash or give an answer instead
+            of an error. Find the two problems and say how to fix each.
+          snippet: |-
+            for token in tokens:
+                if is_number(token):
+                    output.append(token)
+                elif token == "(":
+                    ops.push(token)
+                elif token == ")":
+                    while ops.top() != "(":
+                        output.append(ops.pop())
+                    ops.pop()
+                else:
+                    while not ops.empty() and ops.top() != "(" and precedence(ops.top()) >= precedence(token):
+                        output.append(ops.pop())
+                    ops.push(token)
+            while not ops.empty():
+                output.append(ops.pop())
+          rubric:
+            - id: p1
+              point: "A closing bracket with no opening bracket before it keeps popping until the stack is empty and then fails on an empty stack. It should stop and report an unmatched closing bracket"
+            - id: p2
+              point: "An opening bracket still on the stack at the end is copied into the output as if it were an operator. It should be reported as an unclosed bracket"
+        build:
+          prompt: >-
+            Handle brackets: an opening bracket waits on the stack, and a closing bracket moves operators to the
+            output until it reaches its partner, which is then thrown away. Check that 1 plus 1 in brackets times 5
+            gives 10 and 10 / (6 - 1) gives 2, and that a bracket without a partner on either side is reported as
+            invalid input.
+        hints:
+          hint: Feed it 1 + 2 followed by a closing bracket, and then an opening bracket followed by 1 + 2, and watch the stack.
+          example: >-
+            Pairing socks from a pile: a right sock with no left sock left in the pile means one is missing, and so
+            does a left sock still waiting when the pile is empty.
+    teach_back:
+      prompt: >-
+        Explain how your calculator decides the order in which operators are applied, including brackets and runs of
+        operators with the same precedence.
+      rubric:
+        - id: t1
+          concept: operator-precedence
+          point: "Times and divide bind tighter than plus and minus, and among operators of equal precedence the leftmost is applied first"
+        - id: t2
+          concept: shunting-yard
+          point: "Numbers go straight to the output, and an incoming operator first moves every waiting operator of higher or equal precedence to the output, then waits on the stack itself"
+        - id: t3
+          concept: bracket-matching
+          point: "An opening bracket waits on the stack, its closing bracket moves everything above it to the output, and a bracket without a partner is reported as an error"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Evaluating postfix and testing
+    summary: Evaluate the postfix form with a stack, reject malformed input, and automate the tests.
+    concepts: [stack-evaluation, unit-tests-first, differential-testing]
+    steps:
+      - title: Trace the stack
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            Evaluate the postfix expression 6 2 3 * - 4 + with a stack. What is the most numbers the stack holds at
+            any one time? Answer with one number.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              6, 2 and 3 are pushed, so the stack holds 3. Times pops 3 and 2 and pushes 6, leaving 2. Minus pops 6
+              and 6 and pushes 0, leaving 1. The 4 makes 2, and plus leaves 1, the result 4. The most at once is 3.
+              Proof script output: 3.
+        build:
+          prompt: >-
+            Evaluate the postfix output with a stack: push each number, and for each operator pop two numbers, apply
+            it and push the result. Check that 1 2 * 3 4 * - gives -10, and that the whole calculator still gives 10
+            for 2 * 3 + 4 and 2 for 10 / (6 - 1).
+        hints:
+          hint: Write the stack down after every token. A number makes it taller, and an operator takes two off and puts one back.
+          example: A pile of plates is tallest at the moment the most plates are waiting before anyone takes one.
+
+      - title: Pop in the right order
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This evaluator passes the tests for plus and times but fails on others, and it never complains about
+            malformed input. Find the two problems and say how to fix each.
+          snippet: |-
+            stack = []
+            for token in postfix:
+                if is_number(token):
+                    stack.push(token)
+                else:
+                    a = stack.pop()
+                    b = stack.pop()
+                    stack.push(apply(token, a, b))   # works out a, the operator, then b
+            return stack.pop()
+          rubric:
+            - id: p1
+              point: "The first number popped is the right-hand operand, so for 8 2 minus this works out 2 minus 8. The operands should be swapped so the second number popped is on the left"
+            - id: p2
+              point: "It does not check that two numbers are on the stack before an operator, or that exactly one number is left at the end, so input such as 1 2 or a lone plus is not reported as invalid"
+        build:
+          prompt: >-
+            Report malformed expressions, such as a trailing operator or two numbers with nothing between them, as
+            invalid input, instead of crashing or printing a partial result.
+        hints:
+          hint: Try it on 8 2 minus, where the order matters, and on 1 2 with no operator at all.
+          example: >-
+            Taking two letters off the top of a pile gives you the one posted last first, so to read them in the
+            order they were sent you have to swap them.
+
+      - title: Compare with a reference
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            You compare your calculator with the bc tool on a list of expressions. For 7 / 2 your calculator prints
+            3.5 but bc prints 3. Is your calculator wrong, and what should your comparison do about it?
+          rubric:
+            - id: p1
+              point: "bc keeps zero decimal places by default, so its 3 comes from a setting, not from a mistake in either tool"
+            - id: p2
+              point: "A reference is only useful with its settings fixed, for example by giving bc a number of decimal places, or by comparing against a reference that divides the same way"
+            - id: p3
+              point: "The difference shows a design decision, whole-number or floating-point division, that should be written down as a test of its own"
+        build:
+          prompt: >-
+            Automate your tests, as the page asks: keep a list of expressions and expected results that includes every
+            example from the earlier steps, run it on every change, and add a check that compares your calculator with
+            a reference, such as bc with its decimal places set or your language's own expression evaluator, on many
+            generated expressions.
+        hints:
+          hint: Before blaming either tool, ask what each one was told to do with the fraction.
+          example: >-
+            Two kitchen scales show different weights for the same bag because one rounds to the nearest kilogram.
+            Neither is broken, but you must set them the same way before comparing.
+    teach_back:
+      prompt: >-
+        Explain how your calculator evaluates the postfix form, and how your tests let you rewrite the parser between
+        steps without breaking results that already worked.
+      rubric:
+        - id: t1
+          concept: stack-evaluation
+          point: "Each number is pushed, each operator pops two numbers and pushes its result, the second number popped is the left operand, and one number is left at the end"
+        - id: t2
+          concept: unit-tests-first
+          point: "Tests written before the code fix the expected results, such as 2 times 3 plus 4 giving 10, and they stay in place so the rewrite to the shunting yard is checked against them"
+        - id: t3
+          concept: differential-testing
+          point: "Comparing against a reference such as bc on many expressions finds cases the hand-written tests missed, as long as the reference's settings are fixed"

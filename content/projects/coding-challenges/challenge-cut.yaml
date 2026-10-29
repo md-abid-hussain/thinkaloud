@@ -1,0 +1,290 @@
+# Coding Challenges, Build your own cut.
+# Source: https://codingchallenges.fyi/challenges/challenge-cut
+# Written in our own words. The source page is linked, not copied.
+# Every predict and trace key is proven by content/proofs/challenge-cut.mjs and was cross-checked with GNU cut 8.32,
+# uniq 8.32 and wc in Git Bash on the same tiny inputs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-cut
+  title: Build your own cut
+  source_url: https://codingchallenges.fyi/challenges/challenge-cut
+  level: beginner
+  status: generated
+  figure:
+    kind: columns
+  summary: >-
+    A command-line tool that picks chosen columns out of tab- or comma-separated text, from a file or from a pipe,
+    and gives the same output as the Unix cut tool, so it can sit in a pipeline with uniq and wc.
+  requirements:
+    - Print the chosen fields of every line, with -f taking one field or a list such as 1,2 or "1 2"
+    - Split at a tab by default, or at the character given with -d
+    - Print the chosen fields in the order they appear in the line, joined by the delimiter
+    - Read standard input when no file name is given or the name is a single dash
+    - Reject a bad field list with a message on the error stream and a non-zero exit status
+    - Work as one step in a pipeline such as cut, then uniq, then wc
+  restate_rubric:
+    - id: r1
+      point: "The tool prints chosen fields, numbered from 1, from every line of delimited text"
+    - id: r2
+      point: "The delimiter is a tab unless -d names another character, and -f takes one field or a list"
+    - id: r3
+      point: "It reads standard input when there is no file name or the name is a dash, so it works in a pipe"
+  reflection_prompt: >-
+    In your own words, how does your cut split a line, choose its fields and handle input from a file or a pipe,
+    and what would you change to handle CSV values that contain commas inside quotes?
+  primer:
+    what: >-
+      cut is a small Unix tool that picks columns out of text. It treats each line as a record and splits it into
+      fields wherever a delimiter character appears, a tab unless you name another one. You say which fields you
+      want, and cut prints just those for every line. You will build your own version that gives the same output as
+      the real one.
+    why: >-
+      Exported spreadsheets, logs and the output of other tools are all columns of text. Pulling out one column and
+      handing it to the next tool is one of the most common jobs on a command line.
+    example: >-
+      A file has the line Ada, a tab, 36, a tab, London. Fields are counted from the left starting at 1, so field 1
+      is Ada, field 2 is 36 and field 3 is London. Asked for field 3, cut prints London and a newline, then does the
+      same for the next line of the file.
+    words:
+      - term: field
+        meaning: One value in a line, the text between two delimiters or between a delimiter and the edge of the line.
+      - term: delimiter
+        meaning: The character that separates fields, a tab by default or a comma in a CSV file.
+      - term: field list
+        meaning: The fields you ask for, either one number or several, such as 1 and 3.
+      - term: standard input
+        meaning: The stream of text a program receives when another program's output is piped into it.
+      - term: pipeline
+        meaning: A chain of tools where each one's output is the next one's input.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Fields from a line
+    summary: Split each line at a delimiter, choose fields from a list, and reject a bad command line.
+    concepts: [delimited-fields, cli-subcommands, line-endings]
+    steps:
+      - title: Print one field
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            A line holds apple, a tab, banana, a tab, cherry. What does cut -f2 print for that line?
+          key:
+            match: text_ci
+            expected: banana
+            derivation: >-
+              The tab is the default delimiter, so the line has three fields: apple, banana and cherry. Fields are
+              numbered from 1, so field 2 is banana. Proof script output: banana.
+        build:
+          prompt: >-
+            Make your cut read a tab-separated file and print field 2 of every line. For the challenge's sample.tsv,
+            -f2 should print f1, 1, 6, 11, 16 and 21, one per line.
+        hints:
+          hint: Count the fields from the left, starting at 1, not at 0.
+          example: >-
+            In a row of three seats labelled first, second and third, the second seat is the middle one.
+
+      - title: Choose the delimiter
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A line holds red, two commas in a row, then blue. cut -d, -f2 prints the second field followed by a
+            newline. How many bytes is that output line, counting the newline?
+          key:
+            match: number_exact
+            expected: 1
+            derivation: >-
+              cut splits at every comma, so the two commas in a row make three fields: red, an empty field and blue.
+              Field 2 is empty, so the output line holds only the newline, which is 1 byte. A splitter that merged the
+              two commas would wrongly print blue and a newline, 5 bytes. GNU cut piped into wc -c gives 1. Proof
+              script output: 1.
+        build:
+          prompt: >-
+            Add -d to set the delimiter, keeping tab as the default. cut -f1 -d, on fourchords.csv, cut to its first
+            five lines with head, should print Song title and then the quoted titles of 10000 Reasons, 20 Good
+            Reasons, Adore You and Africa. cut -f1 on sample.tsv should still print f0, 0, 5, 10, 15 and 20.
+        hints:
+          hint: Ask what sits between the two commas. Is it nothing, or is it a field with nothing in it?
+          example: >-
+            A form with three boxes where the middle one was left blank still has three boxes. The blank one is
+            empty, not missing.
+
+      - title: Field lists
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A line holds red,green,blue,black. You run cut -d, -f3,1 on it. Write the output line exactly as cut
+            prints it.
+          key:
+            match: text_ci
+            expected: red,blue
+            derivation: >-
+              cut treats the field list as a set of wanted fields and prints them in the order they appear in the
+              line, not the order they were typed. So -f3,1 prints field 1 then field 3, joined by one comma:
+              red,blue. GNU cut prints red,blue. Proof script output: red,blue.
+        build:
+          prompt: >-
+            Accept a field list written with commas, such as -f1,2, or with spaces inside quotes, such as -f "1 2".
+            Print the chosen fields in line order, joined by one delimiter. cut -f1,2 on sample.tsv should print f0
+            and f1, then 0 and 1, and so on to 20 and 21, separated by tabs. cut -d, -f "1 2" on fourchords.csv should
+            start with Song title,Artist. A field of 0, a list that is not numbers, or no -f at all should print a
+            message on the error stream and exit with a non-zero status, as the real cut does.
+        hints:
+          hint: Does the real cut walk through your list, or through the line?
+          example: >-
+            A teacher asked to read out the names of pupils 3 and 1 from the register still reads down the register
+            from the top, so pupil 1 comes first.
+
+      - title: Windows line endings
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A file saved on Windows holds the line x,y, ending with a carriage return and then a newline. cut -d, -f2
+            prints that line's second field followed by a newline. How many bytes is that output line?
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              cut only treats the newline as the end of the line. The carriage return is an ordinary byte to it, so it
+              stays at the end of the last field. Field 2 is y and the carriage return, then cut writes a newline: 3
+              bytes. GNU cut piped into wc -c gives 3. Proof script output: 3.
+        build:
+          prompt: >-
+            Remove only the newline from each line before splitting, and write one newline after each output line.
+            Run your cut and the real one on a file with Windows line endings and on a file whose last line has no
+            final newline, and make the outputs match byte for byte.
+        hints:
+          hint: List every byte of the line, including the two invisible ones at the end, and ask which one cut treats as the end of the line.
+          example: >-
+            If a Windows line reads 5,7 and then the carriage return, asking for field 1 gives just 5, because the
+            stray byte sits at the far end of the line, inside the last field.
+    teach_back:
+      prompt: >-
+        Explain how your cut turns one input line into one output line for a command such as cut -d, -f1,3, and what
+        it does when the command line is wrong.
+      rubric:
+        - id: t1
+          concept: delimited-fields
+          point: "It splits the line at every delimiter and numbers the fields from 1, so two delimiters in a row make an empty field"
+        - id: t2
+          concept: delimited-fields
+          point: "It prints the chosen fields in the order they appear in the line, joined by one delimiter, whatever order the list was typed in"
+        - id: t3
+          concept: line-endings
+          point: "It removes only the newline before splitting and adds one after each output line, so a carriage return stays in the last field"
+        - id: t4
+          concept: cli-subcommands
+          point: "A field of 0, a list that is not numbers or a missing -f gives a message on the error stream and a non-zero exit status"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Pipes and pipelines
+    summary: Read from standard input, stream line by line, and use cut as one step in a pipeline with uniq and wc.
+    concepts: [stdin-vs-file, streaming-constant-memory, unix-pipelines]
+    steps:
+      - title: Read from standard input
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This cut works on files but cannot be used after a pipe. Find the two problems and say how to fix them.
+          snippet: |-
+            fields, delim, names = parse_options(args)
+            if names is empty:
+                error("cut: no input file")
+                exit(1)
+            for name in names:
+                source = open_file(name)
+                for line in read_lines(source):
+                    print(select(line, fields, delim))
+          rubric:
+            - id: p1
+              point: "With no file name it stops with an error, but it should read standard input, which is what a pipe feeds it"
+            - id: p2
+              point: "A name that is a single dash is opened as a file called dash, but it should mean standard input"
+            - id: p3
+              point: "Both are fixed by choosing standard input as the source and passing it to the same line loop the files use"
+        build:
+          prompt: >-
+            When no file name is given, or the name is a single dash, read standard input. Piping the last five lines
+            of fourchords.csv into cut -d, -f "1 2" should print Young Volcanoes with Fall Out Boy, You Found Me with
+            The Fray, You'll Think Of Me with Keith Urban, You're Not Sorry with Taylor Swift and Zombie with The
+            Cranberries, and adding a dash as the file name should print exactly the same.
+        hints:
+          hint: When cut sits after a pipe, where does its text come from, and what file name does it see?
+          example: >-
+            A shop that only accepts parcels with a printed address turns away the courier who hands one over in
+            person. The parcel is the same either way; only the way it arrives differs.
+
+      - title: One line at a time
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            Your cut could be handed a 30 GB log, or the output of a program that never stops writing. Why should it
+            print each output line as soon as it has read that input line, rather than reading everything first and
+            printing at the end?
+          rubric:
+            - id: p1
+              point: "Holding only the current line keeps memory small and the same whatever the input size, so a huge file cannot run it out of memory"
+            - id: p2
+              point: "An input that never ends never reaches a printing stage at the end, so nothing would ever come out"
+            - id: p3
+              point: "Output starts at once, so the next tool in the pipe, such as head, can work, and even stop the pipeline, while cut is still reading"
+        build:
+          prompt: >-
+            Read and print one line at a time, keeping only the current line in memory. Check that cut, then head
+            with five lines, on fourchords.csv prints at once, and that a large file does not make memory grow.
+        hints:
+          hint: Think about what the end of the input means for a program that never stops writing.
+          example: >-
+            A person reading a news ticker aloud says each headline as it scrolls past. If they waited for the last
+            headline before speaking, they would never say anything.
+
+      - title: cut, uniq and wc together
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A small CSV holds four songs, and the artist column reads Toto, Toto, Queen and Toto, in that order. You
+            run cut for the artist field, pipe it into uniq, then into wc -l. What number does wc print?
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              cut prints Toto, Toto, Queen, Toto. uniq only drops a line that repeats the line just before it, so the
+              second Toto goes but the last Toto stays, because Queen sits between them: Toto, Queen, Toto. wc counts
+              3 lines, although there are only 2 different artists. Putting sort before uniq would give 2. GNU cut,
+              uniq and wc give 3, and 2 with sort. Proof script output: 3.
+        build:
+          prompt: >-
+            Run your cut in a pipeline: the artist field of fourchords.csv, comma-separated, into uniq, into wc -l.
+            It should print 155, and you can use the wc you built in the first challenge. Then put sort before uniq
+            and explain why the number changes.
+        hints:
+          hint: Write the four lines out in order and ask which pairs uniq actually compares.
+          example: >-
+            In a queue, each person only checks whether the person directly in front wears the same colour hat. Two
+            red hats with a blue hat between them never meet.
+    teach_back:
+      prompt: >-
+        In the pipeline cut, then uniq, then wc -l, explain where your cut gets its input, how much of it it holds at
+        once, and why the order of the tools changes the answer.
+      rubric:
+        - id: t1
+          concept: stdin-vs-file
+          point: "With no file name, or a dash, it reads standard input with the same line loop it uses for a file"
+        - id: t2
+          concept: streaming-constant-memory
+          point: "It reads, cuts and prints one line at a time, so memory does not grow with the input and output starts at once"
+        - id: t3
+          concept: unix-pipelines
+          point: "Each tool reads the previous one's output as lines on standard input and writes lines to standard output"
+        - id: t4
+          concept: unix-pipelines
+          point: "uniq only removes duplicates that are next to each other, so counting distinct values needs sort before uniq"

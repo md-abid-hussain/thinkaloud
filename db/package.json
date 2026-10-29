@@ -1,0 +1,15 @@
+{
+  "name": "thinkaloud-db",
+  "private": true,
+  "type": "module",
+  "description": "Schema, seeds and tests for the ThinkAloud data model",
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  }
+}

@@ -1,0 +1,661 @@
+<title>ThinkAloud Style Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Martian+Mono:wght@400;500;700&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&family=Fraunces:opsz,wght@9..144,400;9..144,700&family=Atkinson+Hyperlegible:wght@400;700&family=VT323&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&family=JetBrains+Mono:wght@400;500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column of three full-width direction plates; each plate = specimen | live figure, stacking under 920px. */
+:root {
+  --page-bg: #F1F2F0; --page-fg: #17191B; --page-muted: #555B60; --page-rule: #C9CED2; --page-chip: #FFFFFF;
+
+  --a-bg: #EDEFF1; --a-surface: #FFFFFF; --a-ink: #15191D; --a-muted: #525A63; --a-rule-soft: #C5CBD1;
+  --a-wave: #C9801A;
+  --a-accent: #8F4F00; --a-fill: #F5B95A; --a-on-fill: #2A1700; --a-soft: #FBE9CF; --a-hl: #FFE2A8; --a-hl-ink: #3D2600;
+  --a-new: #8A929B; --a-seen: #2F6DB5; --a-expl: #1F7A4D; --a-appl: #7A4BC2;
+
+  --b-bg: #F6F7F7; --b-surface: #FFFFFF; --b-ink: #0E1116; --b-muted: #4E5661; --b-rule-soft: #CBD0D6;
+  --b-accent: #00607F; --b-fill: #00607F; --b-on-fill: #FFFFFF; --b-soft: #DCEFF5; --b-hl: #CDEBF4; --b-hl-ink: #003647;
+  --b-new: #8A929B; --b-seen: #2F6DB5; --b-expl: #1F7A4D; --b-appl: #7A4BC2;
+
+  --c-bg: #F8FAF7; --c-surface: #FFFFFF; --c-ink: #12201A; --c-muted: #4D5E56; --c-rule-soft: #CFDCD4; --c-grid: #E1EAE4;
+  --c-accent: #1D5C44; --c-fill: #1D5C44; --c-on-fill: #FFFFFF; --c-soft: #DDEFE6; --c-hl: #FFE45E; --c-hl-ink: #2E2600;
+  --c-new: #8A929B; --c-seen: #2F6DB5; --c-expl: #1F7A4D; --c-appl: #7A4BC2;
+
+  --d-bg: #FAFAF5; --d-surface: #F3F1E8; --d-ink: #1A1A1A; --d-muted: #4A4A4A; --d-rule-soft: #D6D4CA; --d-dot: #E2E1D8;
+  --d-accent: #3553FF; --d-fill: #3553FF; --d-on-fill: #FFFFFF; --d-soft: #E6EAFF; --d-hl: #DDE3FF; --d-hl-ink: #14248F;
+  --d-new: #B8B6AD; --d-seen: #4A4A4A; --d-expl: #3553FF; --d-appl: #B8870F;
+
+  --e-bg: #FFFFEB; --e-surface: #FFFDF9; --e-ink: #1A1A1A; --e-muted: #66665F; --e-rule-soft: #E4E4D0;
+  --e-accent: #034F46; --e-fill: #F0D7FF; --e-on-fill: #1A1A1A; --e-soft: #EDEDD7; --e-hl: #FFDCA8; --e-hl-ink: #3A2300;
+  --e-teal: #034F46; --e-on-teal: #FFFFEB; --e-on-teal-muted: #CFE3DD; --e-glow: #FFA946; --e-flare: #FF6C4C; --e-fig: #034F46; --e-on-fig: #FFFFEB;
+  --e-new: #A39D8E; --e-seen: #0052B4; --e-expl: #034F46; --e-appl: #7F1C34;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --t-press: 160ms; --t-enter: 240ms;
+  --f-mono-page: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --f-body-page: "Literata", Georgia, "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page-bg: #101214; --page-fg: #E6E8EA; --page-muted: #9AA1A8; --page-rule: #2E3439; --page-chip: #1A1E22;
+    --a-bg: #14171B; --a-surface: #1C2026; --a-ink: #E6E9EC; --a-muted: #9BA3AC; --a-rule-soft: #343B44;
+    --a-accent: #F2B25C; --a-fill: #E89A2C; --a-on-fill: #2A1700; --a-soft: #3A2A12; --a-hl: #5A3F0E; --a-hl-ink: #FFE9C2; --a-wave: #E89A2C;
+    --a-new: #6E7781; --a-seen: #6FA6E8; --a-expl: #5CC68E; --a-appl: #B08CF0;
+    --b-bg: #0C1015; --b-surface: #131922; --b-ink: #DCE3EA; --b-muted: #8D98A5; --b-rule-soft: #2A333F;
+    --b-accent: #5CC8EA; --b-fill: #5CC8EA; --b-on-fill: #04212B; --b-soft: #0F2E3A; --b-hl: #134152; --b-hl-ink: #D6F3FC;
+    --b-new: #6E7781; --b-seen: #6FA6E8; --b-expl: #5CC68E; --b-appl: #B08CF0;
+    --c-bg: #0E1512; --c-surface: #15201B; --c-ink: #E2ECE6; --c-muted: #93A69C; --c-rule-soft: #2A3A32; --c-grid: #17231D;
+    --c-accent: #74D6AC; --c-fill: #74D6AC; --c-on-fill: #062418; --c-soft: #143426; --c-hl: #D9BE34; --c-hl-ink: #1F1900;
+    --c-new: #6E7781; --c-seen: #6FA6E8; --c-expl: #5CC68E; --c-appl: #B08CF0;
+    --d-bg: #0A0D1A; --d-surface: #131830; --d-ink: #E8E6DC; --d-muted: #A8A6A0; --d-rule-soft: #2A3150; --d-dot: #1A2040;
+    --d-accent: #6B8EFF; --d-fill: #6B8EFF; --d-on-fill: #0A0D1A; --d-soft: #1B2244; --d-hl: #22306A; --d-hl-ink: #DCE3FF;
+    --d-new: #6E6C68; --d-seen: #C8C6C0; --d-expl: #6B8EFF; --d-appl: #D4A83D;
+    --e-bg: #1A1A1A; --e-surface: #232321; --e-ink: #FFFFEB; --e-muted: #B5B2A6; --e-rule-soft: #3A3A35;
+    --e-accent: #FFA946; --e-fill: #F0D7FF; --e-on-fill: #1A1A1A; --e-soft: #2C2C27; --e-hl: #5C3A10; --e-hl-ink: #FFE3BD;
+    --e-teal: #034F46; --e-on-teal: #FFFFEB; --e-on-teal-muted: #CFE3DD; --e-glow: #FFA946; --e-flare: #FF7A5C; --e-fig: #5FC7B4; --e-on-fig: #062B26;
+    --e-new: #8F8A7D; --e-seen: #7FA8E8; --e-expl: #5FC7B4; --e-appl: #E58AA2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page-bg: #101214; --page-fg: #E6E8EA; --page-muted: #9AA1A8; --page-rule: #2E3439; --page-chip: #1A1E22;
+  --a-bg: #14171B; --a-surface: #1C2026; --a-ink: #E6E9EC; --a-muted: #9BA3AC; --a-rule-soft: #343B44;
+  --a-accent: #F2B25C; --a-fill: #E89A2C; --a-on-fill: #2A1700; --a-soft: #3A2A12; --a-hl: #5A3F0E; --a-hl-ink: #FFE9C2; --a-wave: #E89A2C;
+  --a-new: #6E7781; --a-seen: #6FA6E8; --a-expl: #5CC68E; --a-appl: #B08CF0;
+  --b-bg: #0C1015; --b-surface: #131922; --b-ink: #DCE3EA; --b-muted: #8D98A5; --b-rule-soft: #2A333F;
+  --b-accent: #5CC8EA; --b-fill: #5CC8EA; --b-on-fill: #04212B; --b-soft: #0F2E3A; --b-hl: #134152; --b-hl-ink: #D6F3FC;
+  --b-new: #6E7781; --b-seen: #6FA6E8; --b-expl: #5CC68E; --b-appl: #B08CF0;
+  --c-bg: #0E1512; --c-surface: #15201B; --c-ink: #E2ECE6; --c-muted: #93A69C; --c-rule-soft: #2A3A32; --c-grid: #17231D;
+  --c-accent: #74D6AC; --c-fill: #74D6AC; --c-on-fill: #062418; --c-soft: #143426; --c-hl: #D9BE34; --c-hl-ink: #1F1900;
+  --c-new: #6E7781; --c-seen: #6FA6E8; --c-expl: #5CC68E; --c-appl: #B08CF0;
+  --d-bg: #0A0D1A; --d-surface: #131830; --d-ink: #E8E6DC; --d-muted: #A8A6A0; --d-rule-soft: #2A3150; --d-dot: #1A2040;
+  --d-accent: #6B8EFF; --d-fill: #6B8EFF; --d-on-fill: #0A0D1A; --d-soft: #1B2244; --d-hl: #22306A; --d-hl-ink: #DCE3FF;
+  --d-new: #6E6C68; --d-seen: #C8C6C0; --d-expl: #6B8EFF; --d-appl: #D4A83D;
+  --e-bg: #1A1A1A; --e-surface: #232321; --e-ink: #FFFFEB; --e-muted: #B5B2A6; --e-rule-soft: #3A3A35;
+  --e-accent: #FFA946; --e-fill: #F0D7FF; --e-on-fill: #1A1A1A; --e-soft: #2C2C27; --e-hl: #5C3A10; --e-hl-ink: #FFE3BD;
+  --e-teal: #034F46; --e-on-teal: #FFFFEB; --e-on-teal-muted: #CFE3DD; --e-glow: #FFA946; --e-flare: #FF7A5C; --e-fig: #5FC7B4; --e-on-fig: #062B26;
+  --e-new: #8F8A7D; --e-seen: #7FA8E8; --e-expl: #5FC7B4; --e-appl: #E58AA2;
+  color-scheme: dark;
+}
+
+/* Each plate maps its prefixed tokens onto one shared vocabulary. */
+.dir-a { --bg: var(--a-bg); --surface: var(--a-surface); --ink: var(--a-ink); --muted: var(--a-muted); --rule-soft: var(--a-rule-soft); --accent: var(--a-accent); --fill: var(--a-fill); --on-fill: var(--a-on-fill); --soft: var(--a-soft); --hl: var(--a-hl); --hl-ink: var(--a-hl-ink); --st-new: var(--a-new); --st-seen: var(--a-seen); --st-expl: var(--a-expl); --st-appl: var(--a-appl);
+  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif; --f-body: "Newsreader", Georgia, serif; --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 6px; --bw: 1.5px; --shadow: 3px 3px 0 var(--ink); }
+.dir-b { --bg: var(--b-bg); --surface: var(--b-surface); --ink: var(--b-ink); --muted: var(--b-muted); --rule-soft: var(--b-rule-soft); --accent: var(--b-accent); --fill: var(--b-fill); --on-fill: var(--b-on-fill); --soft: var(--b-soft); --hl: var(--b-hl); --hl-ink: var(--b-hl-ink); --st-new: var(--b-new); --st-seen: var(--b-seen); --st-expl: var(--b-expl); --st-appl: var(--b-appl);
+  --f-display: "Martian Mono", ui-monospace, Consolas, monospace; --f-body: "Literata", Georgia, serif; --f-mono: "Martian Mono", ui-monospace, Consolas, monospace;
+  --radius: 0px; --bw: 2px; --shadow: 4px 4px 0 var(--ink); }
+.dir-c { --bg: var(--c-bg); --surface: var(--c-surface); --ink: var(--c-ink); --muted: var(--c-muted); --rule-soft: var(--c-rule-soft); --accent: var(--c-accent); --fill: var(--c-fill); --on-fill: var(--c-on-fill); --soft: var(--c-soft); --hl: var(--c-hl); --hl-ink: var(--c-hl-ink); --st-new: var(--c-new); --st-seen: var(--c-seen); --st-expl: var(--c-expl); --st-appl: var(--c-appl);
+  --f-display: "Fraunces", Georgia, serif; --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif; --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 4px; --bw: 1px; --shadow: none; }
+.dir-d { --bg: var(--d-bg); --surface: var(--d-surface); --ink: var(--d-ink); --muted: var(--d-muted); --rule-soft: var(--d-rule-soft); --accent: var(--d-accent); --fill: var(--d-fill); --on-fill: var(--d-on-fill); --soft: var(--d-soft); --hl: var(--d-hl); --hl-ink: var(--d-hl-ink); --st-new: var(--d-new); --st-seen: var(--d-seen); --st-expl: var(--d-expl); --st-appl: var(--d-appl);
+  --f-display: "VT323", ui-monospace, Consolas, monospace; --f-body: "Source Serif 4", Georgia, serif; --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --radius: 0px; --bw: 1px; --shadow: 3px 3px 0 var(--ink); }
+.dir-e { --bg: var(--e-bg); --surface: var(--e-surface); --ink: var(--e-ink); --muted: var(--e-muted); --rule-soft: var(--e-rule-soft); --accent: var(--e-accent); --fill: var(--e-fill); --on-fill: var(--e-on-fill); --soft: var(--e-soft); --hl: var(--e-hl); --hl-ink: var(--e-hl-ink); --st-new: var(--e-new); --st-seen: var(--e-seen); --st-expl: var(--e-expl); --st-appl: var(--e-appl);
+  --figfill: var(--e-fig); --on-figfill: var(--e-on-fig);
+  --f-display: "EB Garamond", Garamond, Georgia, serif; --f-body: "Figtree", "Segoe UI", system-ui, sans-serif; --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 10px; --bw: 1.5px; --shadow: none; }
+
+* { box-sizing: border-box; }
+body { background: var(--page-bg); color: var(--page-fg); font-family: var(--f-body-page); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
+.wrap { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+:focus-visible { outline: 2px solid var(--page-fg); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px 32px; padding-block: 36px 4px; border-bottom: 1px solid var(--page-rule); padding-bottom: 20px; }
+.top h1 { margin: 0; font-family: var(--f-body-page); font-weight: 500; font-size: clamp(1.6rem, 3.2vw, 2.2rem); line-height: 1.15; text-wrap: balance; }
+.top p { margin: 6px 0 0; color: var(--page-muted); max-width: 62ch; }
+.kicker { font-family: var(--f-mono-page); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--page-muted); margin: 0 0 8px; }
+.theme { display: inline-flex; border: 1px solid var(--page-rule); border-radius: 999px; padding: 3px; background: var(--page-chip); }
+.theme button { font: 500 13px/1 var(--f-mono-page); letter-spacing: 0.04em; color: var(--page-muted); background: transparent; border: 0; border-radius: 999px; padding: 0 14px; min-height: 36px; cursor: pointer; }
+.theme button[aria-pressed="true"] { background: var(--page-fg); color: var(--page-bg); }
+
+/* Plate */
+.plate { background: var(--bg); color: var(--ink); border: var(--bw) solid var(--ink); border-radius: calc(var(--radius) * 2); overflow: hidden; }
+.dir-c .plate, .plate.dir-c { background-image: linear-gradient(var(--c-grid) 1px, transparent 1px), linear-gradient(90deg, var(--c-grid) 1px, transparent 1px); background-size: 20px 20px; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; padding: 18px 24px; border-bottom: var(--bw) solid var(--ink); background: var(--surface); }
+.plate-head .label { font: 500 12px/1.4 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.plate-head .name { font-family: var(--f-display); font-weight: 700; font-size: 20px; }
+.plate-head .idea { flex: 1 1 380px; min-width: 0; color: var(--muted); font-family: var(--f-body); font-size: 15px; }
+.plate-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; padding: 28px 24px; }
+@media (max-width: 920px) { .plate-body { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .plate-body, .plate-head { padding-left: 16px; padding-right: 16px; } }
+.col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+.display { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(2.1rem, 5.2vw, 3.6rem); line-height: 1.02; letter-spacing: -0.02em; text-wrap: balance; }
+.dir-b .display { font-weight: 500; font-size: clamp(1.7rem, 4.2vw, 2.8rem); letter-spacing: -0.04em; line-height: 1.12; }
+.dir-c .display { font-weight: 400; font-variation-settings: "opsz" 144; letter-spacing: -0.03em; }
+.dir-c .display em { font-style: normal; background: linear-gradient(transparent 58%, var(--hl) 58%, var(--hl) 92%, transparent 92%); color: var(--ink); }
+.lede { margin: 0; font-family: var(--f-body); font-size: 18px; line-height: 1.55; max-width: 52ch; color: var(--ink); }
+.micro { font: 500 11px/1.4 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+/* Components */
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { font: 500 15px/1 var(--f-body); min-height: 44px; padding: 0 18px; border-radius: var(--radius); border: var(--bw) solid var(--ink); cursor: pointer; transition: transform var(--t-press) var(--ease-out), box-shadow var(--t-press) var(--ease-out); }
+.dir-b .btn { font: 500 13px/1 var(--f-mono); letter-spacing: 0.02em; }
+.btn-primary { background: var(--fill); color: var(--on-fill); box-shadow: var(--shadow); }
+.btn-ghost { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.dir-c .btn-primary { border-color: var(--fill); }
+.btn:active { transform: translate(2px, 2px); box-shadow: none; }
+.chip { font: 500 12px/1 var(--f-mono); padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--rule-soft); background: var(--surface); display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
+.chip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+.card { background: var(--surface); border: var(--bw) solid var(--ink); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+.dir-c .card { border-color: var(--rule-soft); }
+.answer { margin: 0; font-family: var(--f-body); font-size: 17px; line-height: 1.65; }
+mark.ev { background: var(--hl); color: var(--hl-ink); padding: 0 3px; border-radius: 2px; }
+.dir-c mark.ev { background: linear-gradient(100deg, transparent 0 2px, var(--hl) 2px calc(100% - 3px), transparent calc(100% - 3px)); padding: 1px 4px; }
+.met { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink); }
+.met svg { flex: none; margin-top: 3px; }
+.mentor { font-family: var(--f-body); font-style: italic; font-size: 17px; line-height: 1.6; margin: 0; }
+.dir-c .mentor { font-style: normal; }
+.trace { font: 400 12px/1.7 var(--f-mono); color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+
+/* A: transcript */
+.tx { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 14px; }
+.tx .ts { font: 500 12px/1.9 var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tx .who { font: 500 11px/1.4 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin: 0 0 4px; }
+.tx .turn { padding-bottom: 14px; border-bottom: 1px dashed var(--rule-soft); }
+.tx .turn:last-child { border-bottom: 0; padding-bottom: 0; }
+.wave { display: flex; align-items: center; gap: 2px; height: 28px; margin: 2px 0 8px; }
+.wave span { width: 3px; border-radius: 2px; background: var(--fill); transform-origin: center; }
+.dir-a .wave span { background: var(--a-wave); }
+@media (prefers-reduced-motion: no-preference) { .wave.live span { animation: wave 900ms ease-in-out 4; } }
+@keyframes wave { 50% { transform: scaleY(0.35); } }
+
+/* B: manual page */
+.manbar { display: flex; justify-content: space-between; gap: 12px; font: 500 12px/1 var(--f-mono); letter-spacing: 0.04em; padding: 10px 0; border-block: var(--bw) solid var(--ink); }
+.manbar span:nth-child(2) { color: var(--muted); }
+.man h3 { margin: 0 0 6px; font: 700 13px/1.3 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.man p { margin: 0 0 4px; padding-left: 24px; font-family: var(--f-body); }
+.man code { font: 400 14px/1.6 var(--f-mono); background: var(--soft); padding: 2px 6px; }
+.man section + section { margin-top: 14px; }
+
+/* C: notebook */
+.margin { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 14px; }
+.margin .note { font: 400 12px/1.45 var(--f-mono); color: var(--accent); border-right: 1px solid var(--accent); padding-right: 10px; text-align: right; }
+
+/* D: blueprint (close take on the reference) */
+.plate.dir-d { background-image: radial-gradient(var(--d-dot) 1px, transparent 1.2px); background-size: 16px 16px; }
+.dir-d .display { font-weight: 400; text-transform: uppercase; color: var(--accent); font-size: clamp(2.6rem, 7vw, 5rem); line-height: 0.92; letter-spacing: 0.01em; }
+.dir-d .plate-head .name { font-weight: 400; font-size: 28px; text-transform: uppercase; letter-spacing: 0.02em; }
+.dir-d .fig-title { font-weight: 400; font-size: 26px; text-transform: uppercase; }
+.dir-d .btn { font: 500 13px/1 var(--f-mono); letter-spacing: 0.04em; }
+.dir-d .btn-ghost { background: transparent; }
+.figno { font: 500 12px/1.4 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.figno b { color: var(--accent); font-weight: 500; }
+.dropcap::first-letter { font-family: "VT323", ui-monospace, monospace; float: left; font-size: 3.4em; line-height: 0.8; padding: 4px 8px 0 0; color: var(--accent); }
+
+/* E: Transcript in Wispr Flow colours */
+.dir-e .plate-head { background: var(--e-teal); color: var(--e-on-teal); border-bottom-color: var(--e-teal); }
+.dir-e .plate-head .label { color: var(--e-glow); }
+.dir-e .plate-head .idea { color: var(--e-on-teal-muted); }
+.dir-e .plate-head .name { font-family: "EB Garamond", Georgia, serif; font-weight: 500; font-size: 26px; }
+.pick { font: 600 12px/1 "Figtree", system-ui, sans-serif; letter-spacing: 0.02em; padding: 6px 10px; border-radius: 999px; background: var(--e-fill); color: var(--e-on-fill); }
+.pick-a { font: 500 12px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; background: var(--fill); color: var(--on-fill); border: var(--bw) solid var(--ink); border-radius: var(--radius); }
+.pick-ref { font: 500 12px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 4px; }
+.dir-e .display { font-weight: 400; font-size: clamp(2.6rem, 6.4vw, 4.6rem); line-height: 0.98; letter-spacing: -0.03em; }
+.dir-e .display em { font-style: italic; }
+.dir-e .lede { font-weight: 500; font-size: 18px; }
+.dir-e .answer { font-family: "EB Garamond", Georgia, serif; font-size: 20px; line-height: 1.5; }
+.dir-e .btn { font: 600 15px/1 var(--f-body); }
+.dir-e .btn-primary { border-color: var(--ink); }
+.dir-e .wave span { background: var(--e-flare); }
+.dir-e .tx .who.voice { color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.dir-e .tx .who.voice::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--e-flare); }
+.mentor-panel { background: var(--e-teal); color: var(--e-on-teal); border-radius: 10px; padding: 14px 16px; }
+.mentor-panel .who { color: var(--e-glow) !important; }
+.mentor-panel .mentor { font-family: "EB Garamond", Georgia, serif; font-style: normal; font-size: 20px; line-height: 1.45; }
+.mentor-panel .trace { color: var(--e-on-teal-muted); }
+.ratio { display: flex; flex-direction: column; gap: 8px; }
+.ratio-bar { display: flex; height: 28px; border: var(--bw) solid var(--ink); border-radius: 8px; overflow: hidden; }
+.ratio-bar span { height: 100%; }
+.ratio-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font: 400 12px/1.5 var(--f-mono); color: var(--muted); }
+.ratio-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--rule-soft); }
+.ratio p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+
+/* Swatches */
+.swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0 24px 26px; }
+@media (max-width: 640px) { .swatches { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .swatches { padding: 0 16px 20px; } }
+.sw-group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sw-row.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sw-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: var(--bw) solid var(--ink); border-radius: var(--radius); overflow: hidden; }
+.sw { min-height: 64px; padding: 8px; display: flex; flex-direction: column; justify-content: flex-end; font: 400 11px/1.3 var(--f-mono); }
+.sw b { font-weight: 500; display: block; }
+
+/* Figure */
+.fig { background: var(--surface); border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
+.fig-title { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 20px; line-height: 1.2; }
+.dir-b .fig-title { font-weight: 500; font-size: 16px; }
+.dir-c .fig-title { font-weight: 400; font-size: 24px; }
+.seg { display: inline-flex; border: var(--bw) solid var(--ink); border-radius: var(--radius); overflow: hidden; }
+.seg button { font: 500 12px/1 var(--f-mono); background: var(--surface); color: var(--ink); border: 0; min-height: 40px; padding: 0 12px; cursor: pointer; }
+.seg button + button { border-left: var(--bw) solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ctl .btn { min-height: 40px; font-size: 13px; padding: 0 14px; }
+
+.filebar-wrap { display: flex; flex-direction: column; gap: 6px; }
+.filebar { display: flex; height: 40px; border: var(--bw) solid var(--ink); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+.filebar .chunk { height: 100%; border-right: var(--bw) solid var(--ink); background: var(--bg); display: flex; align-items: center; justify-content: center; font: 500 11px/1 var(--f-mono); color: var(--muted); transition: background-color var(--t-enter) var(--ease-out), color var(--t-enter) var(--ease-out); min-width: 0; overflow: hidden; white-space: nowrap; }
+.filebar .chunk:last-child { border-right: 0; }
+.filebar .chunk.done { background: var(--soft); color: var(--ink); }
+.filebar .chunk.now { background: var(--figfill, var(--fill)); color: var(--on-figfill, var(--on-fill)); }
+.scale { display: flex; justify-content: space-between; font: 400 11px/1 var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.pipe { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; }
+.box { border: var(--bw) solid var(--ink); border-radius: var(--radius); padding: 10px 12px; background: var(--bg); min-width: 0; }
+.box .k { font: 500 11px/1.3 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.box .v { font: 500 20px/1.3 var(--f-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dir-b .box .v { font-size: 17px; }
+.meter { height: 10px; border: 1px solid var(--ink); border-radius: 2px; margin-top: 8px; overflow: hidden; background: var(--surface); }
+.meter i { display: block; height: 100%; background: var(--figfill, var(--fill)); width: 0; transition: width 520ms var(--ease-out); }
+.arrow { font: 500 18px/1 var(--f-mono); color: var(--accent); }
+.log { list-style: none; margin: 0; padding: 0; font: 400 13px/1.9 var(--f-mono); font-variant-numeric: tabular-nums; border-top: 1px dashed var(--rule-soft); padding-top: 8px; }
+.log li { display: flex; justify-content: space-between; gap: 12px; }
+.log li.eof { color: var(--accent); font-weight: 500; }
+@media (prefers-reduced-motion: no-preference) { .log li.fresh { animation: rise var(--t-enter) var(--ease-out); } }
+@keyframes rise { from { opacity: 0.2; transform: translateY(4px); } }
+.cap { margin: 0; font-family: var(--f-body); font-size: 15px; color: var(--muted); }
+.cap strong { color: var(--ink); font-weight: 500; }
+
+.foot { color: var(--page-muted); font-size: 15px; max-width: 70ch; }
+.foot h2 { font-family: var(--f-body-page); font-weight: 500; color: var(--page-fg); font-size: 20px; margin: 0 0 8px; }
+.foot ul { margin: 0; padding-left: 20px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="kicker">ThinkAloud · visual identity · round 3</p>
+      <h1>Transcript is the direction</h1>
+      <p>A is chosen, with a lighter meter amber in light mode. B and C stay as alternatives. D and E copy other brands, so they're kept for reference only and won't be used.</p>
+    </div>
+    <div class="theme" role="group" aria-label="Theme">
+      <button type="button" id="th-system" data-t="system" aria-pressed="true">System</button>
+      <button type="button" id="th-light" data-t="light" aria-pressed="false">Light</button>
+      <button type="button" id="th-dark" data-t="dark" aria-pressed="false">Dark</button>
+    </div>
+  </header>
+
+  <!-- A -->
+  <article class="plate dir-a" aria-labelledby="a-name">
+    <div class="plate-head">
+      <span class="label">Direction A</span>
+      <span class="name" id="a-name">Transcript</span>
+      <span class="pick pick-a">Chosen</span>
+      <span class="idea">Your spoken reasoning is the hero. Drawn from interview transcripts and studio meters: timestamps, speaker labels, a waveform where you talk.</span>
+    </div>
+    <div class="plate-body">
+      <div class="col">
+        <h2 class="display">Build it yourself. Explain it out loud.</h2>
+        <p class="lede">Pick a coding challenge. Talk through each idea in your own words, and get help only when you ask for it.</p>
+        <div class="card tx" aria-label="Sample step as a transcript">
+          <span class="ts">00:00</span>
+          <div class="turn"><p class="who">Prompt</p><p class="answer">A 20,000-byte file is read with an 8,192-byte buffer. How many reads return data, and why?</p></div>
+          <span class="ts">00:14</span>
+          <div class="turn">
+            <p class="who">You · dictated</p>
+            <div class="wave live" id="a-wave" aria-hidden="true"></div>
+            <p class="answer">The buffer fills twice, then <mark class="ev">the third read only gives back the 3,616 that are left</mark>. <mark class="ev">The same buffer is reused each time</mark>, so memory stays flat.</p>
+          </div>
+          <span class="ts">00:31</span>
+          <div class="turn"><p class="who">Mentor</p><p class="mentor">Your counts are right. Once nothing is left, what does the next read hand back?</p><p class="trace">read brief → ran key check → asked grader: 2 of 3 points</p></div>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn-primary">Check my answer</button>
+          <button type="button" class="btn btn-ghost">I'm not sure</button>
+        </div>
+        <div class="row" aria-label="Concept states">
+          <span class="chip"><i style="background: var(--st-new)"></i>new</span>
+          <span class="chip"><i style="background: var(--st-seen)"></i>seen</span>
+          <span class="chip"><i style="background: var(--st-expl)"></i>explained</span>
+          <span class="chip"><i style="background: var(--st-appl)"></i>applied</span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="fig" data-fig data-title="Take 01 · inside wc" data-sub="one buffer, many reads"></div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="sw-group"><p class="micro">Light</p><div class="sw-row">
+        <div class="sw" style="background:#EDEFF1;color:#15191D"><b>Ground</b>#EDEFF1</div>
+        <div class="sw" style="background:#15191D;color:#EDEFF1"><b>Ink</b>#15191D</div>
+        <div class="sw" style="background:#F5B95A;color:#2A1700"><b>Meter amber</b>#F5B95A</div>
+        <div class="sw" style="background:#FFE2A8;color:#3D2600"><b>Evidence</b>#FFE2A8</div>
+      </div></div>
+      <div class="sw-group"><p class="micro">Dark</p><div class="sw-row">
+        <div class="sw" style="background:#14171B;color:#E6E9EC"><b>Ground</b>#14171B</div>
+        <div class="sw" style="background:#E6E9EC;color:#14171B"><b>Ink</b>#E6E9EC</div>
+        <div class="sw" style="background:#F2B25C;color:#2A1700"><b>Meter amber</b>#F2B25C</div>
+        <div class="sw" style="background:#5A3F0E;color:#FFE9C2"><b>Evidence</b>#5A3F0E</div>
+      </div></div>
+    </div>
+  </article>
+
+  <!-- B -->
+  <article class="plate dir-b" aria-labelledby="b-name">
+    <div class="plate-head">
+      <span class="label">Direction B</span>
+      <span class="name" id="b-name">Manual page</span>
+      <span class="idea">Every project reads like a well-kept manual for the tool you're building. Drawn from Unix man pages and workshop drawings: section heads, synopsis lines, numbered figures.</span>
+    </div>
+    <div class="plate-body">
+      <div class="col">
+        <div class="manbar" aria-hidden="true"><span>WC(1)</span><span>ThinkAloud manual</span><span>WC(1)</span></div>
+        <h2 class="display">Build it yourself. Explain it out loud.</h2>
+        <div class="card man">
+          <section><h3>Name</h3><p>wc · count lines, words, bytes and characters</p></section>
+          <section><h3>Synopsis</h3><p><code>wc [-c] [-l] [-w] [-m] [file ...]</code></p></section>
+          <section><h3>Step 1 · Predict</h3><p>A 20,000-byte file is read with an 8,192-byte buffer. How many reads return data, and why?</p></section>
+          <section><h3>Your answer</h3><p class="answer">The buffer fills twice, then <mark class="ev">the third read only gives back the 3,616 that are left</mark>. <mark class="ev">The same buffer is reused each time</mark>, so memory stays flat.</p></section>
+          <section><h3>Mentor</h3><p class="mentor">Your counts are right. Once nothing is left, what does the next read hand back?</p><p class="trace">read brief → ran key check → asked grader: 2 of 3 points</p></section>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn-primary">Check my answer</button>
+          <button type="button" class="btn btn-ghost">I'm not sure</button>
+        </div>
+        <div class="row" aria-label="Concept states">
+          <span class="chip"><i style="background: var(--st-new)"></i>new</span>
+          <span class="chip"><i style="background: var(--st-seen)"></i>seen</span>
+          <span class="chip"><i style="background: var(--st-expl)"></i>explained</span>
+          <span class="chip"><i style="background: var(--st-appl)"></i>applied</span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="fig" data-fig data-title="Fig. 1 · wc(1) read loop" data-sub="buffered input, constant memory"></div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="sw-group"><p class="micro">Light</p><div class="sw-row">
+        <div class="sw" style="background:#F6F7F7;color:#0E1116"><b>Paper</b>#F6F7F7</div>
+        <div class="sw" style="background:#0E1116;color:#F6F7F7"><b>Ink</b>#0E1116</div>
+        <div class="sw" style="background:#00607F;color:#FFFFFF"><b>Cyan ink</b>#00607F</div>
+        <div class="sw" style="background:#CDEBF4;color:#003647"><b>Evidence</b>#CDEBF4</div>
+      </div></div>
+      <div class="sw-group"><p class="micro">Dark</p><div class="sw-row">
+        <div class="sw" style="background:#0C1015;color:#DCE3EA"><b>Paper</b>#0C1015</div>
+        <div class="sw" style="background:#DCE3EA;color:#0C1015"><b>Ink</b>#DCE3EA</div>
+        <div class="sw" style="background:#5CC8EA;color:#04212B"><b>Cyan ink</b>#5CC8EA</div>
+        <div class="sw" style="background:#134152;color:#D6F3FC"><b>Evidence</b>#134152</div>
+      </div></div>
+    </div>
+  </article>
+
+  <!-- C -->
+  <article class="plate dir-c" aria-labelledby="c-name">
+    <div class="plate-head">
+      <span class="label">Direction C</span>
+      <span class="name" id="c-name">Lab notebook</span>
+      <span class="idea">Learning shown as a marked-up notebook page. Drawn from graph paper, margin notes and an examiner's highlighter: the grader's evidence is literally highlighted in your words.</span>
+    </div>
+    <div class="plate-body">
+      <div class="col">
+        <h2 class="display">Build it yourself. Explain it <em>out loud</em>.</h2>
+        <p class="lede">Pick a coding challenge. Talk through each idea in your own words, and get help only when you ask for it.</p>
+        <div class="card">
+          <div class="margin">
+            <span class="note">Step 1<br>predict</span>
+            <p class="answer" style="font-size:16px">A 20,000-byte file is read with an 8,192-byte buffer. How many reads return data, and why?</p>
+            <span class="note">your words</span>
+            <p class="answer">The buffer fills twice, then <mark class="ev">the third read only gives back the 3,616 that are left</mark>. <mark class="ev">The same buffer is reused each time</mark>, so memory stays flat.</p>
+            <span class="note">graded</span>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="met"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Counts match the key: 8,192 + 8,192 + 3,616</div>
+              <div class="met"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Buffer reused, memory flat</div>
+              <div class="met" style="color:var(--muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>Not yet: how the loop knows it's finished</div>
+            </div>
+            <span class="note">mentor</span>
+            <div><p class="mentor">Your counts are right. Once nothing is left, what does the next read hand back?</p><p class="trace">read brief → ran key check → asked grader: 2 of 3 points</p></div>
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn-primary">Check my answer</button>
+          <button type="button" class="btn btn-ghost">I'm not sure</button>
+        </div>
+        <div class="row" aria-label="Concept states">
+          <span class="chip"><i style="background: var(--st-new)"></i>new</span>
+          <span class="chip"><i style="background: var(--st-seen)"></i>seen</span>
+          <span class="chip"><i style="background: var(--st-expl)"></i>explained</span>
+          <span class="chip"><i style="background: var(--st-appl)"></i>applied</span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="fig" data-fig data-title="Fig. 1 · one buffer, many reads" data-sub="what wc does with a big file"></div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="sw-group"><p class="micro">Light</p><div class="sw-row">
+        <div class="sw" style="background:#F8FAF7;color:#12201A"><b>Graph paper</b>#F8FAF7</div>
+        <div class="sw" style="background:#12201A;color:#F8FAF7"><b>Ink</b>#12201A</div>
+        <div class="sw" style="background:#1D5C44;color:#FFFFFF"><b>Pen green</b>#1D5C44</div>
+        <div class="sw" style="background:#FFE45E;color:#2E2600"><b>Highlighter</b>#FFE45E</div>
+      </div></div>
+      <div class="sw-group"><p class="micro">Dark</p><div class="sw-row">
+        <div class="sw" style="background:#0E1512;color:#E2ECE6"><b>Graph paper</b>#0E1512</div>
+        <div class="sw" style="background:#E2ECE6;color:#0E1512"><b>Ink</b>#E2ECE6</div>
+        <div class="sw" style="background:#74D6AC;color:#062418"><b>Pen green</b>#74D6AC</div>
+        <div class="sw" style="background:#D9BE34;color:#1F1900"><b>Highlighter</b>#D9BE34</div>
+      </div></div>
+    </div>
+  </article>
+
+  <!-- D -->
+  <article class="plate dir-d" aria-labelledby="d-name">
+    <div class="plate-head">
+      <span class="label">Direction D</span>
+      <span class="name" id="d-name">Blueprint</span>
+      <span class="pick pick-ref">Reference only</span>
+      <span class="idea">A close take on AI Engineering from Scratch, kept only for comparison. It copies another site's identity, so it won't be used.</span>
+    </div>
+    <div class="plate-body">
+      <div class="col">
+        <p class="figno"><b>FIG_000</b> · wc · milestone 1 · step 01</p>
+        <h2 class="display">Build it yourself. Explain it out loud.</h2>
+        <p class="lede dropcap">Pick a coding challenge. Talk through each idea in your own words, and get help only when you ask for it. Your code stays yours.</p>
+        <div class="card">
+          <p class="figno" style="margin-bottom:10px"><b>STEP_01</b> · predict</p>
+          <p class="answer" style="margin-bottom:14px">A 20,000-byte file is read with an 8,192-byte buffer. How many reads return data, and why?</p>
+          <p class="figno" style="margin-bottom:6px">Your answer · dictated</p>
+          <p class="answer" style="margin-bottom:14px">The buffer fills twice, then <mark class="ev">the third read only gives back the 3,616 that are left</mark>. <mark class="ev">The same buffer is reused each time</mark>, so memory stays flat.</p>
+          <p class="figno" style="margin-bottom:6px">Mentor</p>
+          <p class="mentor">Your counts are right. Once nothing is left, what does the next read hand back?</p>
+          <p class="trace">read brief → ran key check → asked grader: 2 of 3 points</p>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn-primary">Check my answer</button>
+          <button type="button" class="btn btn-ghost">I'm not sure</button>
+        </div>
+        <div class="row" aria-label="Concept states">
+          <span class="chip"><i style="background: var(--st-new)"></i>new</span>
+          <span class="chip"><i style="background: var(--st-seen)"></i>seen</span>
+          <span class="chip"><i style="background: var(--st-expl)"></i>explained</span>
+          <span class="chip"><i style="background: var(--st-appl)"></i>applied</span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="fig" data-fig data-title="Inside wc" data-sub="FIG_WC · interactive simulation"></div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="sw-group"><p class="micro">Light</p><div class="sw-row">
+        <div class="sw" style="background:#FAFAF5;color:#1A1A1A"><b>Paper</b>#FAFAF5</div>
+        <div class="sw" style="background:#1A1A1A;color:#FAFAF5"><b>Ink</b>#1A1A1A</div>
+        <div class="sw" style="background:#3553FF;color:#FFFFFF"><b>Blueprint</b>#3553FF</div>
+        <div class="sw" style="background:#DDE3FF;color:#14248F"><b>Evidence</b>#DDE3FF</div>
+      </div></div>
+      <div class="sw-group"><p class="micro">Dark</p><div class="sw-row">
+        <div class="sw" style="background:#0A0D1A;color:#E8E6DC"><b>Paper</b>#0A0D1A</div>
+        <div class="sw" style="background:#E8E6DC;color:#0A0D1A"><b>Ink</b>#E8E6DC</div>
+        <div class="sw" style="background:#6B8EFF;color:#0A0D1A"><b>Blueprint</b>#6B8EFF</div>
+        <div class="sw" style="background:#22306A;color:#DCE3FF"><b>Evidence</b>#22306A</div>
+      </div></div>
+    </div>
+  </article>
+
+  <!-- E -->
+  <article class="plate dir-e" aria-labelledby="e-name">
+    <div class="plate-head">
+      <span class="label">Direction E</span>
+      <span class="name" id="e-name">Transcript in Wispr colours</span>
+      <span class="pick pick-ref">Reference only</span>
+      <span class="idea">Direction A in Wispr Flow's own palette and type, kept only for comparison. It copies another company's brand, so it won't be used.</span>
+    </div>
+    <div class="plate-body">
+      <div class="col">
+        <h2 class="display">Build it yourself. <em>Explain it out loud.</em></h2>
+        <p class="lede">Pick a coding challenge. Talk through each idea in your own words, and get help only when you ask for it.</p>
+        <div class="card tx" aria-label="Sample step as a transcript">
+          <span class="ts">00:00</span>
+          <div class="turn"><p class="who">Prompt</p><p class="answer">A 20,000-byte file is read with an 8,192-byte buffer. How many reads return data, and why?</p></div>
+          <span class="ts">00:14</span>
+          <div class="turn">
+            <p class="who voice">You · dictated</p>
+            <div class="wave live" id="e-wave" aria-hidden="true"></div>
+            <p class="answer">The buffer fills twice, then <mark class="ev">the third read only gives back the 3,616 that are left</mark>. <mark class="ev">The same buffer is reused each time</mark>, so memory stays flat.</p>
+          </div>
+          <span class="ts">00:31</span>
+          <div class="turn"><div class="mentor-panel"><p class="who">Mentor</p><p class="mentor">Your counts are right. Once nothing is left, what does the next read hand back?</p><p class="trace">read brief → ran key check → asked grader: 2 of 3 points</p></div></div>
+        </div>
+        <div class="row">
+          <button type="button" class="btn btn-primary">Check my answer</button>
+          <button type="button" class="btn btn-ghost">I'm not sure</button>
+        </div>
+        <div class="row" aria-label="Concept states">
+          <span class="chip"><i style="background: var(--st-new)"></i>new</span>
+          <span class="chip"><i style="background: var(--st-seen)"></i>seen</span>
+          <span class="chip"><i style="background: var(--st-expl)"></i>explained</span>
+          <span class="chip"><i style="background: var(--st-appl)"></i>applied</span>
+        </div>
+        <div class="ratio">
+          <p class="micro">How the colours share the screen</p>
+          <div class="ratio-bar" aria-hidden="true">
+            <span style="width:60%;background:var(--e-bg)"></span>
+            <span style="width:16%;background:var(--e-ink)"></span>
+            <span style="width:14%;background:var(--e-teal)"></span>
+            <span style="width:4%;background:var(--e-fill)"></span>
+            <span style="width:3%;background:var(--e-glow)"></span>
+            <span style="width:3%;background:var(--e-flare)"></span>
+          </div>
+          <div class="ratio-key">
+            <span><i style="background:var(--e-bg)"></i>60% Lumen ground</span>
+            <span><i style="background:var(--e-ink)"></i><i style="background:var(--e-teal)"></i>30% ink and Fathom teal</span>
+            <span><i style="background:var(--e-fill)"></i>Dawn: actions</span>
+            <span><i style="background:var(--e-glow)"></i>Glow: evidence</span>
+            <span><i style="background:var(--e-flare)"></i>Flare: your voice</span>
+          </div>
+          <p>Each accent has one job, so they never compete. Teal and coral sit almost opposite on the colour wheel, so they never touch the same element. Dawn lilac is a pale tint, so it only fills controls, always with dark text.</p>
+        </div>
+      </div>
+      <div class="col">
+        <div class="fig" data-fig data-title="Inside wc" data-sub="one buffer, many reads"></div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="sw-group"><p class="micro">Light</p><div class="sw-row six">
+        <div class="sw" style="background:#FFFFEB;color:#1A1A1A"><b>Lumen</b>#FFFFEB</div>
+        <div class="sw" style="background:#1A1A1A;color:#FFFFEB"><b>Vast</b>#1A1A1A</div>
+        <div class="sw" style="background:#034F46;color:#FFFFEB"><b>Fathom</b>#034F46</div>
+        <div class="sw" style="background:#F0D7FF;color:#1A1A1A"><b>Dawn</b>#F0D7FF</div>
+        <div class="sw" style="background:#FFDCA8;color:#3A2300"><b>Glow tint</b>#FFDCA8</div>
+        <div class="sw" style="background:#FF6C4C;color:#1A1A1A"><b>Flare</b>#FF6C4C</div>
+      </div></div>
+      <div class="sw-group"><p class="micro">Dark</p><div class="sw-row six">
+        <div class="sw" style="background:#1A1A1A;color:#FFFFEB"><b>Vast</b>#1A1A1A</div>
+        <div class="sw" style="background:#FFFFEB;color:#1A1A1A"><b>Lumen</b>#FFFFEB</div>
+        <div class="sw" style="background:#034F46;color:#FFFFEB"><b>Fathom</b>#034F46</div>
+        <div class="sw" style="background:#F0D7FF;color:#1A1A1A"><b>Dawn</b>#F0D7FF</div>
+        <div class="sw" style="background:#5C3A10;color:#FFE3BD"><b>Glow deep</b>#5C3A10</div>
+        <div class="sw" style="background:#FF7A5C;color:#1A1A1A"><b>Flare</b>#FF7A5C</div>
+      </div></div>
+    </div>
+  </article>
+
+  <section class="foot" aria-labelledby="craft">
+    <h2 id="craft">What all five keep from the reference</h2>
+    <ul>
+      <li>Labels that say something true: a timestamp, a man-page section or a margin note, never decoration.</li>
+      <li>A reading voice for your words and the mentor's, separate from the interface.</li>
+      <li>Hard edges, one accent, and a second theme designed rather than inverted.</li>
+      <li>A figure that explains the project and that you can break: switch the buffer to 4 KB and watch the read count change.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('.theme button');
+  function setTheme(t) {
+    if (t === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.t === t)); });
+    try { localStorage.setItem('ta-theme', t); } catch (e) {}
+  }
+  btns.forEach(function (b) { b.addEventListener('click', function () { setTheme(b.dataset.t); }); });
+  try { var saved = localStorage.getItem('ta-theme'); if (saved) setTheme(saved); } catch (e) {}
+
+  var h = [6,10,16,22,14,8,12,20,26,18,10,6,9,15,24,28,20,12,7,11,18,22,16,9,6,10,14,20,24,17,10,7,12,19,23,15,9,6,8,13];
+  ['a-wave', 'e-wave'].forEach(function (id) {
+    var wave = document.getElementById(id);
+    if (!wave) return;
+    h.forEach(function (v, i) { var s = document.createElement('span'); s.style.height = v + 'px'; s.style.animationDelay = (i * 30) + 'ms'; wave.appendChild(s); });
+  });
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var TOTAL = 20000;
+  var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+  function reads(buf) { var out = [], left = TOTAL; while (left > 0) { var r = Math.min(buf, left); out.push(r); left -= r; } out.push(0); return out; }
+
+  document.querySelectorAll('[data-fig]').forEach(function (fig, idx) {
+    var st = { buf: 8192, step: -1, timer: null };
+    fig.innerHTML =
+      '<div class="fig-head"><div><p class="micro">' + fig.dataset.sub + '</p><h3 class="fig-title">' + fig.dataset.title + '</h3></div>' +
+      '<div class="seg" role="group" aria-label="Buffer size"><button type="button" id="buf8-' + idx + '" data-b="8192" aria-pressed="true">8 KB buffer</button><button type="button" id="buf4-' + idx + '" data-b="4096" aria-pressed="false">4 KB buffer</button></div></div>' +
+      '<div class="filebar-wrap"><p class="micro">File · 20,000 bytes</p><div class="filebar" data-bar></div><div class="scale"><span>0</span><span>10,000</span><span>20,000</span></div></div>' +
+      '<div class="pipe"><div class="box"><div class="k">This read</div><div class="v" data-now>-</div><div class="meter" aria-hidden="true"><i data-meter></i></div></div><span class="arrow" aria-hidden="true">→</span><div class="box"><div class="k">Counted so far</div><div class="v" data-sum>0</div></div></div>' +
+      '<ol class="log" data-log aria-live="polite"></ol>' +
+      '<div class="ctl"><button type="button" class="btn btn-primary" data-play>Play</button><button type="button" class="btn btn-ghost" data-step>Step</button><button type="button" class="btn btn-ghost" data-reset>Reset</button></div>' +
+      '<p class="cap" data-cap></p>';
+
+    var bar = fig.querySelector('[data-bar]'), log = fig.querySelector('[data-log]'), nowEl = fig.querySelector('[data-now]'), sumEl = fig.querySelector('[data-sum]'), meter = fig.querySelector('[data-meter]'), cap = fig.querySelector('[data-cap]');
+
+    function draw(fresh) {
+      var rs = reads(st.buf), data = rs.slice(0, -1);
+      bar.innerHTML = data.map(function (r, i) {
+        var cls = i < st.step ? 'done' : (i === st.step ? 'now' : '');
+        return '<div class="chunk ' + cls + '" style="width:' + (r / TOTAL * 100) + '%">' + (r / TOTAL > 0.12 ? fmt(r) : '') + '</div>';
+      }).join('');
+      var shown = Math.min(st.step, rs.length - 1), sum = 0, items = [];
+      for (var i = 0; i <= shown; i++) {
+        sum += rs[i];
+        var eof = rs[i] === 0;
+        items.push('<li class="' + (eof ? 'eof ' : '') + (fresh && i === shown ? 'fresh' : '') + '"><span>read ' + (i + 1) + '</span><span>' + (eof ? '0 bytes · end of file, loop stops' : fmt(rs[i]) + ' bytes') + '</span></li>');
+      }
+      log.innerHTML = items.join('');
+      var cur = shown >= 0 ? rs[shown] : null;
+      nowEl.textContent = cur === null ? '-' : fmt(cur) + ' B';
+      meter.style.width = cur === null ? '0%' : (cur / st.buf * 100) + '%';
+      sumEl.textContent = fmt(sum) + ' B';
+      var done = shown === rs.length - 1;
+      cap.innerHTML = done
+        ? '<strong>' + (rs.length - 1) + ' reads return data, then one returns 0.</strong> Memory used stays at one ' + (st.buf / 1024) + ' KB buffer, whatever the file size.'
+        : 'Press Play or Step to send the file through the buffer.';
+      fig.querySelectorAll('.seg button').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.b === st.buf)); });
+    }
+    function stop() { if (st.timer) { clearInterval(st.timer); st.timer = null; } }
+    function step() { var n = reads(st.buf).length; if (st.step < n - 1) { st.step++; draw(true); } else stop(); }
+    function play() { stop(); st.step = -1; draw(false); if (reduce) { st.step = reads(st.buf).length - 1; draw(false); return; } st.timer = setInterval(step, 850); step(); }
+
+    fig.querySelector('[data-play]').addEventListener('click', play);
+    fig.querySelector('[data-step]').addEventListener('click', function () { stop(); step(); });
+    fig.querySelector('[data-reset]').addEventListener('click', function () { stop(); st.step = -1; draw(false); });
+    fig.querySelectorAll('.seg button').forEach(function (b) { b.addEventListener('click', function () { stop(); st.buf = +b.dataset.b; st.step = reads(st.buf).length - 1; draw(false); }); });
+
+    st.step = reads(st.buf).length - 1;
+    draw(false);
+  });
+})();
+</script>

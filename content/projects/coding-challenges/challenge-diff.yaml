@@ -1,0 +1,393 @@
+# Coding Challenges, Build your own diff.
+# Source: https://codingchallenges.fyi/challenges/challenge-diff
+# Written in our own words. The source page is linked, not copied.
+# Every predict and trace key is proven by content/proofs/challenge-diff.mjs and was cross-checked with GNU diff 3.12
+# and grep in Git Bash on the same tiny inputs (diff compares bytes, so the locale does not change these results).
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-diff
+  title: Build your own diff
+  source_url: https://codingchallenges.fyi/challenges/challenge-diff
+  level: intermediate
+  status: generated
+  figure:
+    kind: diff
+  summary: >-
+    A command-line tool that compares two text files and prints the lines to remove and the lines to add to turn the
+    first into the second, built on a longest common subsequence function written test first.
+  requirements:
+    - Write unit tests before the code they test, starting with the cases on the challenge page
+    - Find the longest common subsequence of two strings, then of two lists of lines
+    - Turn two lists of lines into a list of differences, with removed lines marked by a less-than sign and added lines by a greater-than sign
+    - Provide a ccdiff command that takes two file paths and prints their differences, and prints nothing for identical files
+    - Consider how the approach copes with very large files
+  restate_rubric:
+    - id: r1
+      point: "The tool compares two files and prints what to remove and what to add to turn the first into the second"
+    - id: r2
+      point: "It is built on the longest common subsequence of the two files' lines, which is the part that stays the same"
+    - id: r3
+      point: "Removed lines are marked with a less-than sign and added lines with a greater-than sign, and the tests are written before the code"
+  reflection_prompt: >-
+    In your own words, how does your design find what changed between two files, how did writing tests first shape it,
+    and what would you change for files with millions of lines?
+  primer:
+    what: >-
+      diff compares two text files and lists the changes that turn the first into the second. If the files are the
+      same it prints nothing. The heart of it is finding the longest run of lines that both files share in the same
+      order; every line outside that shared part was either removed from the old file or added in the new one. You
+      will build that function first for strings, then for lines, then wrap it in a ccdiff command.
+    why: >-
+      Every code review, version control system and patch relies on diffs. Building one teaches a classic use of
+      dynamic programming, and how a careful table turns an impossible search into a quick one.
+    example: >-
+      An old shopping list says milk, eggs, bread. The new one says milk, butter, bread. Both share milk then bread,
+      in that order, and nothing longer. So eggs was removed and is printed after a less-than sign, and butter was
+      added and is printed after a greater-than sign. Milk and bread are not printed at all.
+    words:
+      - term: subsequence
+        meaning: Items taken from a sequence in their original order, possibly skipping some. ACE is a subsequence of ABCDE, but CA is not.
+      - term: longest common subsequence
+        meaning: The longest subsequence that two sequences both contain. For two files it is the lines that stay the same.
+      - term: dynamic programming
+        meaning: Solving a big problem by solving each smaller overlapping part once, storing the answers in a table and building on them.
+      - term: edit script
+        meaning: The list of removals and additions that turns one version of a text into another.
+      - term: unit test
+        meaning: A small automatic check that one function gives the expected answer for one input.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Longest common subsequence of strings
+    summary: Write the tests first, then find the longest common subsequence of two strings with a table.
+    concepts: [longest-common-subsequence, dynamic-programming, unit-tests-first]
+    steps:
+      - title: What a common subsequence is
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            Take the words SPRING and STRING. How long is their longest common subsequence? Answer with one number.
+          key:
+            match: number_exact
+            expected: 5
+            derivation: >-
+              The words differ only in the second letter, P against T. Skipping that letter in each leaves S, R, I, N,
+              G in both, in the same order, and no common subsequence can be 6 long because the words are not equal.
+              GNU diff on the two words written one letter per line marks only one letter removed. Proof script
+              output: 5.
+        build:
+          prompt: >-
+            Set up a unit testing library and write tests before any code. Start with the page's cases: ABCDEF with
+            ABCDEF gives ABCDEF, ABC with XYZ gives an empty string, AABCXY with XYZ gives XY, two empty strings give an
+            empty string, and ABCD with AC gives AC. Run them and watch them fail.
+        hints:
+          hint: Line the two words up letter by letter and find the one place they disagree.
+          example: >-
+            HOUSE and MOUSE differ only in the first letter, so they share O, U, S, E, a common subsequence 4 letters
+            long.
+
+      - title: Fill the table
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            Take ABCD and ACBD. More than one common subsequence may tie for the longest, so give only its length. How
+            long is the longest common subsequence? Answer with one number.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              A, then B or C, then D appears in both: ABD and ACD both work. All four letters cannot work, because B
+              comes before C in the first string and after it in the second. So the length is 3, reached by two
+              different subsequences. GNU diff, one letter per line, marks one letter removed out of four. Proof
+              script output: 3.
+        build:
+          prompt: >-
+            Build a table with one row per prefix of the first string and one column per prefix of the second. Each
+            cell holds the length for those two prefixes: one more than the cell up and to the left when the letters
+            match, otherwise the larger of the cell above and the cell to the left.
+        hints:
+          hint: B and C swap places between the two strings. Can a subsequence keep both of them?
+          example: >-
+            Two friends rank the same films. If one ranks Jaws above Alien and the other ranks Alien above Jaws, any
+            ranking they both agree with can include only one of those two films.
+
+      - title: Recursion without a table
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: This first attempt at the longest common subsequence has two problems. Find them.
+          snippet: |-
+            lcs(a, b):
+                if a is empty or b is empty:
+                    return ""
+                if first(a) == first(b):
+                    return first(a) + lcs(rest(a), rest(b))
+                return lcs(rest(a), b)
+          rubric:
+            - id: p1
+              point: "When the first letters differ it only drops a letter from a, so it misses answers that need a letter dropped from b; for B against AB it returns empty instead of B"
+            - id: p2
+              point: "The fix is to try both, dropping the first letter of a and dropping the first letter of b, and keep the longer result"
+            - id: p3
+              point: "Once both branches are tried, the same pairs of suffixes are solved again and again, so the time grows exponentially; storing each answer in a table fixes it"
+        build:
+          prompt: >-
+            Read the subsequence itself back out of the filled table: start at the bottom-right cell and walk back,
+            taking a letter whenever the two letters match and otherwise moving towards the larger neighbour. All of
+            the page's tests should now pass.
+        hints:
+          hint: Try it on B and AB, and ask which letter should be skipped when the first letters differ.
+          example: >-
+            Looking for a friend in two queues, stepping past only the person at the front of the first queue will
+            never help if the mismatch is at the front of the second.
+
+      - title: Tests that allow ties
+        minutes: 10
+        think:
+          kind: explain
+          prompt: >-
+            A classmate's LCS function returns AC for ABC and ACB, and your test expects AB. Their code may be correct.
+            Why, and how would you write tests that do not fail correct code?
+          rubric:
+            - id: p1
+              point: "Two strings can have several longest common subsequences of the same length, here AB and AC, so expecting one exact string can reject a correct answer"
+            - id: p2
+              point: "A better test checks that the result has the right length and is a subsequence of both strings"
+            - id: p3
+              point: "Exact-string tests are still fine for cases with only one longest answer, such as the ones on the page"
+        build:
+          prompt: >-
+            Add your own edge cases: one empty string, a single letter, no letters in common, one string inside the
+            other and a case with tied answers. Think about how the time and memory grow with the lengths of the
+            strings.
+        hints:
+          hint: List every common subsequence of length two for ABC and ACB.
+          example: >-
+            Asking for the tallest person in a room and expecting one name fails when two people are exactly the same
+            height.
+    teach_back:
+      prompt: >-
+        Explain how your function finds the longest common subsequence of two strings, why it uses a table, and how
+        writing tests first shaped it.
+      rubric:
+        - id: t1
+          concept: longest-common-subsequence
+          point: "When the current letters match they extend the common subsequence, otherwise the answer is the longer of skipping a letter from one string or from the other"
+        - id: t2
+          concept: dynamic-programming
+          point: "Each table cell holds the answer for two prefixes and is computed once from its neighbours, so the work is the number of cells instead of an exponential search"
+        - id: t3
+          concept: unit-tests-first
+          point: "The tests were written before the code, from the page's cases and edge cases such as empty strings and no common letters, so they defined what correct means and failed first"
+
+  # ------------------------------------------------------------------------------------------
+  - title: From lines to an edit script
+    summary: Run the same algorithm on lists of lines, and turn the shared lines into removed and added lines.
+    concepts: [longest-common-subsequence, edit-scripts, line-endings]
+    steps:
+      - title: Removed lines
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            The old file holds apple, banana, cherry and date, one per line. The new file holds apple, cherry and egg.
+            How many lines does the diff mark as removed, with a less-than sign? Answer with one number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              The longest run of lines both files share in order is apple then cherry. Every old line outside it is
+              removed: banana and date, so 2. Egg is the one added line. GNU diff marks the same two lines with a
+              less-than sign. Proof script output: 2.
+        build:
+          prompt: >-
+            Make your LCS work on lists of lines as well as strings, comparing whole lines. Write the page's two line
+            tests first: in the short one the result is the single shared line this is the lcs, and in the paragraph
+            one it is the two shared lines about the weekly challenge and about writing a full application.
+        hints:
+          hint: Find the lines both files keep in the same order, then count which old lines are left over.
+          example: >-
+            An old guest list says Ann, Ben, Cal and a new one says Ann, Cal, Dee. Ann and Cal stay, Ben was removed
+            and Dee was added.
+
+      - title: Line endings
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            The old file holds the lines one and two, each ending in a plain newline. Someone saves the same two lines
+            on Windows, so each now ends in a carriage return and a newline. Your ccdiff splits at newlines and
+            compares the lines exactly as read. How many lines does it mark as removed? Answer with one number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              Splitting at the newline leaves the carriage return on the end of every new line, so one with a carriage
+              return is not equal to one. No line is shared, both old lines are removed and both new lines added, so
+              2. GNU diff on the same files marks 2 lines removed and 2 added. Proof script output: 2.
+        build:
+          prompt: >-
+            Decide what ccdiff should do with carriage returns and a missing final newline: report them, as the real
+            diff does by default, or offer an option to ignore them. Add a test for each case.
+        hints:
+          hint: Look at the last character of each line in the new file after it has been split.
+          example: >-
+            Two typed names that look the same can still differ if one has a space at the end that you cannot see.
+
+      - title: Write out the differences
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This routine walks the two files alongside their common lines and prints the differences. Find the two
+            problems.
+          snippet: |-
+            i = 0
+            j = 0
+            for line in common:
+                while old[i] != line:
+                    print("> " + old[i])
+                    i = i + 1
+                while new[j] != line:
+                    print("< " + new[j])
+                    j = j + 1
+                i = i + 1
+                j = j + 1
+          rubric:
+            - id: p1
+              point: "The markers are swapped: lines only in the old file are removed and need a less-than sign, lines only in the new file are added and need a greater-than sign"
+            - id: p2
+              point: "Lines after the last common line are never printed, because the loop ends with the common lines, so the rest of both files must be printed afterwards"
+            - id: p3
+              point: "A test whose files differ in their last lines, or have no lines in common, would catch the second problem"
+        build:
+          prompt: >-
+            Write a function that takes the two lists of lines and returns the differences, each removed line starting
+            with a less-than sign and each added line with a greater-than sign. Write its tests first. On the page's
+            sample it should give four lines: the old opening line removed, its new version added, then the old line
+            about using the challenges removed and its new version added.
+        hints:
+          hint: Try it on files that share only their first line, and see which lines are ever printed.
+          example: >-
+            Proofreading two drafts side by side, you have to keep reading after the last sentence they share, or you
+            miss everything added at the end.
+    teach_back:
+      prompt: >-
+        Explain how your tool turns two files into lines marked with less-than and greater-than signs, and why two lines
+        that look the same on screen can still be reported as different.
+      rubric:
+        - id: t1
+          concept: longest-common-subsequence
+          point: "The same LCS algorithm runs on lists of lines, comparing whole lines, and the lines it finds are the ones that stay the same"
+        - id: t2
+          concept: edit-scripts
+          point: "Old lines outside the common lines are printed as removed with a less-than sign, new lines outside them as added with a greater-than sign, in file order"
+        - id: t3
+          concept: line-endings
+          point: "Lines are compared byte for byte, so a carriage return, trailing space or missing final newline makes them differ unless the tool strips or reports them"
+
+  # ------------------------------------------------------------------------------------------
+  - title: The ccdiff command and large files
+    summary: Wrap the functions in a command, check it against the real diff, and see what large files cost.
+    concepts: [cli-subcommands, dynamic-programming, time-space-complexity, differential-testing]
+    steps:
+      - title: A command that fails well
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: This first version of the ccdiff command has problems. Find two of them and say how to fix them.
+          snippet: |-
+            main(args):
+                old = read_lines(args[1])
+                new = read_lines(args[2])
+                for line in differences(old, new):
+                    print(line)
+                exit(0)
+          rubric:
+            - id: p1
+              point: "It never checks that two paths were given, so a missing argument crashes instead of printing a usage message"
+            - id: p2
+              point: "A missing or unreadable file is not handled, so there is no clear message on the error stream and no non-zero exit status"
+            - id: p3
+              point: "It always exits with 0, but the real diff exits with 0 when the files are the same, 1 when they differ and 2 on trouble, which scripts rely on"
+        build:
+          prompt: >-
+            Build the ccdiff command: it takes two file paths, reads both and prints the differences using your
+            functions. Running it on the page's origcc.txt and newcc.txt should print the same four lines as before,
+            and on two identical files it should print nothing.
+        hints:
+          hint: Run it in your head with no arguments, then with a file name that does not exist.
+          example: >-
+            A ticket machine that takes your money without checking you chose a destination leaves you with no ticket
+            and no explanation.
+
+      - title: How the table grows
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            Comparing a file of n lines with a file of m lines needs a table of about n times m cells. If both files
+            become twice as long, about how many times more cells does the table need? Answer with one number.
+          key:
+            match: number_exact
+            expected: 4
+            derivation: >-
+              Twice as many rows and twice as many columns gives two times two as many cells, so 4 times as many. Time
+              grows the same way, because each cell is filled once. This is why the plain table is fine for small files
+              and hopeless for two files of a million lines each. Proof script output: 4.
+        build:
+          prompt: >-
+            Try ccdiff on two large files, such as two versions of a long book, and watch its time and memory. Then
+            think about the page's optional last step: what could make it cope with very large files?
+        hints:
+          hint: Picture the table as a rectangle and double both of its sides.
+          example: >-
+            A square garden twice as long and twice as wide needs four times as much grass seed.
+
+      - title: Trim what is shared
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            Two versions of a file have 1000 lines each and differ only in line 500, which was rewritten. Before building
+            the table, ccdiff strips the lines both files share at the start and at the end. How many lines of the old
+            file are left to go into the table? Answer with one number.
+          key:
+            match: number_exact
+            expected: 1
+            derivation: >-
+              Lines 1 to 499 match at the start and are stripped, and lines 501 to 1000 match at the end and are
+              stripped. Only line 500 is left from each file, so the table shrinks from about a million cells to one.
+              GNU diff on the same files reports a single change, 500c500. Proof script output: 1.
+        build:
+          prompt: >-
+            Strip the shared lines at the start and end before building the table. Then write a check that runs the
+            real diff and ccdiff on many pairs of files and compares the lines starting with a less-than or
+            greater-than sign, since the real diff also prints change headers that ccdiff does not.
+        hints:
+          hint: Walk forward from the first line while the files agree, then backward from the last line.
+          example: >-
+            Comparing two copies of a long contract where only one clause changed, you would skip the identical pages
+            at the front and back and only read the page that differs.
+    teach_back:
+      prompt: >-
+        Explain what ccdiff does from the moment it is run to the moment it exits, what it costs in time and memory for
+        large files, and how you would show its output matches the real diff.
+      rubric:
+        - id: t1
+          concept: cli-subcommands
+          point: "It takes two file paths, reports a missing argument or unreadable file on the error stream with a non-zero exit status, and prints nothing when the files are the same"
+        - id: t2
+          concept: dynamic-programming
+          point: "It fills a table with one cell for each pair of line prefixes, each computed once from its neighbours, then walks back through it to produce the differences"
+        - id: t3
+          concept: time-space-complexity
+          point: "Time and memory grow with the product of the two file lengths, so doubling both files makes it four times slower, and trimming shared lines or a smarter algorithm such as Myers helps"
+        - id: t4
+          concept: differential-testing
+          point: "It runs the real diff and ccdiff on the same pairs of files, including edge cases, and compares the removed and added lines"

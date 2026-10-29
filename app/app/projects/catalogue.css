@@ -1,0 +1,48 @@
+/* Catalogue rules, copied from design/catalogue.html and scoped under .pg-catalogue. */
+/* Page head: text only, kept short */
+.pg-catalogue .head { padding-block: 32px 24px; max-width: 46em; }
+.pg-catalogue .head h1 { font-weight: 700; font-size: clamp(2.1rem, 3.6vw, 3rem); line-height: 1.05; letter-spacing: -0.025em; margin: 10px 0 12px; }
+.pg-catalogue .head .lede { margin: 0; font-size: 19px; line-height: 1.55; }
+.pg-catalogue .head .src { margin: 8px 0 0; font-size: 16px; color: var(--muted); }
+.pg-catalogue .head .src a, .pg-catalogue .head .back a { color: var(--ink); }
+.pg-catalogue .head .back { margin: 14px 0 0; font-size: 17px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.pg-catalogue .head .back .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--ok); flex: none; }
+.pg-catalogue .head .back a { font-weight: 500; }
+/* Toolbar: search, area and count in one row (sticky from tablet width) */
+.pg-catalogue .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding-block: 14px; border-block: 1px solid var(--rule); background: var(--bg); }
+@media (min-width: 760px) {
+  .pg-catalogue .tools { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--head-h)); z-index: 4; }
+}
+.pg-catalogue .search { position: relative; flex: 1 1 280px; max-width: 520px; min-width: 0; }
+.pg-catalogue .search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.pg-catalogue .search input { width: 100%; font: 400 17px/1.2 var(--f-body); color: var(--ink); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 6px; min-height: 44px; padding: 0 40px 0 42px; }
+.pg-catalogue .search input::placeholder { color: var(--muted); opacity: 1; }
+.pg-catalogue .search input::-webkit-search-cancel-button { display: none; }
+.pg-catalogue .search .clear { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
+.pg-catalogue .search .clear:hover { color: var(--ink); }
+.pg-catalogue .pick { position: relative; flex: 0 1 auto; min-width: 0; }
+.pg-catalogue .pick select { appearance: none; -webkit-appearance: none; font: 500 14px/1.2 var(--f-mono); color: var(--ink); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 6px; min-height: 44px; padding: 0 40px 0 14px; cursor: pointer; max-width: 100%; }
+.pg-catalogue .pick svg { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--ink); }
+.pg-catalogue .count { margin-left: auto; white-space: nowrap; }
+@media (max-width: 600px) {
+  .pg-catalogue .search { flex-basis: 100%; max-width: none; }
+  .pg-catalogue .pick { flex: 1 1 0; }
+  .pg-catalogue .pick select { width: 100%; }
+  .pg-catalogue .count { margin-left: 0; }
+}
+/* Learning paths */
+.pg-catalogue .path { padding-block: 36px 12px; }
+.pg-catalogue .path + .path { border-top: 1px solid var(--rule); }
+.pg-catalogue .path-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 20px; }
+.pg-catalogue .path-head h2 { font-weight: 700; font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.1; letter-spacing: -0.02em; }
+.pg-catalogue .path-head .label { flex: 1 1 auto; }
+.pg-catalogue .path-head .shared { flex-basis: 100%; margin: 0; }
+/* The rest of Coding Challenges */
+.pg-catalogue .more { border-top: 1.5px solid var(--ink); margin-top: 48px; padding-block: 56px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (min-width: 1000px) {
+  .pg-catalogue .more { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; align-items: end; }
+}
+.pg-catalogue .more h2 { font-weight: 700; font-size: clamp(2rem, 4.4vw, 3.2rem); line-height: 1.04; letter-spacing: -0.025em; margin-top: 14px; }
+.pg-catalogue .more p { margin: 0 0 20px; font-size: 20px; line-height: 1.55; max-width: 34em; }
+.pg-catalogue .more .examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 22px; padding: 0; list-style: none; }
+.pg-catalogue .more .examples li { font: 400 13px/1 var(--f-mono); border: 1px dashed var(--muted); color: var(--muted); border-radius: 999px; padding: 7px 10px; }

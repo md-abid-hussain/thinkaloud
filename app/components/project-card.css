@@ -1,0 +1,37 @@
+/* Project cards, shared by the landing and the catalogue (copied from their designs).
+   Scoped under .proj-grid; base rules come first so the breakpoint rules below can override them. */
+.proj-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.proj-grid .card { position: relative; background: var(--surface); border: 1.5px solid var(--ink); border-radius: 10px; display: flex; flex-direction: column; min-width: 0; transition: transform 200ms var(--ease), box-shadow 200ms var(--ease); }
+.proj-grid .card:hover, .proj-grid .card:focus-within { transform: translate(-3px, -3px); box-shadow: 6px 6px 0 var(--ink); }
+.proj-grid .card-top { display: flex; justify-content: space-between; gap: 8px; padding: 14px 16px 0; font: 400 12px/1.4 var(--f-mono); color: var(--muted); }
+.proj-grid .card-top .checked { color: var(--ok); }
+.proj-grid .card-fig { padding: 10px 16px 0; }
+.proj-grid .card-fig svg { width: 100%; height: auto; display: block; }
+.proj-grid .card-body { padding: 12px 16px 18px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.proj-grid .card h3 { font-weight: 700; font-size: 24px; line-height: 1.15; }
+.proj-grid .card h3 a { text-decoration: none; }
+.proj-grid .card h3 a::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
+.proj-grid .card p { margin: 0; font-size: 17px; line-height: 1.5; }
+.proj-grid .card .learn { font: 400 13px/1.5 var(--f-mono); color: var(--muted); margin-top: auto; padding-top: 8px; }
+.proj-grid .learn b { color: var(--ink); font-weight: 500; }
+.proj-grid .card .mine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 500 13px/1.4 var(--f-mono); color: var(--ok); padding-top: 10px; border-top: 1px dashed var(--rule); margin-top: 4px; }
+.proj-grid .card .mine .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--ok); flex: none; }
+.proj-grid .card .mine .progress { display: flex; gap: 4px; margin-top: 0; flex: 1 1 100%; }
+.proj-grid .card .mine .progress span { height: 6px; flex: 1; border-radius: 3px; background: var(--rule); }
+.proj-grid .card .mine .progress span.on { background: var(--ok); }
+.proj-grid .card .mine.going { color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) { .card:hover [data-anim], .card:focus-within [data-anim] { animation: var(--anim); } }
+
+@media (max-width: 1080px) {
+  .proj-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .proj-grid .card { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); grid-template-rows: auto 1fr; }
+  .proj-grid .card-top { grid-column: 1 / -1; }
+  .proj-grid .card-fig { padding: 8px 8px 16px 16px; align-self: center; }
+  .proj-grid .card-body { padding: 8px 20px 18px 12px; }
+}
+@media (max-width: 600px) {
+  .proj-grid .card { display: flex; }
+  .proj-grid .card-fig { padding: 10px 16px 0; }
+  .proj-grid .card-fig svg { max-width: 360px; margin: 0 auto; }
+  .proj-grid .card-body { padding: 12px 16px 18px; }
+}

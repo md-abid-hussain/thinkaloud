@@ -1,0 +1,392 @@
+# Coding Challenges, Build your own web server.
+# Source: https://codingchallenges.fyi/challenges/challenge-webserver
+# Written in our own words. The source page is linked, not copied.
+# The page's sample reply for a missing file shows 400 Not Found while its text asks for 404. This file uses 404.
+# Every predict and trace key is proven by content/proofs/challenge-webserver.mjs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-webserver
+  title: Build your own web server
+  source_url: https://codingchallenges.fyi/challenges/challenge-webserver
+  level: intermediate
+  status: generated
+  figure:
+    kind: net
+  summary: >-
+    An HTTP server built on a bare TCP socket. It reads each request, serves files from a www folder, handles many
+    clients at the same time, and refuses any request that tries to reach a file outside that folder.
+  requirements:
+    - Listen on a TCP port on localhost and read the request line and headers of each request
+    - Reply with a status line, an empty line and a body, then close the connection
+    - Serve files from a www folder, mapping / and /index.html to index.html
+    - Answer 404 Not Found when no file matches the path
+    - Serve several clients at the same time, so a slow one does not hold up the others
+    - Never send a file from outside www, and let the user choose the www folder at startup
+  restate_rubric:
+    - id: r1
+      point: "It is an HTTP server that accepts TCP connections, reads each request and writes back a reply"
+    - id: r2
+      point: "It serves files from a www folder, giving index.html for / and 404 when a file is missing"
+    - id: r3
+      point: "It serves several clients at once and refuses paths that lead outside www"
+  reflection_prompt: >-
+    In your own words, how does your server turn the bytes arriving on a socket into a safe reply, and what would you
+    change to serve thousands of clients at once?
+  primer:
+    what: >-
+      A web server waits for browsers and tools such as curl to connect over TCP, reads the text request each one
+      sends, and writes back a text reply. A request starts with a request line made of three parts separated by single
+      spaces: the method, the path and the HTTP version. Header lines follow, one per line, and an empty line ends
+      them. You will build a server that sends files from a folder called www to many clients at once, without letting
+      anyone read files outside it.
+    why: >-
+      Every web page reaches you this way, and HTTP/1.1 is plain text, so you can read and write it yourself. Building
+      a server shows how a stream of bytes becomes separate messages, and why anything a stranger sends must be checked.
+    example: >-
+      Visiting http://localhost/ with curl sends the request line GET / HTTP/1.1, so the method is GET, the path is a
+      single slash and the version is HTTP/1.1. A few header lines such as Host: localhost follow, then an empty line.
+      The server answers with the status line HTTP/1.1 200 OK, an empty line and a body, then closes the connection.
+    words:
+      - term: socket
+        meaning: One end of a network connection. A program reads bytes from it and writes bytes to it, like a file.
+      - term: port
+        meaning: A number that picks which program on a machine receives a connection. Web servers usually listen on 80.
+      - term: request line
+        meaning: The first line of a request, holding the method, the path and the HTTP version, separated by spaces.
+      - term: header
+        meaning: A line of the form name, colon, value, such as Host followed by localhost, that adds a detail to a message.
+      - term: CRLF
+        meaning: A carriage return followed by a line feed, the two bytes that end every line of an HTTP message.
+      - term: status line
+        meaning: The first line of a reply, holding the version, a status code such as 200 or 404, and a short phrase.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: One request, one reply
+    summary: Accept a TCP connection, read a whole request, and answer with the path that was asked for.
+    concepts: [tcp-sockets, http-message-format, message-framing]
+    steps:
+      - title: Read the request line
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            curl asks your server for http://localhost/docs/intro.html, and the request line it sends is
+            GET /docs/intro.html HTTP/1.1. What path does your server take out of that line?
+          key:
+            match: text_ci
+            expected: docs/intro.html
+            derivation: >-
+              The request line has three parts separated by single spaces: the method GET, the path /docs/intro.html
+              and the version HTTP/1.1. The path is the second part. The key leaves off the leading slash so that an
+              answer of /docs/intro.html and one of docs/intro.html both match. Proof script output: docs/intro.html.
+        build:
+          prompt: >-
+            Open a TCP socket bound to 127.0.0.1 on port 80, or on a port such as 8080 if your system needs
+            administrator rights for 80. Accept one connection at a time, read the request line, and split it into the
+            method, the path and the version.
+        hints:
+          hint: The request line has three parts with a single space between each. Which part names what is being asked for?
+          example: In the line POST /login HTTP/1.1 the method is POST, the path is /login and the version is HTTP/1.1.
+
+      - title: Read up to the empty line
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            curl sends these lines, each ending with a carriage return and a line feed: GET / HTTP/1.1, then
+            Host: localhost, then User-Agent: curl/8.4.0, then Accept: */*, then an empty line. How many header lines
+            does this request have?
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              The first line is the request line, not a header. Host, User-Agent and Accept are the headers. The empty
+              line is not a header either, it only marks where the headers end. So there are 3. Proof script output: 3.
+        build:
+          prompt: >-
+            Keep reading from the connection, adding each read to what you already have, until you have seen the empty
+            line that ends the headers. Log each header line, and make sure a request that arrives in several small
+            pieces is read the same as one that arrives at once.
+        hints:
+          hint: Name each line in turn. Is it the request line, a header, or the line that only marks the end?
+          example: >-
+            A letter has an address block, then a blank line, then the message. The blank line belongs to neither part.
+            It only shows where the address stops.
+
+      - title: Write the reply
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This handler works with curl on your machine most of the time, but some clients get a garbled reply or a
+            wrong path. Find the two problems and say how to fix each.
+          snippet: |-
+            conn = accept(server)
+            data = read(conn, 1024)
+            path = split(data, " ")[1]
+            write(conn, "HTTP/1.1 200 OK\r\n")
+            write(conn, "Requested path: " + path)
+            close(conn)
+          rubric:
+            - id: p1
+              point: "One read can return only part of the request, so the server must keep reading and buffering until the empty line that ends the headers arrives"
+            - id: p2
+              point: "There is no empty line between the status line and the body, so the client reads the body as a header. Send a carriage return and line feed on its own line before the body"
+        build:
+          prompt: >-
+            Reply with the status line HTTP/1.1 200 OK, an empty line, and the body Requested path: followed by the
+            path, then close the socket. Running curl http://localhost/ should print Requested path: /.
+        hints:
+          hint: Ask what a single read is promised to return, and how a client knows the headers of the reply are over.
+          example: >-
+            Someone reading a letter aloud over a crackly phone line may get it in pieces. You wait for the sign-off
+            before you answer, not for the first pause.
+    teach_back:
+      prompt: >-
+        Explain what your server does from the moment curl connects until curl prints the reply, and how the server
+        knows it has the whole request.
+      rubric:
+        - id: t1
+          concept: tcp-sockets
+          point: "The server binds to an address and port and listens, and each accepted connection gets its own socket, a two-way stream of bytes that is closed after the reply"
+        - id: t2
+          concept: message-framing
+          point: "TCP keeps no message boundaries, so the server keeps reading and buffering until the empty line that ends the headers has arrived"
+        - id: t3
+          concept: http-message-format
+          point: "A request is a request line with method, path and version, then headers, then an empty line, and the reply is a status line, an empty line and the body, with every line ending in a carriage return and line feed"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Serve files from www
+    summary: Turn the request path into a file in the www folder, and send it with the right status and length.
+    concepts: [static-file-serving, message-framing, bytes-vs-characters]
+    steps:
+      - title: Map paths to files
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            The www folder holds index.html and nothing else. Your server gets four requests, for the paths /, then
+            /index.html, then /about.html, then /index. How many of them are answered with 200 OK?
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              The path / is mapped to index.html, so it gets 200. /index.html names the file directly, so it gets 200.
+              There is no about.html, so that gets 404, and /index names a file called index with no extension, which
+              does not exist either, so 404. That makes 2. Proof script output: 2.
+        build:
+          prompt: >-
+            Create a www folder holding an index.html. Answer / and /index.html with 200 OK and the contents of that
+            file, and answer any path with no matching file with 404 Not Found. The challenge page's sample shows 400
+            Not Found, but 404 is the code that means not found, so use 404.
+        hints:
+          hint: For each path, first apply the one special rule for a bare slash, then ask whether a file with exactly that name exists.
+          example: >-
+            A library desk that hands you the welcome leaflet when you ask for nothing in particular still says no when
+            you ask for a book it does not have.
+
+      - title: Where the body ends
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            Your server closes the connection after each reply, so the client knows the body is over. A browser would
+            rather send several requests over one connection. How can it then tell where one reply's body ends, and
+            what must the server get exactly right?
+          rubric:
+            - id: p1
+              point: "Closing the connection marks the end of the body, but that only works for one reply per connection"
+            - id: p2
+              point: "A Content-Length header tells the client how many bytes of body follow the empty line"
+            - id: p3
+              point: "If the length is too small, the rest of the body is read as the start of the next reply, and if it is too large the client waits for bytes that never come"
+        build:
+          prompt: >-
+            Send a Content-Length header with the size of the body in bytes and a Content-Type of text/html for HTML
+            files, then check the headers with curl -i.
+        hints:
+          hint: Once the connection stays open, the end of the stream no longer marks anything. What could the server announce before the body instead?
+          example: >-
+            A parcel service that writes the number of boxes on the first box lets the receiver know when the delivery
+            is complete, without waiting for the van to drive away.
+
+      - title: Send the file safely
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            Leave aside for now that the path is joined to the folder without a check, which the next milestone fixes.
+            Find the two other problems in this handler and say how to fix each.
+          snippet: |-
+            path = request_path(request)
+            if path == "/":
+                path = "/index.html"
+            text = read_text("www" + path)
+            write(conn, "HTTP/1.1 200 OK\r\n")
+            write(conn, "Content-Length: " + length(text) + "\r\n\r\n")
+            write(conn, text)
+          rubric:
+            - id: p1
+              point: "When the file does not exist, reading it fails and the client gets no reply at all. Check for the file and send 404 Not Found when it is missing"
+            - id: p2
+              point: "length of the text counts characters, but Content-Length must count bytes, so a UTF-8 page with accented letters gets the wrong length. Read the file as bytes and send their count"
+            - id: p3
+              point: "Reading the file as text also breaks images and other binary files, which reading bytes avoids"
+        build:
+          prompt: >-
+            Read files as bytes, send their byte count as the Content-Length, and answer 404 Not Found when the file
+            cannot be found instead of letting the handler fail. Then write down what could go wrong when a stranger
+            chooses the path that is joined to your folder. The next milestone deals with it.
+        hints:
+          hint: Try the handler on a file that is not there, and on a page containing the word café.
+          example: >-
+            A word count on a page in French and a byte count of the same page differ, because an accented letter
+            takes two bytes in UTF-8.
+    teach_back:
+      prompt: >-
+        Explain how your server turns a request path into a reply, and how the client knows where the body of that
+        reply ends.
+      rubric:
+        - id: t1
+          concept: static-file-serving
+          point: "The path is mapped to a file inside www, with / giving index.html, and the file is sent with 200 OK and a matching Content-Type, or 404 Not Found when there is no such file"
+        - id: t2
+          concept: message-framing
+          point: "The body's end is marked either by closing the connection or by a Content-Length header sent before the body"
+        - id: t3
+          concept: bytes-vs-characters
+          point: "The file is read as bytes and Content-Length counts bytes, because a character can take more than one byte and images are not text"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Many clients, safe paths
+    summary: Serve clients side by side, keep every request inside www, and let the user choose the folder.
+    concepts: [concurrent-connections, untrusted-paths, cli-subcommands]
+    steps:
+      - title: Serve clients side by side
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            Three clients connect at the same moment, and your server takes 2 seconds to answer each request. How many
+            seconds does the last client wait for its reply when the server handles one connection at a time, and how
+            many when it handles each connection on its own thread? Give the first, then the second.
+          key:
+            match: numbers_all
+            expected: [6, 2]
+            derivation: >-
+              One at a time, the first reply is sent at 2 seconds, the second at 4 and the third at 6, because each
+              client waits for the ones ahead of it. With a thread per connection all three are handled together, so
+              every reply, the last one included, is sent at 2 seconds. Proof script output: [6, 2].
+        build:
+          prompt: >-
+            Handle each connection on its own thread or task. To test it, make each request wait 20 seconds and log
+            the thread id, then start 7 curl requests at once. All 7 should come back after about 20 seconds, with
+            different thread ids in the log, not one after another.
+        hints:
+          hint: Draw a timeline for each server. When can the second client's request start being handled?
+          example: >-
+            A shop with one till serves the queue one person at a time, so the third customer waits for the two before
+            them. With three tills open, all three are served at once.
+
+      - title: Limits for slow clients
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            Your server now starts a new thread for every connection. What can go wrong when a client connects and
+            never sends anything, or when thousands of clients connect at once, and what limits help?
+          rubric:
+            - id: p1
+              point: "Each open connection holds a thread and its memory, so a silent client ties them up for as long as it stays connected"
+            - id: p2
+              point: "Thousands of connections at once means thousands of threads, which can run the machine out of memory or threads"
+            - id: p3
+              point: "A read timeout closes clients that send nothing, and a fixed pool of threads or an event loop caps what many clients can take"
+        build:
+          prompt: >-
+            Close a connection that has sent nothing for a few seconds, and decide how many connections your server
+            will handle at once, for example with a thread pool.
+        hints:
+          hint: What does one waiting thread cost, and does that cost go away while its client stays silent?
+          example: >-
+            A restaurant that gives every arriving guest their own waiter runs out of waiters on a busy night, and a
+            guest who sits without ordering keeps theirs all evening.
+
+      - title: Stay inside www
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This check is meant to keep every request inside the www folder. Find the two problems, and say what a
+            correct check does instead.
+          snippet: |-
+            www = args[1]
+            path = replace(request_path, "../", "")
+            full = www + path
+            if starts_with(full, www):
+                send_file(conn, full)
+            else:
+                send_status(conn, 403)
+          rubric:
+            - id: p1
+              point: "Removing the text ../ once is not enough, because a path such as ....// turns into ../ after the removal, and encoded dots slip past it"
+            - id: p2
+              point: "The check compares the text before any .. is applied, so the joined string always starts with www and the check can never fail"
+            - id: p3
+              point: "Resolve and normalise the full path first, then check that it lies inside the resolved www folder by whole folder names, so a folder called www-old does not count"
+        build:
+          prompt: >-
+            Resolve every request path against the www folder, normalise it, and refuse it unless the result lies
+            inside www. A request such as /../../etc/passwd must never return a file.
+        hints:
+          hint: Work out by hand what is left of ....//secret.txt after the removal, and ask whether the final check can ever be false.
+          example: >-
+            Cutting the word bad out of the text babadd leaves bad. A filter that removes a pattern once can create the
+            very pattern it removed.
+
+      - title: Choose the folder and test it
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            The www folder is /srv/www. It holds index.html and a folder docs, which holds guide.html. Your server
+            answers 200 for an existing file inside www, 404 for a path inside www with no file, and 403 for any path
+            that resolves outside www. What status does it send for each of these requests, in this order:
+            /docs/../index.html, then /../secret.txt, then /docs/missing.html?
+          key:
+            match: numbers_all
+            expected: [200, 403, 404]
+            derivation: >-
+              Joined to /srv/www, the first path is /srv/www/docs/../index.html, and applying the .. removes docs,
+              giving /srv/www/index.html, which is inside and exists: 200. The second becomes /srv/www/../secret.txt,
+              and the .. removes www, giving /srv/secret.txt, which is outside: 403. The third is /srv/www/docs/missing.html,
+              inside but not there: 404. Proof script output: [200, 403, 404].
+        build:
+          prompt: >-
+            Take the www folder as a startup argument, and refuse to start, with a message on the error stream and a
+            non-zero exit status, if it does not exist. Write tests that send traversal attempts, including encoded
+            dots and a sibling folder whose name starts with www, and check that none of them returns a file.
+        hints:
+          hint: Join each path to the folder, let every .. remove the folder name just before it, and only then look at where you ended up.
+          example: >-
+            From the folder /home/sam/photos, going into trips and then up one level lands back in photos, but going
+            up one level straight away lands in /home/sam, which is outside photos.
+    teach_back:
+      prompt: >-
+        Someone on your network sends many requests at once, some of them slow and some asking for files outside www.
+        Explain how your server keeps answering everyone, keeps the files safe, and learns which folder to serve.
+      rubric:
+        - id: t1
+          concept: concurrent-connections
+          point: "Each connection is handled on its own thread, a pooled thread or an event loop, so a slow client does not hold up the others, with timeouts and a cap on how many run at once"
+        - id: t2
+          concept: untrusted-paths
+          point: "The request path is joined to www, resolved and normalised, and refused unless the result is still inside www, because filtering out the text .. is not enough"
+        - id: t3
+          concept: cli-subcommands
+          point: "The www folder is given as a startup argument, and a missing or bad folder gives a message on the error stream and a non-zero exit status"

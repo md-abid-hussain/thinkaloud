@@ -1,0 +1,1288 @@
+# The shared concept catalogue. Every project file refers to concepts by slug.
+#
+# Rules for adding to it:
+#   - Search this file first. Never add a near-duplicate of a concept that exists.
+#   - A concept is language-neutral. Language and framework detail goes under language_notes.
+#   - `prerequisites` lists the concepts that should be understood BEFORE this one.
+#   - `related` lists concepts that overlap but are not required first.
+#   - Briefs are 2 to 3 sentences in our own words.
+#   - `status: generated` means nobody has checked it yet. Change it to `reviewed` after a check.
+#
+# Areas (fixed): text-encodings, streams-io, formats-parsing, state-storage, process-testing,
+#                design-structure, networking-http, concurrency, apis-backends, data-stores
+
+format: 1
+
+concepts:
+  # ---- from the wc sample (reviewed) ----
+  - slug: bytes-vs-characters
+    name: Bytes vs characters
+    area: text-encodings
+    kind: foundation
+    status: reviewed
+    brief: A byte is a unit of storage. A character is a unit of text. In UTF-8 one character takes one to four bytes.
+
+  - slug: explicit-charsets
+    name: Explicit charsets
+    area: text-encodings
+    kind: foundation
+    status: reviewed
+    brief: Decoding bytes needs a named encoding. Relying on a platform default breaks when the tool runs elsewhere.
+    prerequisites: [bytes-vs-characters]
+
+  - slug: decoding-across-chunks
+    name: Decoding across chunk boundaries
+    area: text-encodings
+    kind: foundation
+    status: reviewed
+    brief: A chunk of bytes can end in the middle of a character, so a decoder keeps the leftover bytes for the next chunk.
+    prerequisites: [explicit-charsets, stream-read-contract]
+
+  - slug: streaming-constant-memory
+    name: Streaming in constant memory
+    area: streams-io
+    kind: foundation
+    status: reviewed
+    brief: Read input in fixed-size chunks and keep running totals, so memory does not grow with the input.
+    prerequisites: [stream-read-contract]
+
+  - slug: stdin-vs-file
+    name: Standard input vs file
+    area: streams-io
+    kind: foundation
+    status: reviewed
+    brief: A file and standard input can be treated as the same kind of byte stream, so one loop serves both.
+
+  - slug: stream-read-contract
+    name: The read contract
+    area: streams-io
+    kind: foundation
+    status: reviewed
+    brief: A read can return fewer bytes than the buffer holds. The returned count says how many are valid, and -1 means the end.
+
+  # ---- added for wc ----
+  - slug: line-endings
+    name: Lines and line endings
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: >-
+      A line is the text up to and including a newline byte, so tools count lines by counting newlines. A last
+      line with no newline after it is not counted. Files written on Windows end each line with a carriage return
+      and a newline, and the carriage return is an extra byte that line counting ignores but byte counting sees.
+    related: [bytes-vs-characters]
+    resources:
+      - title: Newline (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Newline
+
+  - slug: word-state-machine
+    name: Counting words with a state machine
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A word counter walks the text once and remembers one thing: whether it is inside a word. A word starts when a
+      non-space character follows a space or the start of input, so runs of spaces never make empty words. The
+      remembered state has to survive from one chunk of input to the next.
+    related: [streaming-constant-memory]
+    resources:
+      - title: Finite-state machine (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Finite-state_machine
+
+  - slug: differential-testing
+    name: Testing against a reference tool
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      Run your tool and a trusted reference on the same inputs and compare the outputs. Your own expected values
+      only test what you already believe, while the reference exposes cases you did not think of, such as odd
+      whitespace or line endings. Pin the reference version and settings, since they can change its answers.
+    resources:
+      - title: Differential testing (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Differential_testing
+
+  # ---- added for the static site generator ----
+  - slug: site-directory-layout
+    name: Directory layout as the data model
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      A site generator treats folders as its data model. Content holds what the author writes, themes hold how
+      pages look, and the output folder holds what gets published. Keeping them apart lets each change without
+      touching the others, and lets the output be rebuilt from the other two.
+    resources:
+      - title: Hugo, directory structure
+        url: https://gohugo.io/getting-started/directory-structure/
+
+  - slug: cli-subcommands
+    name: Command-line arguments and exit codes
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      A command-line tool reads its options, subcommands and file names from its arguments, and rejects ones it does
+      not understand. It writes results to standard output and problems to the error stream, and exits with a
+      non-zero status on failure, so scripts can tell success from failure.
+    resources:
+      - title: Command Line Interface Guidelines
+        url: https://clig.dev/
+
+  - slug: untrusted-paths
+    name: Untrusted names in file paths
+    area: streams-io
+    kind: foundation
+    status: generated
+    brief: >-
+      A name that ends up inside a file path, from a command line or a web request, can contain .. and climb out
+      of the folder you meant. Resolve the full path, normalise it, and check that it still sits inside the base
+      folder before you read or write.
+    related: [site-directory-layout]
+    resources:
+      - title: OWASP, Path traversal
+        url: https://owasp.org/www-community/attacks/Path_Traversal
+      - title: Java Path (Javadoc)
+        url: https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html
+        language: java
+    language_notes:
+      - language: java
+        body: |-
+          Join the base folder and the name with Path.resolve, remove dot segments with Path.normalize, and check the
+          result with Path.startsWith against the base, which should already be absolute and normalised.
+          Path.startsWith compares whole name elements, so a folder called public-old does not count as inside public.
+          An absolute name replaces the base when it is resolved, and the startsWith check then rejects it. Use
+          Path.toRealPath on the base if symbolic links are possible.
+
+  - slug: markup-to-html
+    name: Converting Markdown to HTML
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A Markdown renderer works in two layers. It finds the block structure first, such as headings and paragraphs,
+      then handles inline marks such as emphasis and links inside each block. The result is written out as HTML
+      elements.
+    related: [explicit-charsets]
+    resources:
+      - title: CommonMark specification
+        url: https://spec.commonmark.org/
+      - title: Markdown syntax (Daring Fireball)
+        url: https://daringfireball.net/projects/markdown/syntax
+
+  - slug: output-escaping
+    name: Escaping text inserted into HTML
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Text placed into HTML must be escaped, so that characters such as <, > and & show as text and are not read as
+      markup. Escape plain values at the point they are inserted, and leave alone text that is already HTML.
+    resources:
+      - title: OWASP, Cross Site Scripting Prevention Cheat Sheet
+        url: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+
+  - slug: template-substitution
+    name: Template substitution
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A template is text with named holes, such as {{ Title }}. Filling it in one pass over the template, instead of
+      one replace per name, keeps text that merely looks like a placeholder inside a value from being filled in
+      a second time.
+    prerequisites: [markup-to-html, output-escaping]
+    resources:
+      - title: Hugo, introduction to templating
+        url: https://gohugo.io/templates/introduction/
+
+  - slug: build-pipeline
+    name: Build pipeline
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      A build reads inputs, transforms them and writes outputs, and the same inputs should always give the same
+      output. Writing everything into a freshly cleared output folder, instead of editing files in place, keeps
+      stale files out and makes the result safe to publish as a whole.
+    prerequisites: [site-directory-layout]
+    resources:
+      - title: Static site generator (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Static_site_generator
+
+  - slug: static-file-serving
+    name: Serving static files over HTTP
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A static server turns a URL path into a file. It maps / to index.html, sends the file with the right
+      Content-Type, and answers 404 when nothing matches. The browser trusts the Content-Type header, not the file
+      extension.
+    prerequisites: [untrusted-paths]
+    resources:
+      - title: MDN, MIME types
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types
+      - title: jdk.httpserver package (Javadoc)
+        url: https://docs.oracle.com/en/java/javase/25/docs/api/jdk.httpserver/com/sun/net/httpserver/package-summary.html
+        language: java
+    language_notes:
+      - language: java
+        body: |-
+          The JDK ships a small HTTP server in the jdk.httpserver module. HttpServer.create binds a server to an
+          InetSocketAddress, and HttpServer.createContext registers a handler for a path prefix. In the handler, add
+          the Content-Type header to the exchange's response headers before calling HttpExchange.sendResponseHeaders
+          with the status and the length. Files.probeContentType can return null, so keep a small map from extension
+          to type for html, css and js.
+
+  - slug: file-watching
+    name: Watching files for changes
+    area: streams-io
+    kind: foundation
+    status: generated
+    brief: >-
+      A tool can notice file changes by polling modification times on a timer, or by asking the operating system for
+      change notifications. Notifications are faster and cheaper but platform-specific, and they often arrive in
+      bursts, so a tool waits briefly (debouncing) before it acts.
+    resources:
+      - title: inotify(7), Linux manual page
+        url: https://man7.org/linux/man-pages/man7/inotify.7.html
+      - title: WatchService (Javadoc)
+        url: https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/WatchService.html
+        language: java
+    language_notes:
+      - language: java
+        body: |-
+          WatchService in java.nio.file reports create, modify and delete events for one directory. It does not watch
+          subdirectories, so register each one yourself, for example while walking the tree with Files.walkFileTree.
+          WatchService.take waits for the next batch of events, and WatchKey.reset must be called afterwards or the
+          key stops delivering. On some platforms the built-in implementation polls, so changes can arrive late.
+
+  - slug: live-reload-push
+    name: Pushing a reload to the browser
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A page cannot know that the server rebuilt it unless something tells it. The development server keeps a
+      connection open, for example with server-sent events, and sends a message after each rebuild. A small script
+      added to pages in development only then reloads the browser.
+    prerequisites: [static-file-serving, file-watching]
+    resources:
+      - title: MDN, Using server-sent events
+        url: https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
+
+  # ---- added for wave 1: text tools (cut, grep) ----
+  - slug: delimited-fields
+    name: Fields in delimited text
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Tab- and comma-separated files store one record per line, split into fields at a delimiter character. Fields
+      are numbered from 1, and two delimiters in a row mean an empty field, not a missing one. Plain splitting breaks
+      when a value contains the delimiter inside quotes, which full CSV parsers handle and simple tools do not.
+    related: [line-endings]
+    resources:
+      - title: Delimiter-separated values (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Delimiter-separated_values
+
+  - slug: unix-pipelines
+    name: Composing tools with pipes
+    area: streams-io
+    kind: foundation
+    status: generated
+    brief: >-
+      Small tools that read standard input and write standard output can be chained, so each does one job and the
+      shell joins them. Lines of text are the shared format. The order of the chain matters, because some tools only
+      work on what they see next to each other, such as uniq, which only removes adjacent duplicates.
+    prerequisites: [stdin-vs-file]
+    resources:
+      - title: Pipeline (Unix) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Pipeline_(Unix)
+
+  - slug: regex-matching
+    name: Matching with regular expressions
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A regular expression describes a set of strings using literal characters, classes such as any digit or any
+      word character, and anchors for the start and end of a line. A line matches when the pattern succeeds starting
+      at some position in it, so an unanchored pattern can match anywhere and an empty pattern matches every line.
+    resources:
+      - title: Regular expression (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Regular_expression
+      - title: MDN, Regular expressions guide
+        url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions
+
+  - slug: recursive-file-walk
+    name: Walking a directory tree
+    area: streams-io
+    kind: foundation
+    status: generated
+    brief: >-
+      To visit every file under a folder, list its entries, handle the files, and descend into each subfolder the same
+      way. The order entries come back in is not guaranteed, symbolic links can form loops, and some folders cannot be
+      read, so a walker needs a rule for each.
+    resources:
+      - title: Depth-first search (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Depth-first_search
+
+  - slug: case-folding
+    name: Comparing text without case
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: >-
+      A case-insensitive match maps both the pattern and the text to one common form before comparing. In ASCII that is
+      a simple swap between upper and lower letters, but in Unicode some letters change length or have more than one
+      lower-case form, so the language's case-folding rules are safer than a hand-made table.
+    related: [bytes-vs-characters]
+    resources:
+      - title: Unicode FAQ, case mapping
+        url: https://unicode.org/faq/casemap_charprop.html
+
+  # ---- added for wave 1: parsing (JSON parser) ----
+  - slug: lexical-analysis
+    name: Lexing text into tokens
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A lexer reads characters and groups them into tokens, such as a brace, a string, a number or a keyword, and skips
+      the whitespace between them. The parser then works with meaningful pieces instead of single characters, and the
+      lexer is the natural place to reject a character that cannot start any token.
+    resources:
+      - title: Lexical analysis (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Lexical_analysis
+
+  - slug: recursive-descent-parsing
+    name: Recursive descent parsing
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A recursive descent parser has one function per rule of the grammar, and a rule that contains other rules calls
+      their functions, so nesting in the input becomes nesting of calls. It looks at the next token to decide which
+      rule applies and reports an error at the first token no rule allows.
+    prerequisites: [lexical-analysis]
+    resources:
+      - title: Recursive descent parser (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Recursive_descent_parser
+
+  - slug: json-grammar
+    name: The JSON grammar
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A JSON value is an object, an array, a string, a number, true, false or null, and objects and arrays can hold
+      any value, nested as deep as you like. The rules are strict: keys are double-quoted strings, there are no
+      trailing commas or comments, and numbers have no leading zeros.
+    related: [recursive-descent-parsing]
+    resources:
+      - title: Introducing JSON (json.org)
+        url: https://www.json.org/json-en.html
+      - title: RFC 8259, The JSON Data Interchange Format
+        url: https://www.rfc-editor.org/rfc/rfc8259
+
+  - slug: conformance-test-suite
+    name: Conformance test suites
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      A conformance suite is a shared set of inputs, each with the verdict a correct implementation must give, valid or
+      invalid. Running it shows whether you follow the specification in the corners nobody thinks of, and an invalid
+      input that is accepted is as much a failure as a valid one that is rejected.
+    related: [differential-testing]
+    resources:
+      - title: Conformance testing (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Conformance_testing
+
+  # ---- added for wave 1: bits and structures (Huffman, Bloom filter) ----
+  - slug: frequency-map
+    name: Counting with a map
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      To count how often each symbol occurs, keep a map from symbol to count and add one for every symbol you read.
+      One pass over the input is enough, and the map grows with the number of distinct symbols, not with the size of
+      the input.
+    resources:
+      - title: Hash table (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Hash_table
+
+  - slug: priority-queue
+    name: Priority queues
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      A priority queue hands back the smallest (or largest) item first, whatever order the items were added in. A
+      binary heap does this in logarithmic time per insert or removal, which makes it the usual tool for greedy
+      algorithms that repeatedly take the two cheapest items.
+    resources:
+      - title: Priority queue (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Priority_queue
+
+  - slug: huffman-coding
+    name: Huffman coding
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Huffman coding gives frequent symbols short bit codes and rare symbols long ones. It builds a binary tree by
+      repeatedly joining the two least frequent nodes, and each symbol's code is the path from the root to its leaf,
+      for example 0 for left and 1 for right.
+    prerequisites: [frequency-map, priority-queue]
+    resources:
+      - title: Huffman coding (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Huffman_coding
+
+  - slug: prefix-codes
+    name: Prefix-free codes
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      In a prefix-free code no code is the start of another, so a stream of bits can be decoded without separators:
+      read bits until they spell a whole code, emit its symbol, and start again. Codes read from the leaves of a
+      binary tree are prefix-free by construction.
+    related: [huffman-coding]
+    resources:
+      - title: Prefix code (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Prefix_code
+
+  - slug: bit-packing
+    name: Packing bits into bytes
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Files hold whole bytes, so single bits and codes of any length have to be packed eight to a byte. Bit n lives in
+      byte n divided by 8, at position n modulo 8. When the last byte is not full it is padded, so the reader needs to
+      know how many bits are real, from a stored count or the header.
+    related: [bytes-vs-characters]
+    resources:
+      - title: Bit array (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Bit_array
+
+  - slug: file-header-format
+    name: Self-describing file headers
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      A binary file usually starts with a header: a fixed identifier that says what kind of file it is, a version, and
+      the numbers a reader needs before the data, such as sizes or a table. Reading checks the identifier and version
+      first, so a wrong or newer file is rejected instead of misread, and the header says where the data starts.
+    resources:
+      - title: List of file signatures (Wikipedia)
+        url: https://en.wikipedia.org/wiki/List_of_file_signatures
+
+  - slug: byte-order
+    name: Byte order of numbers
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A number larger than one byte is stored as several bytes, and the order of those bytes has to be agreed.
+      Big-endian puts the most significant byte first and is the usual order in file formats and network protocols;
+      little-endian puts it last and is what most processors use in memory.
+    resources:
+      - title: Endianness (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Endianness
+
+  - slug: round-trip-testing
+    name: Round-trip testing
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      When one step undoes another, such as compress and decompress or save and load, feed many inputs through both
+      and check that you get back exactly what you started with, byte for byte. Include awkward inputs, such as an
+      empty file, a single repeated symbol and every possible byte value.
+    related: [differential-testing]
+    resources:
+      - title: Round-trip format conversion (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Round-trip_format_conversion
+
+  - slug: hash-functions
+    name: Hash functions
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      A hash function turns any input into a fixed-size number. The same input always gives the same number, and a good
+      non-cryptographic hash such as FNV-1a spreads similar inputs across the whole range. Different inputs can still
+      collide, so code that uses hashes has to decide what a collision means.
+    resources:
+      - title: Fowler-Noll-Vo hash function (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+
+  - slug: bloom-filter
+    name: Bloom filters
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      A Bloom filter answers "is this item in the set?" with a bit array and several hash functions. Adding an item
+      sets the bit chosen by each hash, and a lookup that finds any of those bits clear means definitely not present.
+      All bits set only means probably present, and the bit count and hash count are chosen from the expected number of
+      items and the false positive rate you accept.
+    prerequisites: [hash-functions]
+    related: [bit-packing]
+    resources:
+      - title: Bloom filter (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Bloom_filter
+
+  # ---- added for wave 1: networking (echo server, web server) ----
+  - slug: tcp-sockets
+    name: TCP sockets
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A TCP server binds to an address and port, listens, and accepts connections, each of which becomes its own
+      socket. A connection is a two-way stream of bytes that arrives in order, and a read that returns nothing means
+      the other side closed it.
+    related: [stream-read-contract]
+    resources:
+      - title: Beej's Guide to Network Programming
+        url: https://beej.us/guide/bgnet/
+      - title: RFC 9293, Transmission Control Protocol
+        url: https://www.rfc-editor.org/rfc/rfc9293
+
+  - slug: message-framing
+    name: Message framing on a byte stream
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      TCP keeps no message boundaries: two sends can arrive in one read, and one send can arrive split over several.
+      A protocol therefore marks where a message ends, with a delimiter such as a newline or a blank line, or with a
+      length sent first, and the reader buffers bytes until a whole message is there.
+    prerequisites: [tcp-sockets]
+    related: [stream-read-contract]
+    resources:
+      - title: Beej's Guide to Network Programming
+        url: https://beej.us/guide/bgnet/
+
+  - slug: concurrent-connections
+    name: Serving many connections at once
+    area: concurrency
+    kind: foundation
+    status: generated
+    brief: >-
+      A server that handles one connection at a time makes every other client wait, even for a slow one that sends
+      nothing. Giving each connection its own thread, a thread from a pool, or a slot in an event loop lets clients be
+      served side by side. Any state they share then needs protecting.
+    prerequisites: [tcp-sockets]
+    resources:
+      - title: C10k problem (Wikipedia)
+        url: https://en.wikipedia.org/wiki/C10k_problem
+
+  - slug: udp-datagrams
+    name: UDP datagrams
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      UDP sends separate messages, called datagrams, with no connection. Each read returns exactly one datagram and the
+      address it came from, so a reply goes back to that address. Datagrams can be lost, duplicated or reordered, and
+      nothing retries them for you.
+    related: [tcp-sockets]
+    resources:
+      - title: RFC 768, User Datagram Protocol
+        url: https://www.rfc-editor.org/rfc/rfc768
+
+  - slug: graceful-shutdown
+    name: Graceful shutdown
+    area: concurrency
+    kind: foundation
+    status: generated
+    brief: >-
+      To stop a server without losing work, first stop accepting new connections, then let the work already in flight
+      finish, then close what is left. A time limit keeps one stuck client from blocking the exit forever.
+    related: [concurrent-connections]
+    resources:
+      - title: Graceful exit (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Graceful_exit
+
+  - slug: http-message-format
+    name: The HTTP message format
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      An HTTP/1.1 request is a request line with the method, path and version, then header lines, then an empty line,
+      then an optional body. A response has the same shape, starting with a status line such as 200 OK. Every line
+      ends with a carriage return and a newline, and the empty line is what ends the headers.
+    prerequisites: [message-framing]
+    resources:
+      - title: MDN, HTTP messages
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages
+      - title: RFC 9112, HTTP/1.1
+        url: https://www.rfc-editor.org/rfc/rfc9112
+
+  # ---- added for wave 1: backends (URL shortener, rate limiter) ----
+  - slug: rest-api-design
+    name: Designing a REST API
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A REST API names resources with paths and acts on them with HTTP methods: POST to create, GET to read, DELETE to
+      remove. The status code tells the client what happened, such as 201 for created, 400 for a bad request, 404 for
+      an unknown resource and 429 for too many requests, and the body explains it.
+    prerequisites: [http-message-format]
+    resources:
+      - title: MDN, HTTP request methods
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods
+      - title: MDN, HTTP response status codes
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status
+
+  - slug: http-redirects
+    name: HTTP redirects
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A redirect is a response with a 3xx status and a Location header that names where to go instead, and the browser
+      follows it by itself. A permanent redirect such as 301 may be cached by the browser, so later visits never reach
+      the server, while a temporary one such as 302 is asked for again each time.
+    prerequisites: [http-message-format]
+    resources:
+      - title: MDN, Redirections in HTTP
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Redirections
+
+  - slug: short-id-generation
+    name: Generating short IDs
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A short ID can come from hashing the long value and keeping a few characters, from a counter, or from random
+      characters. Hashing gives the same ID for the same input, and a counter never collides but is guessable. Short
+      IDs from a hash or a random source can collide, so the store must check and pick another when the ID is taken.
+    related: [hash-functions]
+    resources:
+      - title: Base62 (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Base62
+      - title: Birthday problem (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Birthday_problem
+
+  - slug: key-value-store
+    name: Key-value stores
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      A key-value store keeps values under unique keys and offers three basic operations: put, get and delete. It does
+      no joins or queries across values, which makes it fast and simple to scale. A persistent store keeps the data
+      when the process restarts, and an in-memory one loses it.
+    resources:
+      - title: Key-value database (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Key%E2%80%93value_database
+
+  - slug: idempotency
+    name: Idempotent requests
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A request is idempotent when sending it twice leaves the system as sending it once does. Deleting the same item
+      twice, or shortening the same URL twice and getting the same key back, are examples. It matters because clients
+      retry when a reply is lost.
+    related: [rest-api-design]
+    resources:
+      - title: MDN, Idempotent
+        url: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+
+  - slug: token-bucket
+    name: Token bucket rate limiting
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A token bucket holds up to a fixed number of tokens and refills at a steady rate. Each request takes one token,
+      and a request that finds the bucket empty is rejected. The capacity sets how big a burst can be, and the refill
+      rate sets the long-run average.
+    resources:
+      - title: Token bucket (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Token_bucket
+
+  - slug: fixed-window-counter
+    name: Fixed window counters
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A fixed window limiter cuts time into windows of equal length, such as each whole minute, and counts requests in
+      the current one, rejecting any over the limit. It is cheap, but a client can send a full window's worth just
+      before a boundary and another just after, so twice the limit in a short time.
+    related: [token-bucket]
+    resources:
+      - title: Rate limiting (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Rate_limiting
+
+  - slug: sliding-window-log
+    name: Sliding window logs
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A sliding window log keeps the time of every accepted request. For each new request it drops the times older than
+      the window and accepts only if the remaining count is under the limit. It is exact, but its memory grows with the
+      limit for every client.
+    related: [fixed-window-counter]
+    resources:
+      - title: Rate limiting (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Rate_limiting
+
+  - slug: sliding-window-counter
+    name: Sliding window counters
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      A sliding window counter keeps only two counts, for the current and the previous fixed window. It estimates the
+      requests in the last full window by adding the current count to the previous count, weighted by how much of the
+      previous window still overlaps. It smooths the boundary problem with almost no memory.
+    prerequisites: [fixed-window-counter]
+    resources:
+      - title: Cloudflare, How we built rate limiting capable of scaling to millions of domains
+        url: https://blog.cloudflare.com/counting-things-a-lot-of-different-things/
+
+  - slug: distributed-counters
+    name: Counters shared between servers
+    area: concurrency
+    kind: foundation
+    status: generated
+    brief: >-
+      When several servers enforce one limit, the count has to live in a shared store. If each server reads the count,
+      adds one and writes it back, two servers can read the same value and one update is lost. An atomic increment in
+      the store, which does the read and the write as one step, avoids that race.
+    related: [key-value-store]
+    resources:
+      - title: Race condition (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Race_condition
+      - title: Redis, INCR
+        url: https://redis.io/docs/latest/commands/incr/
+
+  # ---- added for wave 2: text algorithms (sort, diff, comment remover) ----
+  - slug: lexicographic-order
+    name: Ordering text
+    area: text-encodings
+    kind: foundation
+    status: generated
+    brief: >-
+      Sorting text compares two strings character by character and decides at the first difference, so apple comes
+      before apricot and a shorter prefix comes first. Comparing raw byte values puts every capital letter before every
+      small one, while a locale's collation rules order text the way a dictionary does, so the same lines can sort
+      differently on two machines.
+    related: [bytes-vs-characters]
+    resources:
+      - title: Lexicographic order (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Lexicographic_order
+      - title: GNU coreutils, sort invocation
+        url: https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
+
+  - slug: sorting-algorithms
+    name: Sorting algorithms
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      Merge sort, quicksort, heapsort and radix sort all put items in order but differ in cost. Merge sort is stable,
+      meaning equal items keep their input order, and always takes order n log n time; quicksort is usually faster but
+      can degrade on unlucky input; heapsort needs no extra memory; radix sort avoids comparisons altogether.
+    prerequisites: [time-space-complexity]
+    resources:
+      - title: Sorting algorithm (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Sorting_algorithm
+
+  - slug: external-sorting
+    name: Sorting more than fits in memory
+    area: streams-io
+    kind: foundation
+    status: generated
+    brief: >-
+      When the input is larger than memory, sort it in pieces that fit, write each sorted piece to a temporary file,
+      then merge the pieces by repeatedly taking the smallest front line among them. Only one line per piece needs to be
+      in memory during the merge.
+    prerequisites: [sorting-algorithms]
+    related: [streaming-constant-memory]
+    resources:
+      - title: External sorting (Wikipedia)
+        url: https://en.wikipedia.org/wiki/External_sorting
+
+  - slug: time-space-complexity
+    name: How cost grows with input
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      Big O notation describes how the time or memory an algorithm needs grows as the input grows, ignoring constant
+      factors. An order n squared algorithm that is fine for a hundred lines can be hopeless for a million, so the
+      question to ask is what happens when the input is ten times bigger.
+    resources:
+      - title: Big O notation (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Big_O_notation
+
+  - slug: longest-common-subsequence
+    name: Longest common subsequence
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      A subsequence keeps items in order but may skip some, so ACE is a subsequence of ABCDE. The longest common
+      subsequence of two sequences is the longest one that both contain, and it is what stays the same between an old
+      and a new file. It is found with a table where each cell holds the answer for two shorter prefixes.
+    prerequisites: [dynamic-programming]
+    resources:
+      - title: Longest common subsequence (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Longest_common_subsequence
+
+  - slug: dynamic-programming
+    name: Dynamic programming
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      Dynamic programming solves a problem by solving its smaller overlapping parts once each and storing the answers
+      in a table, then building the full answer from them. It turns an exponential search into polynomial work, at the
+      price of the memory the table needs.
+    related: [time-space-complexity]
+    resources:
+      - title: Dynamic programming (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Dynamic_programming
+
+  - slug: edit-scripts
+    name: Describing changes as an edit script
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      A diff describes how to turn the old version into the new one: lines only in the old version are removed, lines
+      only in the new version are added, and the common subsequence stays. Classic diff output marks removed lines with
+      a less-than sign and added lines with a greater-than sign, grouped by where they occur.
+    prerequisites: [longest-common-subsequence]
+    resources:
+      - title: Diff (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Diff
+      - title: GNU diffutils, normal format
+        url: https://www.gnu.org/software/diffutils/manual/html_node/Normal.html
+
+  - slug: unit-tests-first
+    name: Writing tests first
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      Writing a small failing test before the code makes you decide what the code should do, including edge cases such
+      as empty input, before you decide how. Each test stays as a guard, so later changes and optimisations can be made
+      without silently breaking what already worked.
+    related: [differential-testing]
+    resources:
+      - title: Test-driven development (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Test-driven_development
+
+  - slug: lexer-states
+    name: Scanning with context states
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      The same characters mean different things in different places: two slashes start a comment in code but not inside
+      a string. A scanner therefore tracks which context it is in, such as code, string, line comment or block comment,
+      and each character can switch the context. A pattern search that ignores context removes too much.
+    related: [lexical-analysis, word-state-machine]
+    resources:
+      - title: Comment (computer programming) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Comment_(computer_programming)
+
+  - slug: meaningful-comments
+    name: Comments that tools read
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Some comments are instructions, not notes. Doc comments right before a declaration become documentation, build
+      constraints decide which files compile, and directives tell a linter to skip a line. A tool that strips comments
+      has to recognise and keep these, or it changes what the program does.
+    related: [lexer-states]
+    resources:
+      - title: Go Doc Comments
+        url: https://go.dev/doc/comment
+      - title: Flake8, selecting and ignoring violations
+        url: https://flake8.pycqa.org/en/latest/user/violations.html
+
+  # ---- added for wave 2: interpreters (calculator, Brainfuck) ----
+  - slug: operator-precedence
+    name: Operator precedence and associativity
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Precedence decides which operator binds tighter, so multiplication happens before addition unless brackets say
+      otherwise. Associativity decides the order among equal operators: subtraction and division work left to right,
+      so 8 minus 3 minus 2 is 3, not 7.
+    resources:
+      - title: Order of operations (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Order_of_operations
+
+  - slug: shunting-yard
+    name: The shunting yard algorithm
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      The shunting yard algorithm turns an infix expression into postfix order. Numbers go straight to the output, and
+      operators wait on a stack until an operator of lower or equal precedence, or a closing bracket, pushes them out.
+      The result can be evaluated without any brackets.
+    prerequisites: [operator-precedence]
+    resources:
+      - title: Shunting yard algorithm (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Shunting_yard_algorithm
+
+  - slug: stack-evaluation
+    name: Evaluating postfix with a stack
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      In postfix order an operator follows its operands, so an expression is evaluated with one stack: push each number,
+      and for each operator pop two numbers, apply it and push the result. The second number popped is the left
+      operand, which matters for subtraction and division. A well-formed expression leaves exactly one number.
+    related: [shunting-yard]
+    resources:
+      - title: Reverse Polish notation (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Reverse_Polish_notation
+
+  - slug: floating-point-numbers
+    name: Integer and floating-point numbers
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      Integers are exact, but integer division drops the remainder. Floating-point numbers hold fractions in binary, so
+      many decimals such as 0.1 are stored approximately and small errors appear in results. A calculator has to choose
+      how it divides and how it prints results.
+    resources:
+      - title: The Floating-Point Guide
+        url: https://floating-point-gui.de/
+
+  - slug: interpreter-loop
+    name: The interpreter loop
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      An interpreter keeps a program counter that points at the current instruction and runs a loop: fetch the
+      instruction, carry it out, move the counter on. A jump instruction sets the counter somewhere else instead.
+      Everything else the program can touch, such as memory cells and a data pointer, is state the loop updates.
+    resources:
+      - title: Interpreter (computing) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Interpreter_(computing)
+      - title: Brainfuck (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Brainfuck
+
+  - slug: bracket-matching
+    name: Matching brackets with a stack
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      To pair each opening bracket with its closing one, push the position of every opening bracket on a stack and pop
+      it when a closing bracket arrives. A pop from an empty stack, or a stack that is not empty at the end, means the
+      brackets are unbalanced. Doing this once before running gives every jump its target.
+    resources:
+      - title: Stack (abstract data type) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Stack_(abstract_data_type)
+
+  - slug: bytecode-compilation
+    name: Compiling to bytecode
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      Instead of interpreting source text directly, a compiler first turns it into a compact list of instructions,
+      dropping comments and working out jump targets once. A small virtual machine then runs the list, which is faster
+      because the slow decisions were made ahead of time.
+    related: [interpreter-loop]
+    resources:
+      - title: Bytecode (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Bytecode
+
+  - slug: peephole-optimization
+    name: Peephole optimisation
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      A peephole optimiser looks at short runs of instructions and replaces them with fewer that do the same thing,
+      such as five increments becoming one add of five, or a loop that only empties a cell becoming one clear. Each
+      rewrite must leave the program's output unchanged.
+    prerequisites: [bytecode-compilation]
+    resources:
+      - title: Peephole optimization (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Peephole_optimization
+
+  - slug: benchmarking
+    name: Measuring performance
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      Measure before and after a change on the same workload and machine, run it several times, and compare like with
+      like, such as wall time against wall time. A change that is not measured is a guess, and an optimisation that
+      changes the output is a bug.
+    resources:
+      - title: Benchmark (computing) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Benchmark_(computing)
+
+  # ---- added for wave 2: files (duplicate file finder) ----
+  - slug: candidate-filtering
+    name: Cheap checks before expensive ones
+    area: design-structure
+    kind: foundation
+    status: generated
+    brief: >-
+      When comparing many items, rule out most pairs with a cheap test first and save the expensive test for what is
+      left. Files of different sizes cannot be duplicates, so group by size before hashing, and only compare bytes for
+      files whose hashes match.
+    related: [time-space-complexity]
+    resources:
+      - title: Data deduplication (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Data_deduplication
+
+  - slug: content-digests
+    name: Content digests
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      A digest such as MD5 or SHA-256 reduces a file of any size to a short fingerprint, computed by streaming the file
+      through it. Equal files always have equal digests, and different files almost never do, but MD5 collisions can be
+      made on purpose, so a byte comparison is the final proof.
+    related: [hash-functions, streaming-constant-memory]
+    resources:
+      - title: Cryptographic hash function (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Cryptographic_hash_function
+
+  - slug: cache-invalidation
+    name: Knowing when a cache is stale
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      A cache saves work by remembering results, but it must know when a result no longer holds. Store what the result
+      depended on, such as a file's size and modification time, next to it, and recompute when either has changed.
+    resources:
+      - title: Cache invalidation (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Cache_invalidation
+
+  - slug: safe-destructive-actions
+    name: Confirming destructive actions
+    area: process-testing
+    kind: foundation
+    status: generated
+    brief: >-
+      A command that deletes or overwrites should show exactly what it will do, ask before doing it, and treat anything
+      other than a clear yes as no. Keeping at least one copy of every duplicate, and logging what was removed, makes a
+      mistake recoverable.
+    related: [cli-subcommands]
+    resources:
+      - title: Command Line Interface Guidelines
+        url: https://clig.dev/
+
+  # ---- added for wave 2: network clients (curl, DNS resolver) ----
+  - slug: url-parsing
+    name: The parts of a URL
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A URL names a scheme, a host, an optional port and a path, as in http, eu.httpbin.org, 80 and /get. When the port
+      is missing the scheme's default is used, 80 for http and 443 for https, and an empty path means the root, a single
+      slash.
+    resources:
+      - title: MDN, What is a URL?
+        url: https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL
+      - title: RFC 3986, URI generic syntax
+        url: https://www.rfc-editor.org/rfc/rfc3986
+
+  - slug: dns-message-format
+    name: The DNS message format
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A DNS message starts with a 12-byte header: an ID that pairs a reply with its query, a flags field with bits such
+      as query or response and recursion desired, and four counts. Then come the question, answer, authority and
+      additional sections, with every number big-endian.
+    prerequisites: [byte-order]
+    related: [udp-datagrams]
+    resources:
+      - title: RFC 1035, Domain names, implementation and specification
+        url: https://www.rfc-editor.org/rfc/rfc1035
+
+  - slug: dns-name-compression
+    name: Encoding and compressing DNS names
+    area: formats-parsing
+    kind: foundation
+    status: generated
+    brief: >-
+      DNS writes a name as labels, each preceded by its length, ending with a zero byte, so dns.google.com becomes 3 dns
+      6 google 3 com 0. To save space, a reply can replace the end of a name with a two-byte pointer whose top two bits
+      are set, giving the offset where the rest of the name already appears.
+    prerequisites: [dns-message-format]
+    resources:
+      - title: RFC 1035, Domain names, implementation and specification
+        url: https://www.rfc-editor.org/rfc/rfc1035
+
+  - slug: iterative-resolution
+    name: Resolving a name from the root
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: >-
+      A resolver that does the work itself starts at a root server, which does not know the answer but names the servers
+      for the top-level domain. It asks those, follows the next referral, and so on until an authoritative server
+      returns the address. A referral that names a server without its address means resolving that name first.
+    prerequisites: [dns-message-format]
+    resources:
+      - title: Domain Name System (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Domain_Name_System
+      - title: Root name server (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Root_name_server
+
+  # ---- added for wave 2: storage servers (Redis, Bitcask) ----
+  - slug: resp-protocol
+    name: The Redis protocol (RESP)
+    area: apis-backends
+    kind: foundation
+    status: generated
+    brief: >-
+      RESP marks each value with its first byte, such as plus for a simple string, colon for an integer, dollar for a
+      bulk string and star for an array, and ends lines with a carriage return and newline. Bulk strings and arrays give
+      their length first, so the reader knows exactly how many bytes or items follow, even when the data has newlines.
+    prerequisites: [message-framing]
+    resources:
+      - title: Redis serialization protocol specification
+        url: https://redis.io/docs/latest/develop/reference/protocol-spec/
+
+  - slug: key-expiry
+    name: Expiring keys
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      A key with a time to live disappears after a set time. Storing the absolute moment it expires, rather than the
+      time left, makes the check one comparison. Checking on every read catches expired keys cheaply, and an occasional
+      background sweep removes ones nobody reads.
+    related: [key-value-store]
+    resources:
+      - title: Redis, EXPIRE
+        url: https://redis.io/docs/latest/commands/expire/
+
+  - slug: snapshot-persistence
+    name: Saving a snapshot to disk
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      An in-memory store can survive a restart by writing its whole state to a file and reading it back at startup.
+      Writing to a temporary file and renaming it over the old one means a crash mid-write leaves the previous snapshot
+      intact, and anything changed since the last snapshot is lost on a crash.
+    related: [key-value-store]
+    resources:
+      - title: Redis persistence
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+
+  - slug: append-only-log
+    name: Append-only log storage
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      An append-only store never changes a record in place: every write, including an update, adds a new record at the
+      end of the active file. Appending is fast and a crash can only damage the last record. The latest record for a key
+      wins, and old ones are cleaned up later.
+    resources:
+      - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
+        url: https://riak.com/assets/bitcask-intro.pdf
+
+  - slug: checksums
+    name: Checksums for stored records
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      A checksum such as CRC-32, stored with each record, is computed again when the record is read. If the two differ
+      the record was cut short or corrupted, for example by a crash mid-write, and it is skipped instead of being
+      trusted.
+    resources:
+      - title: Cyclic redundancy check (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+
+  - slug: hash-index
+    name: An in-memory index into log files
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      Keeping every value in memory does not scale, but keeping only where each value lives does. An in-memory hash
+      table maps each key to the file, the position and the size of its latest value, so a read is one lookup and one
+      disk seek.
+    prerequisites: [append-only-log]
+    related: [key-value-store]
+    resources:
+      - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
+        url: https://riak.com/assets/bitcask-intro.pdf
+
+  - slug: tombstones
+    name: Deleting with tombstones
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      In an append-only store a delete cannot remove the old record, so it appends a tombstone, a record that says the
+      key is gone. Reads and rebuilds treat the tombstone as the latest word on that key, and compaction drops both the
+      tombstone and the old values.
+    prerequisites: [append-only-log]
+    resources:
+      - title: Tombstone (data store) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Tombstone_(data_store)
+
+  - slug: log-compaction
+    name: Compacting a log
+    area: data-stores
+    kind: foundation
+    status: generated
+    brief: >-
+      An append-only log keeps growing with stale values and tombstones. Compaction, which Bitcask calls merging,
+      rewrites the closed files keeping only the latest live value of each key, can write a small hint file listing
+      where each key now lives, and then deletes the old files.
+    prerequisites: [append-only-log, tombstones]
+    resources:
+      - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
+        url: https://riak.com/assets/bitcask-intro.pdf
+
+  - slug: crash-recovery
+    name: Recovering after a crash
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: >-
+      After a crash a store rebuilds its in-memory state from what is on disk, by replaying the log from the start or
+      by reading smaller hint files. Records that fail their checksum, usually a half-written last one, are dropped, so
+      the store comes back with every write that fully reached the disk.
+    related: [checksums, hash-index]
+    resources:
+      - title: Write-ahead logging (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Write-ahead_logging

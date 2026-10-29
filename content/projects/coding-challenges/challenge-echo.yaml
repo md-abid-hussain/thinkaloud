@@ -1,0 +1,330 @@
+# Coding Challenges, Build your own echo server.
+# Source: https://codingchallenges.fyi/challenges/challenge-echo
+# Written in our own words. The source page is linked, not copied. The protocol itself is RFC 862.
+# Every predict and trace key is proven by content/proofs/challenge-echo.mjs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-echo
+  title: Build your own echo server
+  source_url: https://codingchallenges.fyi/challenges/challenge-echo
+  level: beginner
+  status: generated
+  figure:
+    kind: net
+  summary: >-
+    A network server on port 7 that sends back every byte a client sends it, first for one TCP client, then for many
+    at once, then over UDP with a command-line flag, and that shuts down cleanly without dropping echoes that are
+    still on their way.
+  requirements:
+    - Listen on port 7 on every local address and log each connection it accepts
+    - Read what a client sends and write the same bytes back until the client closes the connection
+    - Serve several clients at the same time, so one slow client never holds up another
+    - Run over UDP instead of TCP when started with a UDP flag, still on port 7
+    - Shut down cleanly, finishing echoes in flight and closing every connection
+  restate_rubric:
+    - id: r1
+      point: "It is a server on port 7 that sends back exactly what each client sends it"
+    - id: r2
+      point: "Over TCP it serves many clients at the same time and keeps echoing until each one closes its connection"
+    - id: r3
+      point: "A flag switches it to UDP, and it shuts down cleanly without losing echoes"
+  reflection_prompt: >-
+    In your own words, what surprised you about how data really arrives over TCP and UDP, and what would you change
+    in your server if it had to handle ten thousand clients?
+  primer:
+    what: >-
+      An echo server is the smallest useful network server: whatever a client sends, it sends straight back. The
+      server listens on a port, the echo protocol uses port 7, and each client that connects gets its own
+      connection to read from and write to. You will build one for TCP, make it serve many clients at once, add a
+      UDP mode and make it stop cleanly.
+    why: >-
+      Almost every network program, from web servers to databases, is built on the same few socket calls. An echo
+      server lets you learn them, and how TCP and UDP really deliver data, with nothing else in the way.
+    example: >-
+      In one terminal you start the server. In another you connect with netcat to localhost on port 7 and type good
+      morning, then press enter. The server reads those 13 bytes, 12 letters and spaces plus the newline, and writes
+      the same 13 bytes back, so the line appears twice on your screen: once as you typed it and once as the echo.
+    words:
+      - term: socket
+        meaning: The handle a program uses to send and receive network data, much as a file handle is used to read a file.
+      - term: port
+        meaning: A number from 0 to 65535 that picks out one service on a machine. The echo protocol uses port 7.
+      - term: listening socket
+        meaning: A socket that only waits for clients. Each time it accepts one, it hands back a new socket for that client and keeps waiting.
+      - term: TCP
+        meaning: A protocol that gives two programs a connection carrying a stream of bytes, delivered in order, with lost pieces resent.
+      - term: UDP
+        meaning: A protocol that sends separate messages with no connection. A message can be lost, and nothing resends it.
+      - term: netcat
+        meaning: A command-line tool, nc, that connects to a port and sends what you type, which makes it handy for testing servers.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Echo one client over TCP
+    summary: Accept a connection on port 7, echo its bytes until it closes, and learn how a byte stream really arrives.
+    concepts: [tcp-sockets, stream-read-contract, message-framing]
+    steps:
+      - title: Accept a connection
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            Your server listens on port 7 and accepts one client that connects with netcat. While that client is
+            connected, how many sockets does the server have open, counting the listening one? Answer with the count.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              The listening socket stays open to wait for more clients, and accepting the client hands back a second,
+              new socket that is used only for talking to that client. That makes 2. Proof script output: 2.
+        build:
+          prompt: >-
+            Start a server, ccecho, that binds to every local address on port 7, accepts one TCP connection, logs a
+            line such as Accepted connection from: 127.0.0.1:63798 with the client's address and port, and then exits.
+            Test it by running nc localhost 7 in a second terminal. On Linux and macOS a port below 1024 needs extra
+            privileges, so you may need to run it as an administrator.
+        hints:
+          hint: Does the listening socket go away when a client arrives, and what does accepting give you back?
+          example: >-
+            A receptionist who answers the front desk phone puts each caller through to an extension and is free to
+            answer the next call.
+
+      - title: Echo until the client leaves
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            The server loop reads up to 1024 bytes, writes back exactly what it read, and stops when a read returns
+            zero bytes. A client sends hello and a newline, later sends world and a newline, then closes the
+            connection. Each line arrives in its own read. How many reads does the loop make in total? Answer with the count.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              The first read returns the 6 bytes of hello and its newline, and the second the 6 bytes of world and its
+              newline. After the client closes, the next read returns zero bytes, which means the connection is over,
+              and the loop stops. That is 3 reads. Proof script output: 3.
+        build:
+          prompt: >-
+            After accepting, read from the client and write the same bytes back until a read reports that the client
+            has closed, then log Client disconnected. In netcat, a line you type should appear twice, once as typed
+            and once as the echo, and closing netcat should end the session.
+        hints:
+          hint: Count the reads that bring data, then ask how the loop learns that there is nothing more to come.
+          example: >-
+            On a phone call you keep listening after each sentence, and only the click of the other side hanging up
+            tells you the call is over.
+
+      - title: A line that arrives in pieces
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A client sends hello world and a newline, 12 bytes, in one write. The network delivers it as three packets
+            of 5, 5 and 2 bytes. Each read returns everything that has arrived and not been read yet, and the buffer
+            holds 1024 bytes. Depending on when the server happens to read, what is the fewest and what is the most
+            reads that return data for this line?
+          key:
+            match: numbers_all
+            expected: [1, 3]
+            derivation: >-
+              If all three packets have arrived before the server reads, one read returns all 12 bytes. If the server
+              reads just after each packet lands, each read returns one packet, so 3. Every case in between gives 2.
+              The proof lists every way the packets can be gathered into reads. Proof script output: [1, 3].
+        build:
+          prompt: >-
+            Test the echo with input that may be split: paste a long block of text into netcat, and pipe a file
+            through netcat and compare what comes back with the file. The bytes must come back complete and in order,
+            however many reads it takes.
+        hints:
+          hint: The number of reads depends on timing, not on how the client wrote. Picture the server reading early, then late.
+          example: >-
+            A letter sent in three envelopes might all be in the letterbox when you look, or you might check after
+            each one is delivered.
+
+      - title: One read is not one message
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            A friend changes the server to reply to each line with the word echo, a colon and the line. Sometimes
+            typing hello comes back as two replies, and pasting two lines comes back as one. Find the problem and the fix.
+          snippet: |-
+            while true:
+                data = read(conn, 1024)
+                if data is empty:
+                    break
+                write(conn, "echo: " + data)
+          rubric:
+            - id: p1
+              point: "It treats each read as one line, but TCP keeps no message boundaries, so a read can hold part of a line or several lines"
+            - id: p2
+              point: "Bytes should be collected in a buffer until a newline arrives, and each complete line answered on its own"
+            - id: p3
+              point: "Whatever comes after the last newline stays in the buffer and is joined to the next read"
+        build:
+          prompt: >-
+            Keep your echo server writing back the raw bytes it reads, which needs no framing. Make sure every byte
+            is written: a write can also send less than it was given, so loop until all of it has gone, or use a
+            call your language offers that does this for you.
+        hints:
+          hint: Look back at the line that arrived in pieces. What would this loop write for each of those reads?
+          example: >-
+            Reading a dictated message aloud each time the speaker pauses for breath splits sentences in odd places.
+            Waiting for each full stop gives whole sentences.
+    teach_back:
+      prompt: >-
+        Explain what your server does from the moment a client connects until it leaves, and why code that needs
+        whole lines must never assume that one read is one message.
+      rubric:
+        - id: t1
+          concept: tcp-sockets
+          point: "The server listens on port 7, and accepting a client gives that client its own socket while the listening socket keeps waiting"
+        - id: t2
+          concept: stream-read-contract
+          point: "A read returns whatever has arrived, which can be part of what was sent, and a read of zero bytes means the client closed, which ends the loop"
+        - id: t3
+          concept: message-framing
+          point: "TCP keeps no message boundaries, so code that needs whole lines buffers bytes until a newline, while a plain echo can just write back what it read"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Many clients, UDP and a clean stop
+    summary: Serve clients side by side, add a UDP mode behind a flag, and stop without losing echoes.
+    concepts: [concurrent-connections, udp-datagrams, cli-subcommands, graceful-shutdown]
+    steps:
+      - title: Serve clients side by side
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            A server handles one connection at a time: it echoes for a client until that client leaves, then accepts
+            the next. Client A connects at second 0, sends nothing and leaves at second 30. Client B connects at second
+            5 and sends a line straight away. At which second does B get its echo
+            back? Answer with one number.
+          key:
+            match: number_exact
+            expected: 30
+            derivation: >-
+              The server is busy with A from second 0 until A leaves at second 30. B's connection and its line wait in
+              the queue all that time, even though A sends nothing. At second 30 the server accepts B and echoes the
+              line at once, so B gets it at second 30. Proof script output: 30.
+        build:
+          prompt: >-
+            Keep the server running after each client and accept connections in a loop, handing each one to its own
+            thread or async task. With the server in one terminal and nc localhost 7 in two others, both clients should
+            be echoed at once, and the server should log one Accepted connection from line per client.
+        hints:
+          hint: Follow the server's attention through time. Who is it waiting on between second 5 and second 30?
+          example: >-
+            A shop with one till and a customer who stands there chatting makes everyone behind them wait, however
+            quick their own purchase is.
+
+      - title: Echo over UDP
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            In UDP mode a client sends five datagrams, numbered 1 to 5, one line each. Datagram 3 is lost on the way
+            to the server, and the echo of datagram 5 is lost on the way back. Nothing else is lost. How many echoes
+            reach the client? Answer with the count.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              The server receives 1, 2, 4 and 5, since 3 never arrives, and echoes each of them. The echo of 5 is lost,
+              so the client gets the echoes of 1, 2 and 4. Nothing resends a lost datagram, so that is 3. Proof script
+              output: 3.
+        build:
+          prompt: >-
+            Add a flag, ccecho -udp, that runs the server over UDP on port 7 instead of TCP and logs UDP Echo server
+            listening on :7. Test it with nc -u localhost 7, whose flag may differ in your version of netcat: a line
+            you send should come back. Reject an option you do not know with a message on the error stream and a
+            non-zero exit status.
+        hints:
+          hint: Follow each numbered datagram on its trip to the server and back. Which ones never finish the round trip?
+          example: >-
+            Postcards sent one by one each take their chances. If one goes missing, no one sends it again unless you
+            ask.
+
+      - title: Reply to the right sender
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This UDP echo works when one person tests it, but goes wrong with two clients and with long lines. Find
+            the two problems and the fixes.
+          snippet: |-
+            sock = udp_socket(port 7)
+            client = none
+            while true:
+                data, sender = receive_from(sock, 16)
+                if client is none:
+                    client = sender
+                send_to(sock, data, client)
+          rubric:
+            - id: p1
+              point: "Every reply goes to the first sender ever seen, so a second client's datagrams are echoed to the first client instead"
+            - id: p2
+              point: "UDP has no connection, so each reply must go to the address the datagram came from"
+            - id: p3
+              point: "A datagram longer than the 16-byte buffer is cut short and the rest is thrown away, unlike TCP, so the buffer must be as large as the biggest datagram"
+        build:
+          prompt: >-
+            Make the UDP mode reply to the sender of each datagram, with a buffer big enough for any datagram you
+            expect, and test it with two netcat clients at the same time.
+        hints:
+          hint: Where does the address in each reply come from, and what does a UDP read do with bytes that do not fit?
+          example: >-
+            Answering every letter to the address on the first letter you ever received means your second pen pal
+            never hears back.
+
+      - title: Stop cleanly
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This is the server's handler for Ctrl+C. Clients sometimes lose the end of an echo when the server stops,
+            and a client can even connect during shutdown. Find the problems and say what a clean shutdown does instead.
+          snippet: |-
+            on stop signal:
+                for conn in open_connections:
+                    close(conn)
+                close(listener)
+                exit()
+          rubric:
+            - id: p1
+              point: "It closes client connections before the listener, so new clients can still be accepted during shutdown, and the listener should be closed first"
+            - id: p2
+              point: "It closes connections at once, throwing away bytes that were read but not yet written back, so each handler should finish the echo it has in hand"
+            - id: p3
+              point: "A time limit is needed, so an idle or stuck client cannot keep the server from exiting"
+        build:
+          prompt: >-
+            On Ctrl+C or a stop signal, stop accepting new connections, let every client finish the echo in progress,
+            close all open connections, and exit, with a time limit after which the rest are closed anyway. Check it
+            with two connected netcat clients.
+        hints:
+          hint: Put the shutdown in order. What should stop first, what should be allowed to finish, and what if it never finishes?
+          example: >-
+            A café closing for the night locks the door to new customers first, lets the people inside finish their
+            drinks, and asks anyone still there at closing time to leave.
+    teach_back:
+      prompt: >-
+        Explain how your server serves several clients at once, what changes when it is started in UDP mode, and how
+        it stops without losing anyone's echo.
+      rubric:
+        - id: t1
+          concept: concurrent-connections
+          point: "Each accepted connection gets its own thread or task, so a slow or silent client does not hold up the others"
+        - id: t2
+          concept: udp-datagrams
+          point: "In UDP mode each read is one whole datagram with its sender's address, the reply goes to that address, and a lost datagram is never resent"
+        - id: t3
+          concept: cli-subcommands
+          point: "A command-line flag picks UDP instead of TCP, and an unknown option is rejected with a message on the error stream and a non-zero exit status"
+        - id: t4
+          concept: graceful-shutdown
+          point: "Shutdown stops accepting first, lets echoes in flight finish within a time limit, then closes every connection and exits"

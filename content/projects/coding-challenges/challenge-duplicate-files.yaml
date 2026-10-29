@@ -1,0 +1,373 @@
+# Coding Challenges, Build your own duplicate file finder.
+# Source: https://codingchallenges.fyi/challenges/challenge-duplicate-files
+# Written in our own words. The source page is linked, not copied.
+# Every predict and trace key is proven by content/proofs/challenge-duplicate-files.mjs, which builds the described
+# files in memory and runs the size, digest, cache and --minsize steps on them.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-duplicate-files
+  title: Build your own duplicate file finder
+  source_url: https://codingchallenges.fyi/challenges/challenge-duplicate-files
+  level: intermediate
+  status: generated
+  figure:
+    kind: hash
+  summary: >-
+    A command-line tool that walks a folder tree, finds files with identical content by grouping on size, then MD5
+    digest, then a byte-by-byte check, skips small files on request, and lets you delete one copy of each duplicate
+    after asking which.
+  requirements:
+    - List every file under the folder given on the command line, at any depth
+    - Report files of the same size as potential duplicates, and hash only those
+    - Report files with the same MD5 digest as probable duplicates, and confirm them byte by byte
+    - Skip files smaller than the number of bytes given with --minsize
+    - Ask which file of a duplicate set to delete, and keep every file on any answer that is not a listed number
+  restate_rubric:
+    - id: r1
+      point: "The tool scans a folder and all its subfolders and reports files whose content is identical"
+    - id: r2
+      point: "It narrows the candidates in stages: same size, then same digest, then the same bytes"
+    - id: r3
+      point: "It can skip small files and offers to delete duplicates, asking before it removes anything"
+  reflection_prompt: >-
+    In your own words, where does your tool spend its time on a big folder, and what would you change if it had to
+    scan a million files every night?
+  primer:
+    what: >-
+      A duplicate file finder looks through a folder, and every folder inside it at any depth, for files whose
+      content is exactly the same, whatever they are called. It lists files only; folders themselves are not
+      reported. You will build one called ccdupe that reports duplicate sets and can delete the extra copies.
+    why: >-
+      Copies pile up from downloads, backups and photo imports and waste disk space. Reading and comparing every
+      file against every other one would take far too long, so the tool needs cheap tests that rule most files out
+      before it reads any of them.
+    example: >-
+      A folder holds notes.txt and copy.txt, both 6 bytes with the same text, todo.txt, also 6 bytes but different
+      text, and photo.jpg at 2,000 bytes. No other file is 2,000 bytes, so the photo cannot have a duplicate and is
+      never read. The three 6-byte files are hashed: notes and copy get the same digest and todo gets its own.
+      Finally notes and copy are compared byte by byte and reported as duplicates.
+    words:
+      - term: duplicate
+        meaning: Two or more files whose bytes are exactly the same, even if their names, folders or dates differ.
+      - term: file size
+        meaning: The number of bytes in a file. The file system keeps it, so it is known without reading the file.
+      - term: digest
+        meaning: A short fingerprint computed from every byte of a file, such as an MD5 hash. Equal files have equal digests.
+      - term: MD5
+        meaning: A fast digest of 128 bits. Fine for spotting likely copies, but two different files can be made to share one.
+      - term: candidate
+        meaning: A file that has not yet been ruled out as a duplicate and needs a closer check.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Walk the tree and group by size
+    summary: List every file under a folder, then keep only files that share a size with another file.
+    concepts: [recursive-file-walk, candidate-filtering, time-space-complexity]
+    steps:
+      - title: List every file
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A folder holds three files and two subfolders. The subfolder photos holds two files, and the subfolder
+            empty holds nothing. How many file paths does ccdupe list when it is run on the folder? Answer with one number.
+          key:
+            match: number_exact
+            expected: 5
+            derivation: >-
+              The three files at the top count, and so do the two inside photos. The two subfolders are folders, not
+              files, and empty adds nothing, so 3 + 2 = 5. Running find with the file type filter and wc -l on the same
+              tree in Git Bash also gives 5. Proof script output: 5.
+        build:
+          prompt: >-
+            Make test data: twenty files of 100 random bytes each, one of them copied to a twenty-first file, and a
+            few subfolders at different depths holding further copies. Then make ccdupe take a folder as its argument
+            and print the path of every file inside it, at any depth. A missing argument or a folder that does not
+            exist should give a message on the error stream and a non-zero exit status.
+        hints:
+          hint: Count only the things that hold bytes, and look inside every folder, including the ones that turn out to be empty.
+          example: >-
+            Counting the books in a bookcase means counting the books on every shelf, not the shelves themselves, and an
+            empty shelf adds nothing.
+
+      - title: Group by size
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            The top folder holds a.bin of 100 bytes and b.bin of 200 bytes. Its subfolder holds c.bin of 100 bytes
+            and d.bin of 300 bytes. A deeper subfolder holds e.bin of 300 bytes, f.bin of 400 bytes and g.bin of 100
+            bytes. After grouping by size, how many files still need hashing? Answer with one number.
+          key:
+            match: number_exact
+            expected: 5
+            derivation: >-
+              Size groups are built across the whole tree, not per folder. The 100-byte group holds a, c and g, and the
+              300-byte group holds d and e. b and f are the only files of their sizes, so they cannot have a
+              duplicate. That leaves 3 + 2 = 5 files. Proof script output: 5.
+        build:
+          prompt: >-
+            Record the path and size of every file, and print one line starting Potential duplicates for each group of
+            two or more files of the same size, in place of the plain listing. On the test data every file is 100
+            bytes, so they all show up as potential duplicates, which is why the next milestone is needed.
+        hints:
+          hint: Sort every file into a pile by its size, wherever it lives, then throw away the piles that hold one file.
+          example: >-
+            Matching socks from a laundry basket, you would first sort them by colour. A colour with only one sock
+            cannot make a pair, so you never look at that sock again.
+
+      - title: Walk safely
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This walker works on the test folder, but on a real home folder it never finishes or stops partway with
+            an error. Find the two problems and say how to fix them.
+          snippet: |-
+            function walk(folder, files):
+                for name in list_entries(folder):
+                    path = folder + "/" + name
+                    if is_directory(path):
+                        walk(path, files)
+                    else:
+                        files.add(path)
+          rubric:
+            - id: p1
+              point: "A symbolic link that points to a folder above it makes the walk go round in a loop forever, because the check follows links"
+            - id: p2
+              point: "Skip symbolic links, or remember the folders already visited by their real identity and do not enter one twice"
+            - id: p3
+              point: "A folder it is not allowed to read makes listing fail and stops the whole scan; it should report that folder on the error stream and carry on"
+        build:
+          prompt: >-
+            Make the walk skip symbolic links and report, then skip, any folder or file it cannot read, so one bad
+            entry never stops the scan.
+        hints:
+          hint: Picture a shortcut inside a folder that points back at that same folder, and follow what the walker does with it.
+          example: >-
+            Two mirrors facing each other show a corridor that never ends. A walker that follows a link back to where it
+            came from sees the same thing.
+    teach_back:
+      prompt: >-
+        Explain how your tool finds every file under a folder, why it groups by size before reading any content, and
+        what that saves as the folder grows from a hundred files to a million.
+      rubric:
+        - id: t1
+          concept: recursive-file-walk
+          point: "It lists each folder, keeps the files and descends into each subfolder the same way, skipping symbolic links and reporting folders it cannot read"
+        - id: t2
+          concept: candidate-filtering
+          point: "Files of different sizes cannot be duplicates, so only files that share a size with another file go on to be hashed, and the size is known without reading the file"
+        - id: t3
+          concept: time-space-complexity
+          point: "Comparing every file with every other grows with the square of the number of files, while sorting them into size groups is one pass, so the cost stays manageable for a million files"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Digests and the final proof
+    summary: Hash the same-size candidates in chunks, group them by MD5, and confirm each group byte by byte.
+    concepts: [content-digests, streaming-constant-memory, candidate-filtering]
+    steps:
+      - title: Group by digest
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            Six candidate files, A to F, are all 100 bytes. A, C and F hold exactly the same bytes, B and E hold the
+            same bytes as each other, and D is unlike any other. The tool prints one Probable duplicates line for
+            each group of two or more files with the same MD5 digest. How many lines does it print? Answer with one
+            number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              Equal content always gives an equal digest, so A, C and F share one digest and B and E share another. D
+              has a digest of its own and forms no group. That makes 2 groups, so 2 lines. md5sum in Git Bash on the
+              same six files shows the same two repeated digests. Proof script output: 2.
+        build:
+          prompt: >-
+            Compute the MD5 digest of each candidate from the size step and print one line starting Probable
+            duplicates for each group of matching digests. On the test data only the original file and its copies
+            should now appear together.
+        hints:
+          hint: Group the files by what they hold, then count only the groups with more than one member.
+          example: >-
+            In a class where three pupils share a birthday, two others share another and one has a birthday of their
+            own, there are two shared birthdays.
+
+      - title: Hash big files
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This digest step gives the right groups on the test data but is slow on a real disk and crashes on a
+            folder of videos. Find the two problems and say how to fix them.
+          snippet: |-
+            groups = map from digest to list of paths
+            for path in all_files:
+                data = read_all(path)
+                groups[md5(data)].add(path)
+            for digest, paths in groups:
+                if length(paths) > 1:
+                    print("Probable duplicates:", paths)
+          rubric:
+            - id: p1
+              point: "It hashes every file, not just the ones that share a size with another file, so it reads far more data than it needs to"
+            - id: p2
+              point: "It reads each whole file into memory before hashing, so a file larger than the memory available crashes the tool"
+            - id: p3
+              point: "Feed the file to the digest in fixed-size chunks, so memory stays the same whatever the file size"
+        build:
+          prompt: >-
+            Hash only the files from size groups of two or more, and feed each file to the digest in fixed-size
+            chunks so memory use does not grow with the file.
+        hints:
+          hint: Ask what the loop is given, and what happens in memory when one of those files is 20 GB.
+          example: >-
+            You can weigh a sack of flour by pouring it through a funnel one cup at a time and keeping a running
+            total, without ever needing a bowl large enough for the whole sack.
+
+      - title: Confirm byte by byte
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            Two files of the same size have the same MD5 digest. Why does your tool still compare them byte by byte
+            before it calls them duplicates, and why is that step affordable?
+          rubric:
+            - id: p1
+              point: "Different files can share an MD5 digest, and such pairs can be made on purpose, so a matching digest is strong evidence but not proof"
+            - id: p2
+              point: "The tool may offer to delete one of them, so a false match would lose data, which makes the certainty worth paying for"
+            - id: p3
+              point: "Only files that already match on size and digest reach this check, and the comparison reads both files in chunks and stops at the first byte that differs"
+        build:
+          prompt: >-
+            Compare every pair in a digest group byte by byte, reading both files in chunks, and print one line
+            starting Duplicates for each set that matches completely.
+        hints:
+          hint: Think about what you would lose if two different files were ever treated as copies.
+          example: >-
+            Two people with the same first name and birthday are probably not the same person, so a bank still checks
+            their full ID before merging their accounts.
+    teach_back:
+      prompt: >-
+        A folder holds a 20 GB video, a copy of it under another name, and thousands of small files. Explain how your
+        tool finds the pair of videos without running out of memory, and at what point it is sure they match.
+      rubric:
+        - id: t1
+          concept: candidate-filtering
+          point: "Only files that share a size are hashed, and only files that share a digest are compared byte by byte, so most files are ruled out cheaply"
+        - id: t2
+          concept: streaming-constant-memory
+          point: "Each file is read in fixed-size chunks that are fed to the digest or the comparison, so memory stays the same even for a 20 GB file"
+        - id: t3
+          concept: content-digests
+          point: "Matching MD5 digests make the videos probable duplicates, and the byte-by-byte comparison is what makes them certain, because MD5 collisions can be made"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Options, caching and deleting
+    summary: Add a minimum size option, cache digests between runs, and delete duplicates only on a clear answer.
+    concepts: [cli-subcommands, cache-invalidation, safe-destructive-actions]
+    steps:
+      - title: A minimum size
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            A folder holds files of 0, 0, 500, 999, 1000, 1000 and 4096 bytes, and you run ccdupe with --minsize=1000,
+            which skips any file smaller than 1000 bytes. How many files are left for the size grouping? Answer with
+            one number.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              Smaller than 1000 means the two empty files, the 500-byte file and the 999-byte file are skipped. A file of
+              exactly 1000 bytes is not smaller than 1000, so both of those stay, along with the 4096-byte file: 3
+              files. Proof script output: 3.
+        build:
+          prompt: >-
+            Accept an optional --minsize option, for example --minsize=1000, and skip every file below that many
+            bytes. Reject a value that is not a whole number with a message on the error stream and a non-zero exit
+            status.
+        hints:
+          hint: Decide for each file on its own whether it is smaller than the limit, and look closely at a file that is exactly at the limit.
+          example: >-
+            A ride that needs riders to be at least 120 cm tall lets in a child of exactly 120 cm and turns away one of
+            119 cm.
+
+      - title: Cache the digests
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            Your tool stores each file's MD5 in a cache keyed by its path, size and modification time, and hashes a
+            file only when the cache has no entry for that key. The first run hashes five candidate files. Before the
+            second run you edit one file without changing its size, touch a second so that only its modification time
+            changes, and rename a third. The other two are untouched and all five are still candidates. How many files
+            does the second run hash? Answer with one number.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              The edited file has a new modification time, so its key changed. The touched file holds the same bytes,
+              but its modification time changed, so its key changed too. The renamed file has a new path, so its key is
+              new. The two untouched files hit the cache. That is 3 files hashed again. Proof script output: 3.
+        build:
+          prompt: >-
+            Cache each file's digest between runs, in memory or in a small local database such as SQLite, together
+            with the size and modification time it was computed for, and hash the file again when either has
+            changed.
+        hints:
+          hint: For each of the five files, ask whether its path, its size and its modification time are all exactly what the cache stored.
+          example: >-
+            A cloakroom ticket is checked against the number, the colour and the coat. If any of them is different, the
+            attendant does not hand anything over, even if it might be the same coat.
+
+      - title: Delete with care
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            The tool shows a duplicate set and asks which file to delete, and any answer that is not one of the listed
+            numbers should keep every file. Find the problems in this code and say how to fix them.
+          snippet: |-
+            print("Which file should be deleted?")
+            for i, path in paths:
+                print(i + 1, path)
+            answer = read_line()
+            index = to_number(answer) - 1
+            delete(paths[index])
+          rubric:
+            - id: p1
+              point: "An answer that is not a number, such as an empty line or a word, either crashes the tool or is read as zero instead of keeping every file"
+            - id: p2
+              point: "An answer of zero gives an index of minus one, which in many languages picks the last file, and a number above the list fails, so a file can be deleted that the user never chose"
+            - id: p3
+              point: "Only accept a whole number from 1 to the number of files listed; for anything else delete nothing and move on to the next set"
+        build:
+          prompt: >-
+            Show each duplicate set with the files numbered from 1, ask which file should be deleted, say that any
+            other value keeps the files, and move on. Delete only on a valid number, and print which file was
+            removed.
+        hints:
+          hint: Try the answers 0, an empty line and the word two, and work out what the code deletes for each.
+          example: >-
+            A cash machine that is given a PIN it cannot read cancels the transaction; it does not guess what you
+            meant.
+    teach_back:
+      prompt: >-
+        Explain how a run of ccdupe with --minsize goes from the command line to a deleted file, and how it avoids both
+        repeating work from the last run and deleting the wrong thing.
+      rubric:
+        - id: t1
+          concept: cli-subcommands
+          point: "It reads the folder and the --minsize option from its arguments, skips files below that size, and rejects a bad option with a message on the error stream and a non-zero exit status"
+        - id: t2
+          concept: cache-invalidation
+          point: "A cached digest is reused only when the file's path, size and modification time all match what was stored, and otherwise the file is hashed again"
+        - id: t3
+          concept: safe-destructive-actions
+          point: "It shows each duplicate set, deletes only when the answer is a valid listed number, keeps every file on any other answer, and says what it removed"

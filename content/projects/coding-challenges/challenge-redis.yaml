@@ -1,0 +1,430 @@
+# Coding Challenges, Build your own Redis server.
+# Source: https://codingchallenges.fyi/challenges/challenge-redis
+# Written in our own words. The source page is linked, not copied. The wire format follows the Redis protocol
+# specification (RESP2). Every predict and trace key is proven by content/proofs/challenge-redis.mjs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-redis
+  title: Build your own Redis server
+  source_url: https://codingchallenges.fyi/challenges/challenge-redis
+  level: intermediate
+  status: generated
+  figure:
+    kind: kv
+  summary: >-
+    A small Redis-compatible server on port 6379 that speaks the Redis protocol, keeps keys in memory with optional
+    expiry, serves many clients at once, supports counters and lists, saves its data to disk and can be measured
+    against the real Redis with redis-benchmark.
+  requirements:
+    - Encode and decode every RESP type, including the null bulk string, and reject malformed input
+    - Listen on port 6379 and answer PING with PONG and ECHO with its argument
+    - Store values with SET and read them with GET, replying in the format the real Redis uses
+    - Serve many clients at the same time without errors, checked with redis-benchmark
+    - Support the expiry options EX, PX, EXAT and PXAT on SET
+    - Add EXISTS, DEL, INCR, DECR, LPUSH, RPUSH and SAVE, and load the saved data on startup
+  restate_rubric:
+    - id: r1
+      point: "It is an in-memory key-value server that clients talk to over TCP using the Redis protocol"
+    - id: r2
+      point: "It handles commands such as PING, ECHO, SET and GET, plus expiry, counters and lists"
+    - id: r3
+      point: "It serves many clients at once and can save its data to disk and load it again on startup"
+  reflection_prompt: >-
+    In your own words, what decided how fast and how correct your server was under fifty clients at once, and what
+    would you change to make it survive a crash without losing recent writes?
+  primer:
+    what: >-
+      Redis is a database that keeps all its data in memory and answers commands sent over a network connection, such
+      as SET to store a value under a key and GET to read it back. Clients and server talk in a simple text-like
+      format called RESP. You will build a small server that speaks RESP on port 6379, so the real redis-cli and
+      redis-benchmark tools can talk to it.
+    why: >-
+      Holding data in memory makes every command fast, which is why Redis is used for caches, sessions and counters.
+      Building it teaches how a protocol marks where one message ends on a stream of bytes, and how a server stays
+      correct when many clients change the same data.
+    example: >-
+      When you type PING in redis-cli, the client sends an array holding one bulk string. On the wire that is a star
+      and the digit 1, then a carriage return and a newline. Next comes a dollar sign and the digit 4, the length of
+      the word, then a carriage return and a newline, then the four letters P, I, N and G, and one more carriage
+      return and newline. Your server reads that, and replies with a plus sign, the word PONG and a carriage return
+      and newline.
+    words:
+      - term: RESP
+        meaning: The Redis protocol. The first byte of each value says its type, and every line ends with a carriage return and a newline.
+      - term: carriage return and newline
+        meaning: The two bytes that end every line in RESP, often written as CRLF. Together they count as 2 bytes.
+      - term: simple string
+        meaning: A short reply that starts with a plus sign, such as OK or PONG. It cannot contain a line break.
+      - term: bulk string
+        meaning: A string that starts with a dollar sign and its length in bytes, so it can hold any bytes at all.
+      - term: array
+        meaning: A list of values that starts with a star and the number of items it holds. Clients send every command as an array.
+      - term: key
+        meaning: The name a value is stored under, such as Name in SET Name John.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Speak RESP and answer PING
+    summary: Encode and decode RESP messages, then accept connections on port 6379 and answer PING and ECHO.
+    concepts: [resp-protocol, message-framing, tcp-sockets]
+    steps:
+      - title: Bulk strings on the wire
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            Your server sends the word hello back as a bulk string. How many bytes does that bulk string take on the
+            wire, counting every marker, digit and line ending? Answer with the total.
+          key:
+            match: number_exact
+            expected: 11
+            derivation: >-
+              A bulk string is a dollar sign, its length in digits, a carriage return and newline, the data, and
+              another carriage return and newline. For hello that is 1 + 1 + 2 + 5 + 2 = 11 bytes. Proof script
+              output: 11.
+        build:
+          prompt: >-
+            Write a serialiser and a deserialiser for the five RESP types: simple string, error, integer, bulk string
+            and array, plus the null bulk string and null array. Test them on the messages the challenge lists, such
+            as the null bulk string, PING as an array of one bulk string, ECHO with hello world, GET with key, OK, an
+            error message, the empty bulk string and hello world as a simple string.
+        hints:
+          hint: Walk the message left to right and count each piece, remembering that a line ending is two bytes.
+          example: >-
+            The bulk string holding the word hi is a dollar sign, the digit 2, two line-ending bytes, the two letters
+            and two more line-ending bytes, which is 8 bytes.
+
+      - title: Lengths, not delimiters
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A client stores a value made of the word up, a single newline byte, and the word down. What number follows
+            the dollar sign in the bulk string that carries this value? Answer with one number.
+          key:
+            match: number_exact
+            expected: 7
+            derivation: >-
+              The length counts every byte of the data, and the newline inside the value is data like any other byte:
+              2 + 1 + 4 = 7. The reader takes exactly 7 bytes and then expects the closing carriage return and newline,
+              so the newline inside never ends the string early. Proof script output: 7.
+        build:
+          prompt: >-
+            Make the deserialiser read a bulk string by its length rather than by searching for the next line ending,
+            and add tests for invalid input: an unknown first byte, a length that is not a number, and a message that
+            stops before its last byte.
+        hints:
+          hint: Ask what the length measures. Is a newline inside the value part of the value or part of the framing?
+          example: >-
+            A parcel label that says it holds 3 books tells the receiver to unpack exactly three, even if one of the
+            books has a page that looks like a packing slip.
+
+      - title: Listen on 6379, answer PING and ECHO
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            In a shell you type redis-cli ECHO "Hello World", with the double quotes. How many elements does the array
+            that redis-cli sends to your server hold? Answer with one number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              The shell turns the quoted text into one argument, so redis-cli has two arguments, ECHO and Hello World,
+              and sends an array of two bulk strings. The array starts with a star and the count 2, and the second
+              bulk string has length 11 because it holds the space. Proof script output: 2.
+        build:
+          prompt: >-
+            Listen on port 6379 and accept connections. Answer PING with PONG and ECHO with its argument, and check
+            with redis-cli that PING prints PONG and ECHO "Hello World" prints the same text back.
+        hints:
+          hint: Think about what the quotes do before redis-cli ever sees the words.
+          example: >-
+            Writing a street address on one line of a form keeps it as one entry, even though it is made of several
+            words.
+
+      - title: One read is not one command
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This connection handler works when you type commands one at a time in redis-cli, but fails under load.
+            What does it assume about reads, and how do you fix it?
+          snippet: |-
+            loop:
+                data = read(connection, 1024)
+                if data is empty:
+                    break
+                command = parse_array(data)
+                reply = run(command)
+                write(connection, reply)
+          rubric:
+            - id: p1
+              point: "It assumes one read holds exactly one whole command, but TCP is a stream, so a read can hold half a command or several"
+            - id: p2
+              point: "A command split across two reads fails to parse, and when two pipelined commands arrive in one read the second is lost"
+            - id: p3
+              point: "Keep a buffer per connection, add each read to it, run every complete message it holds and keep the leftover bytes for the next read"
+        build:
+          prompt: >-
+            Give each connection its own input buffer, parse as many complete commands as it holds, and keep any
+            partial command until the rest arrives. Test it by sending two commands in one write and one command
+            split over two writes.
+        hints:
+          hint: What does a single read return when the client sent two commands a millisecond apart?
+          example: >-
+            Letters pushed through a door slot can arrive in a bundle or one at a time. You open each one only when it
+            is complete, and you never throw away the second letter in a bundle.
+    teach_back:
+      prompt: >-
+        A client opens a connection to your server and sends ECHO with a value that contains a line break. Explain how
+        the bytes travel and how your server knows where the command ends and what to send back.
+      rubric:
+        - id: t1
+          concept: tcp-sockets
+          point: "The server listens on port 6379, accepts the client's connection as its own socket, and reads and writes a stream of bytes on it"
+        - id: t2
+          concept: message-framing
+          point: "TCP keeps no message boundaries, so the server buffers bytes and only acts once a whole command has arrived"
+        - id: t3
+          concept: resp-protocol
+          point: "The command is an array whose first line gives the number of items, and each bulk string gives its length before its data"
+        - id: t4
+          concept: resp-protocol
+          point: "Because the length is known, a line break inside the value is read as data, and the reply is a bulk string with the same length"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Store keys for many clients
+    summary: Store values with SET and GET, serve many clients at once, and measure the server with redis-benchmark.
+    concepts: [key-value-store, concurrent-connections, benchmarking]
+    steps:
+      - title: SET and GET
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A client sends GET for a key that was never set. Your server replies the way Redis does over RESP2, with a
+            bulk string that means no value at all. How many bytes long is that reply? Answer with one number.
+          key:
+            match: number_exact
+            expected: 5
+            derivation: >-
+              A missing value is the null bulk string: a dollar sign, the length minus one, then a carriage return
+              and newline. That is 1 + 2 + 2 = 5 bytes. An empty string would be different, a length of 0 followed by
+              an empty line, which is 6 bytes. Proof script output: 5.
+        build:
+          prompt: >-
+            Store values in a map in memory. SET Name John should reply OK and GET Name should then reply John, and
+            GET of a missing key should make redis-cli print nil. Reply with an error when a command has the wrong
+            number of arguments.
+        hints:
+          hint: Nothing and an empty string are not the same reply. Which marker says there is no value at all?
+          example: >-
+            An empty envelope and no envelope are different answers to the question did any mail come for me.
+
+      - title: Many clients at once
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            Your first server serves one connection until it closes and only then accepts the next. redis-benchmark
+            opens 50 connections at once. What happens, and what are two ways to fix it?
+          rubric:
+            - id: p1
+              point: "Only the first connection is served, and the other 49 wait, so the benchmark stalls or times out even though the server is mostly idle"
+            - id: p2
+              point: "One fix gives each connection its own thread, so a slow or quiet client never blocks the others"
+            - id: p3
+              point: "Another fix is an event loop with non-blocking sockets, which serves whichever connections have data ready on a single thread"
+            - id: p4
+              point: "With threads, the shared map has to be protected, for example with a lock, so two clients cannot change it at the same moment"
+        build:
+          prompt: >-
+            Serve many clients at the same time, with a thread per client or with asynchronous input and output, and
+            ideally try both. Run redis-benchmark with -t SET,GET and -q, which opens 50 connections, adding -n 1000
+            if it takes too long, and check that it finishes with no errors and no crash.
+        hints:
+          hint: Picture the second client connecting while the first one is still connected but has gone quiet.
+          example: >-
+            A shop with one assistant who serves one customer from the moment they walk in until they leave keeps a
+            queue outside, even while that customer is only browsing.
+
+      - title: Measure against the real Redis
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            redis-benchmark reports about 40,000 requests per second for your server and about 110,000 for the real
+            Redis. Before you change any code, how do you make the comparison fair, and where would you look first
+            for the gap?
+          rubric:
+            - id: p1
+              point: "Run both servers on the same machine with the same benchmark command, the same request count and the same number of connections"
+            - id: p2
+              point: "Run each benchmark several times and compare the spread, not a single run"
+            - id: p3
+              point: "Look first at the storage structure, which should find a key in constant time, and at how shared data is locked between clients"
+            - id: p4
+              point: "Measure again after each change and check the replies are still correct, because a faster wrong answer is a bug"
+        build:
+          prompt: >-
+            Benchmark GET and SET on your server and on a local Redis, running redis-benchmark with the options -t
+            set,get and -n 100000 and -q, and compare the requests per second and the p50 latency. If yours is far behind, check your data
+            structure and how you handle concurrent access, then measure again.
+        hints:
+          hint: Change one thing at a time, and ask what else differs between the two runs besides your code.
+          example: >-
+            Comparing two runners is only fair on the same track, on the same day, over the same distance.
+    teach_back:
+      prompt: >-
+        Fifty clients send SET and GET to your server at the same time. Explain how the server stores the values, how
+        it serves all fifty, and how you would show it is fast enough.
+      rubric:
+        - id: t1
+          concept: key-value-store
+          point: "Values live in an in-memory map from key to value, so SET and GET are a single lookup, and a missing key gives a null reply"
+        - id: t2
+          concept: concurrent-connections
+          point: "Each connection is served by its own thread or by an event loop, so no client waits for another to finish"
+        - id: t3
+          concept: concurrent-connections
+          point: "The map they all share is protected, so two clients changing it at once cannot corrupt it"
+        - id: t4
+          concept: benchmarking
+          point: "redis-benchmark is run against the server and the real Redis on the same machine with the same settings, several times, and the results are compared"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Expiry, counters, lists and saving
+    summary: Add the expiry options to SET, the counter and list commands, and SAVE with loading on startup.
+    concepts: [key-expiry, distributed-counters, snapshot-persistence]
+    steps:
+      - title: Expiry options on SET
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            When the server clock reads 1,000 seconds, a client sends SET token abc PX 4000. Your server stores the
+            absolute moment the key expires, in seconds. What moment does it store? Answer with one number.
+          key:
+            match: number_exact
+            expected: 1004
+            derivation: >-
+              PX gives the time to live in milliseconds, so 4000 is 4 seconds. Storing the absolute moment means adding
+              it to the current time: 1000 + 4 = 1004. Then any later read only compares the clock with 1004. Proof
+              script output: 1004.
+        build:
+          prompt: >-
+            Extend SET with EX for seconds, PX for milliseconds, EXAT for an absolute Unix time in seconds and PXAT for
+            one in milliseconds. Turn each into the same absolute expiry moment, and write automated tests that read
+            a key before and after it expires.
+        hints:
+          hint: Two questions, what unit PX uses, and what you add the time to live to.
+          example: >-
+            A parking ticket printed at 2 pm with 90 minutes on it is checked against a printed end time of 3:30, not
+            against a clock counting down inside the car.
+
+      - title: Expire cheaply
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This expiry scheme gives wrong answers and gets slower as the store grows. Find both problems and describe
+            a better design.
+          snippet: |-
+            every 1 second:
+                for key in store:
+                    store[key].seconds_left = store[key].seconds_left - 1
+                    if store[key].seconds_left <= 0:
+                        delete store[key]
+
+            on GET key:
+                if key in store:
+                    return store[key].value
+                return null
+          rubric:
+            - id: p1
+              point: "GET never checks the expiry, so a key can still be returned for up to a second after it should have gone"
+            - id: p2
+              point: "Counting down the time left touches every key every second, so the cost grows with the number of keys, and a late timer makes the times drift"
+            - id: p3
+              point: "Store the absolute expiry moment, check it on every read and treat an expired key as missing, and let a background task only remove a small sample of expired keys"
+        build:
+          prompt: >-
+            Check the stored expiry moment whenever a key is read, and add a light background task that removes some
+            expired keys that nobody reads, so expiry stays cheap however many keys there are.
+        hints:
+          hint: Ask what a reader sees between the moment a key expires and the next tick of the timer.
+          example: >-
+            A shop checks the date on a carton of milk when a customer picks it up, rather than walking every aisle
+            once a minute.
+
+      - title: Counters that do not lose updates
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            A key named counter holds 5. Two clients, A and B, each want to add one, but instead of INCR each sends
+            GET, adds one itself and sends SET. The server receives them in this order: A's GET, B's GET, A's SET,
+            B's SET. What does counter hold afterwards? Answer with one number.
+          key:
+            match: number_exact
+            expected: 6
+            derivation: >-
+              Both GETs read 5, before either SET has happened. A sets 5 + 1 = 6, then B also sets 5 + 1 = 6, so one of
+              the two updates is lost. With INCR the server reads and writes in one step, and the result would be 7.
+              Proof script output: 6.
+        build:
+          prompt: >-
+            Add EXISTS and DEL, which take one or more keys and reply with how many exist or were deleted, and INCR
+            and DECR, which change a stored integer by one as a single step on the server. INCR on a missing key
+            starts from 0, and INCR on a value that is not an integer replies with an error.
+        hints:
+          hint: Write down what each client has seen after each of the four messages, in order.
+          example: >-
+            Two clerks each read a stock count of 5 from the same card, each sell one, and each write 4 on the card.
+            Two items left the shelf, but the card only shows one.
+
+      - title: Lists and saving to disk
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A client runs SET a 10, then SAVE, then INCR a twice, then SET b 5. The server crashes, and on restart it
+            loads the saved snapshot. What does GET a return now? Answer with one number.
+          key:
+            match: number_exact
+            expected: 10
+            derivation: >-
+              SAVE writes the whole store as it is at that moment, when a holds 10 and b does not exist. The two INCRs
+              and the SET of b happen only in memory, so the crash loses them. Loading the snapshot gives a back as 10,
+              and b is missing. Proof script output: 10.
+        build:
+          prompt: >-
+            Add LPUSH and RPUSH, which add values to the head or the tail of a list and reply with its new length, and
+            SAVE, which writes the whole store to a file. Load that file on startup, and write it to a temporary file
+            first and rename it over the old one so a crash during SAVE leaves the last snapshot intact.
+        hints:
+          hint: List what is in memory at the moment of SAVE, and separately what happened after it.
+          example: >-
+            A photo of a whiteboard shows what was written when it was taken. Anything added after the photo is gone
+            if the board is wiped.
+    teach_back:
+      prompt: >-
+        Explain how your server makes a key disappear at the right moment, how INCR stays correct when many clients
+        use it, and what survives a restart.
+      rubric:
+        - id: t1
+          concept: key-expiry
+          point: "SET turns EX, PX, EXAT or PXAT into one absolute expiry moment, and every read compares the clock with it and treats an expired key as missing"
+        - id: t2
+          concept: distributed-counters
+          point: "INCR reads, adds and writes in one step on the server, so two clients cannot both read the same old value and lose an update"
+        - id: t3
+          concept: snapshot-persistence
+          point: "SAVE writes the whole store to a file that is loaded on startup, so data survives a restart but changes made after the last SAVE are lost in a crash"
+        - id: t4
+          concept: snapshot-persistence
+          point: "The snapshot is written to a temporary file and renamed over the old one, so a crash during SAVE never leaves a half-written snapshot"

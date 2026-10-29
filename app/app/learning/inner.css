@@ -1,0 +1,43 @@
+/* Your learning, Concept and Settings: built straight from DESIGN_SYSTEM.md (short head, one-column sections). */
+.pg-inner .head { padding-block: 32px 24px; max-width: 46em; }
+.pg-inner .head h1 { font-weight: 700; font-size: clamp(2.1rem, 3.6vw, 3rem); line-height: 1.05; letter-spacing: -0.025em; margin: 10px 0 12px; }
+.pg-inner .head .lede { margin: 0; font-size: 19px; line-height: 1.55; }
+.pg-inner .facts { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 14px 0 0; padding: 0; list-style: none; font: 400 13px/1.5 var(--f-mono); color: var(--muted); }
+.pg-inner .facts li + li::before { content: "·"; margin: 0 10px; color: var(--muted); }
+.pg-inner .actions { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 20px; align-items: center; }
+.pg-inner .sec { border-top: 1.5px solid var(--ink); padding-block: 40px; }
+.pg-inner .sec-h { margin-bottom: 20px; }
+.pg-inner .sec-h h2 { font-weight: 700; font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.1; letter-spacing: -0.02em; margin-top: 8px; }
+.pg-inner .list { list-style: none; margin: 0; padding: 0; }
+.pg-inner .list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.pg-inner .list > li:first-child { border-top: 1px solid var(--rule); }
+.pg-inner .list .t { font: 600 19px/1.3 var(--f-display); }
+.pg-inner .list .t a { text-decoration: none; }
+.pg-inner .list .t a:hover { text-decoration: underline; }
+.pg-inner .list .sub { grid-column: 1 / -1; font-size: 16px; color: var(--muted); margin: 0; }
+.pg-inner .list blockquote { grid-column: 1 / -1; margin: 6px 0 0; padding-left: 12px; border-left: 2px solid var(--wave); font: italic 400 17px/1.5 var(--f-body); }
+.pg-inner .area { font: 500 12px/1.4 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin: 28px 0 8px; }
+.pg-inner .area:first-of-type { margin-top: 0; }
+.pg-inner .st { font: 500 12px/1 var(--f-mono); padding: 6px 8px; border-radius: 4px; white-space: nowrap; color: var(--muted); background: var(--bg); border: 1px solid var(--rule); }
+.pg-inner .st.seen { color: var(--seen); }
+.pg-inner .st.explained { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.pg-inner .st.applied { color: var(--applied); }
+.pg-inner .bar { display: flex; gap: 3px; margin-top: 8px; grid-column: 1 / -1; max-width: 360px; }
+.pg-inner .bar span { height: 6px; flex: 1; border-radius: 3px; background: var(--rule); }
+.pg-inner .bar span.on { background: var(--ok); }
+.pg-inner .brief { font-size: 20px; line-height: 1.6; max-width: 38em; margin: 0; }
+.pg-inner .mine { margin-top: 18px; padding: 16px 18px; border: 1.5px solid var(--ink); border-radius: 8px; background: var(--surface); max-width: 40em; }
+.pg-inner .mine blockquote { margin: 8px 0 0; font: italic 400 18px/1.5 var(--f-body); }
+.pg-inner .note { white-space: pre-wrap; font-size: 17px; margin: 6px 0 0; }
+.pg-inner .form { display: grid; gap: 14px; max-width: 520px; }
+.pg-inner .form label { display: grid; gap: 6px; font: 500 13px/1.3 var(--f-mono); color: var(--muted); }
+.pg-inner .form input, .pg-inner .form select { font: 400 17px/1.2 var(--f-body); color: var(--ink); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 6px; min-height: 44px; padding: 0 12px; }
+.pg-inner .msg { font: 400 14px/1.4 var(--f-mono); margin: 0; }
+.pg-inner .msg.err { color: var(--accent); }
+.pg-inner .danger { border: 1.5px dashed var(--muted); border-radius: 10px; padding: 20px; max-width: 40em; display: grid; gap: 12px; justify-items: start; }
+.pg-inner .empty { border: 1.5px dashed var(--muted); border-radius: 10px; padding: 24px; display: grid; gap: 10px; justify-items: start; }
+.pg-inner .empty h2 { font-weight: 600; font-size: 22px; }
+.pg-inner .empty p { margin: 0; }
+@media (max-width: 600px) {
+  .pg-inner .list > li { grid-template-columns: minmax(0, 1fr); }
+}

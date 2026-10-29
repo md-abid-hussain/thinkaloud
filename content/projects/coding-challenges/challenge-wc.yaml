@@ -1,0 +1,358 @@
+# Coding Challenges #1, Build your own wc.
+# Source: https://codingchallenges.fyi/challenges/challenge-wc
+# Written in our own words. Milestone 1 grew out of the reviewed SQL sample (db/seed_wc_sample.sql) and the
+# checked learning-java/ccwc notes. Every predict and trace key is proven by content/proofs/challenge-wc.mjs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-wc
+  title: Build your own wc
+  source_url: https://codingchallenges.fyi/challenges/challenge-wc
+  level: beginner
+  status: generated
+  figure:
+    kind: stream
+  summary: >-
+    A command-line tool that counts the bytes, lines, words and characters of a file or of text piped into it, and
+    prints the same numbers as the Unix wc tool.
+  requirements:
+    - Count bytes with -c, lines with -l, words with -w and characters with -m
+    - With no option, print the line, word and byte counts followed by the file name
+    - Read standard input when no file name is given
+    - Give the same answers as the reference wc on the sample file from the challenge
+  restate_rubric:
+    - id: r1
+      point: "The tool counts bytes, lines, words and characters"
+    - id: r2
+      point: "Each count has its own option, and with no option it prints lines, words and bytes"
+    - id: r3
+      point: "It reads standard input when no file is given"
+  reflection_prompt: >-
+    In your own words, how does your design handle bytes, characters and input from a file or a pipe, and what would
+    you change?
+  primer:
+    what: >-
+      wc is a small command-line tool that counts what is inside a file: bytes, lines, words and characters. You give
+      it a file name, or pipe text into it from another program, and it prints the counts. You will build your own
+      version, called ccwc, that gives the same answers as the real one.
+    why: >-
+      Counting sounds trivial, but it makes you face how text is really stored: as bytes, with a newline byte at the
+      end of each line and some characters taking more than one byte. It is also a first taste of reading input that
+      may be far bigger than memory.
+    example: >-
+      Take a file holding the words hi there followed by a newline. That is 8 letters and spaces plus the newline, so
+      9 bytes. It has 1 line, because there is one newline, and 2 words, because there are two groups of letters
+      separated by a space. Asked for lines, words and bytes, ccwc prints 1, 2 and 9, then the file name.
+    words:
+      - term: byte
+        meaning: The unit a file is stored in. Every letter in plain English text is one byte, and a newline is one byte too.
+      - term: character
+        meaning: One letter or symbol of text. An accented letter or an emoji can take two to four bytes.
+      - term: line
+        meaning: The text up to and including a newline byte. wc counts lines by counting newlines.
+      - term: word
+        meaning: A group of characters with no spaces, tabs or newlines inside it.
+      - term: standard input
+        meaning: The stream of text a program receives when another program's output is piped into it.
+      - term: stream
+        meaning: Data you read a piece at a time, from the start to the end, without holding all of it at once.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: Bytes and lines
+    summary: Count the bytes and lines of a file by reading it in fixed-size chunks.
+    concepts: [streaming-constant-memory, stream-read-contract, line-endings]
+    steps:
+      - title: Count bytes
+        minutes: 10
+        think:
+          kind: predict
+          prompt: A file holds the two letters h and i, followed by a newline. How many bytes does ccwc -c report?
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              Each plain letter is one byte and the newline is one more byte: 1 + 1 + 1 = 3. Proof script output: 3.
+        build:
+          prompt: >-
+            Make ccwc -c print the byte count and the file name. It should print 342190 for the challenge's test.txt
+            and 0 for an empty file.
+        hints:
+          hint: Count every byte in the file, including the invisible one at the end of the line.
+          example: The word yes followed by a newline is 4 bytes, three letters and one newline.
+
+      - title: Read in chunks
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            Your tool reads with a buffer that holds 4 bytes. The input is the word hello followed by a newline. How
+            many bytes does each read hand back, in order, before the read reports the end of the input?
+          key:
+            match: numbers_all
+            expected: [4, 2]
+            derivation: >-
+              hello plus a newline is 6 bytes. The first read fills the whole buffer with 4 bytes. Only 2 bytes are
+              left, so the second read returns 2 and the rest of the buffer holds leftovers that must be ignored. The
+              third read reports the end. Proof script output: [4, 2].
+        build:
+          prompt: >-
+            Count bytes by reading the file in fixed-size chunks, using the count each read returns, so the tool
+            never holds the whole file in memory.
+        hints:
+          hint: A read can hand back fewer bytes than the buffer holds. The count it returns tells you how many are real.
+          example: >-
+            Pouring 10 litres into 4-litre jugs fills two jugs and leaves 2 litres in the third. The third jug is not
+            full, and you only count what is in it.
+
+      - title: Count lines
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A file holds the letter a, a newline, then the letter b, with no newline at the end. What does ccwc -l
+            report, and why?
+          key:
+            match: number_exact
+            expected: 1
+            derivation: >-
+              wc counts newline bytes, not pieces of text. There is one newline, after the a, so the answer is 1, even
+              though the b sits on a second line on screen. This value comes from the reviewed SQL sample. Proof script
+              output: 1.
+        build:
+          prompt: Make ccwc -l print the line count. It should print 7145 for test.txt.
+        hints:
+          hint: Look for the one byte that ends a line. How many of them are in the file?
+          example: >-
+            A shopping list typed as milk, newline, eggs, newline, bread, with no newline after bread, has 2 newlines,
+            so wc reports 2 lines.
+    teach_back:
+      prompt: >-
+        Your tool might be given a 2 KB file or a 20 GB one. Explain how it counts bytes and lines in both cases
+        without running out of memory.
+      rubric:
+        - id: t1
+          concept: streaming-constant-memory
+          point: "It reads the input in fixed-size chunks and keeps only running totals, so memory stays the same whatever the file size"
+        - id: t2
+          concept: stream-read-contract
+          point: "A read can return fewer bytes than the buffer holds, so it uses the returned count and stops when the read reports the end"
+        - id: t3
+          concept: line-endings
+          point: "Lines are counted by counting newline bytes, so a last line without a newline is not counted"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Words and characters
+    summary: Count words with a small state machine and characters by decoding bytes, across chunk boundaries.
+    concepts: [word-state-machine, bytes-vs-characters, decoding-across-chunks, explicit-charsets]
+    steps:
+      - title: Count words
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A line holds two spaces, the word hello, three spaces, the word world, and a newline. How many words does
+            ccwc -w report?
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              A word is a run of non-space characters. Leading spaces and the run of three spaces only separate words,
+              they never create empty ones, so there are 2 words. Proof script output: 2.
+        build:
+          prompt: Make ccwc -w print the word count. It should print 58164 for test.txt.
+        hints:
+          hint: Ask when a new word begins, not where spaces are. How many times does a letter follow a space or the start?
+          example: >-
+            In a row of parked cars with gaps of different widths, the number of cars does not depend on how wide the
+            gaps are.
+
+      - title: Keep state across chunks
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            The text hello world arrives in two chunks: hel, then lo world. A buggy counter forgets whether it was
+            inside a word each time a new chunk starts. How many words does it report?
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              The first chunk starts the word hel. The second chunk starts with lo, and because the counter forgot it
+              was inside a word, it counts lo as a new word, then world. That gives hel, lo and world, so 3 instead of
+              2. Proof script output: 3.
+        build:
+          prompt: >-
+            Keep the inside-a-word state from one chunk to the next, and check that -w gives the same answer with a
+            tiny buffer as with a large one.
+        hints:
+          hint: Walk the two chunks letter by letter and write down the state the counter is in when the second chunk begins.
+          example: >-
+            A person counting cars who is interrupted mid-car and then forgets they were counting one will count that
+            car twice.
+
+      - title: Bytes are not characters
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A file holds the word café, with an accented e, followed by a newline, saved as UTF-8. What do ccwc -c and
+            ccwc -m report? Give -c first, then -m.
+          key:
+            match: numbers_all
+            expected: [6, 5]
+            derivation: >-
+              c, a and f are one byte each, the accented e takes two bytes in UTF-8, and the newline is one byte:
+              1 + 1 + 1 + 2 + 1 = 6 bytes. As characters it is c, a, f, é and the newline, so 5. Proof script output:
+              [6, 5].
+        build:
+          prompt: >-
+            Make ccwc -m print the character count. It should print 339292 for test.txt when the locale is UTF-8, and
+            the same as -c when the locale has no multibyte characters.
+        hints:
+          hint: Count the letters, then ask how many bytes the one unusual letter needs.
+          example: >-
+            The word naïve has 5 letters, and the ï takes 2 bytes in UTF-8, so it is 6 bytes without a newline.
+
+      - title: Decode across chunks
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: This character counter gives wrong answers on some UTF-8 files. Find the two problems.
+          snippet: |-
+            total = 0
+            while true:
+                chunk = read(input, 4096)
+                if chunk is empty:
+                    break
+                total = total + length(decode(chunk))
+            print(total)
+          rubric:
+            - id: p1
+              point: "A character can be split between two chunks, and decoding each chunk on its own breaks that character"
+            - id: p2
+              point: "A decoder that keeps the leftover bytes of an unfinished character for the next chunk fixes it"
+            - id: p3
+              point: "decode uses the platform default encoding, so the encoding should be named explicitly as UTF-8"
+        build:
+          prompt: >-
+            Decode characters with a decoder that carries unfinished characters from one chunk to the next, name the
+            encoding explicitly, and keep counting bytes on the raw input.
+        hints:
+          hint: What happens to a two-byte character when the first byte is the last byte of one chunk?
+          example: >-
+            Tearing a page in the middle of a word leaves half the word on each piece. Read each piece alone and the
+            word makes no sense, but hold on to the first half and it joins up with the rest.
+    teach_back:
+      prompt: >-
+        Explain how your tool counts words and characters when the input arrives in chunks, and why characters and
+        bytes can give different counts.
+      rubric:
+        - id: t1
+          concept: word-state-machine
+          point: "It remembers whether it is inside a word, counts a word when a non-space follows a space or the start, and keeps that state across chunks"
+        - id: t2
+          concept: bytes-vs-characters
+          point: "A character can take more than one byte in UTF-8, so the character count can be smaller than the byte count"
+        - id: t3
+          concept: decoding-across-chunks
+          point: "A character split between two chunks is finished with the leftover bytes kept from the previous chunk"
+        - id: t4
+          concept: explicit-charsets
+          point: "The encoding is named explicitly, so the counts do not change on a machine with a different default"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Default output and standard input
+    summary: Print the default counts, read from a pipe when no file is given, and check the tool against the real wc.
+    concepts: [stdin-vs-file, cli-subcommands, differential-testing]
+    steps:
+      - title: Default output
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            A file holds one two, a newline, three, and a newline. What three numbers does ccwc print when it is given
+            no option?
+          key:
+            match: numbers_all
+            expected: [2, 3, 14]
+            derivation: >-
+              With no option it prints lines, words and bytes. There are 2 newlines, the words one, two and three, and
+              7 + 1 + 5 + 1 = 14 bytes (one two is 7 bytes, three is 5, plus two newlines). Proof script output:
+              [2, 3, 14].
+        build:
+          prompt: >-
+            With no option, print lines, words and bytes, then the file name. For test.txt that is 7145, 58164 and
+            342190. Reject an option you do not know with a message on the error stream and a non-zero exit status.
+        hints:
+          hint: Work out each of the three counts on its own, then put them in the order wc uses.
+          example: >-
+            A file holding go, newline, has 1 line, 1 word and 3 bytes, so the default output is 1, 1 and 3 followed
+            by the name.
+
+      - title: Read from a pipe
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            To make -c fast, someone asks the file system for the size instead of reading the input. It works on files.
+            What goes wrong when text is piped in, and what is the fix?
+          snippet: |-
+            if option == "-c":
+                print(size_of(source))
+            else:
+                print(count(read_all(source), option))
+          rubric:
+            - id: p1
+              point: "A pipe has no size stored anywhere, since its data arrives while it is being read, so the size is unknown or zero"
+            - id: p2
+              point: "Counting the bytes while reading the stream works the same for a file and a pipe"
+        build:
+          prompt: >-
+            When no file name is given, read standard input with the same counting code. Piping test.txt into ccwc -l
+            should print 7145.
+        hints:
+          hint: Where would the size of a pipe be written down before the other program has finished writing?
+          example: >-
+            You can weigh a bag of rice before you open it, but you cannot weigh water from a tap until it has all
+            run into the jug.
+
+      - title: Compare with the real wc
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            Your own tests with expected numbers all pass, but running the real wc on the same file gives a different
+            word count. What does comparing against the real tool catch that your own expected values miss?
+          rubric:
+            - id: p1
+              point: "Your expected values come from your own understanding, so they share the same mistakes as your code"
+            - id: p2
+              point: "The reference tool shows cases you did not think of, such as unusual whitespace, line endings or the locale"
+            - id: p3
+              point: "Compare both tools on the same inputs, with the reference version and its settings fixed"
+        build:
+          prompt: >-
+            Write a check that runs the real wc and ccwc on the same set of inputs, including an empty file, a file
+            with no final newline, a UTF-8 file and piped input, and reports any difference.
+        hints:
+          hint: If your test and your code were written by the same person on the same day, what mistake could they share?
+          example: >-
+            A student who marks their own homework with their own answer key will never find the mistake they made
+            in both.
+    teach_back:
+      prompt: >-
+        Explain how ccwc decides where to read from, what it does when something goes wrong, and how you would show
+        that it behaves like the real wc.
+      rubric:
+        - id: t1
+          concept: stdin-vs-file
+          point: "With no file name it reads standard input, and the same counting loop serves both, because both are byte streams"
+        - id: t2
+          concept: cli-subcommands
+          point: "A missing file or an unknown option gives a message on the error stream and a non-zero exit status"
+        - id: t3
+          concept: differential-testing
+          point: "Run the real wc and ccwc on the same inputs, including edge cases, and compare the outputs"

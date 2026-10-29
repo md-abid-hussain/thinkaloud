@@ -1,0 +1,423 @@
+# Coding Challenges, Build your own Bitcask.
+# Source: https://codingchallenges.fyi/challenges/challenge-bitcask
+# Written in our own words. The source page is linked, not copied. Background: the Bitcask paper by Sheehy and
+# Smith. The page shows the record layout only as an image, so every key that depends on it states the layout it
+# uses. Every predict and trace key is proven by content/proofs/challenge-bitcask.mjs.
+
+format: 1
+
+project:
+  source: coding_challenges
+  slug: challenge-bitcask
+  title: Build your own Bitcask
+  source_url: https://codingchallenges.fyi/challenges/challenge-bitcask
+  level: intermediate
+  status: generated
+  figure:
+    kind: log
+  summary: >-
+    A key-value store and command-line tool that appends every write to a log of checksummed records, keeps an
+    in-memory index of where each value lives, deletes with tombstones, compacts old files with a merge that writes
+    hint files, and recovers cleanly after a crash.
+  requirements:
+    - Set, get and delete keys from the command line, with the database directory given by -db
+    - Append every write to the active log file as a record that starts with a CRC-32 checksum
+    - Close the active file at a size limit and start a new one, leaving all older files unchanged
+    - Keep an in-memory keydir with the file, position, size and timestamp of each key's latest value
+    - Read a value with one seek and one read, and never return a deleted key
+    - Merge closed files into new ones holding only live values, with a hint file for each, and rebuild the keydir on startup
+  restate_rubric:
+    - id: r1
+      point: "It is a key-value store that never changes data in place but appends every write to a log file"
+    - id: r2
+      point: "An in-memory index records where each key's latest value is on disk, so a read is one seek"
+    - id: r3
+      point: "Deletes write tombstones, a merge removes stale data, and startup rebuilds the index and skips damaged records"
+  reflection_prompt: >-
+    In your own words, what did you give up and what did you gain by never changing a record in place, and what would
+    you change if the keys no longer fitted in memory?
+  primer:
+    what: >-
+      Bitcask is a way to build a key-value store on disk. Every write, even an update, is added to the end of a log
+      file, and nothing already written is ever changed. A table in memory, called the keydir, remembers for each key
+      where its latest value sits in the log, so reading means one jump to the right place. You will start with a
+      first version that simply rewrites the whole table to one file after every change, then turn it into Bitcask.
+    why: >-
+      Adding to the end of a file is the fastest thing a disk does, and a crash can only damage the last record. It
+      is how the Riak database stores data, and the same log idea sits under many modern databases.
+    example: >-
+      Suppose you set colour to red, then set colour to blue. The first version keeps a table in memory and writes it
+      out whole after each change, so its file ends with a single line, colour then blue. The log version appends
+      instead, so its file holds two records, one for red and one for blue, and the keydir entry for colour points
+      at the second record.
+    words:
+      - term: log
+        meaning: A file that is only ever added to at the end. Old records stay where they are.
+      - term: record
+        meaning: One entry in the log, holding a checksum, a timestamp, the sizes of the key and value, then the key and the value.
+      - term: keydir
+        meaning: The in-memory table from each key to the file, position and size of its latest value.
+      - term: active file
+        meaning: The one log file currently being written. When it reaches a size limit it is closed and never changed again.
+      - term: checksum
+        meaning: A number computed from a record's bytes and stored with it, so damage can be detected when the record is read.
+      - term: tombstone
+        meaning: A record that says a key has been deleted.
+
+milestones:
+  # ------------------------------------------------------------------------------------------
+  - title: From a flat file to an append-only log
+    summary: Build the command-line tool on a flat file, then replace it with checksummed records appended to rotating log files.
+    concepts: [key-value-store, append-only-log, checksums, byte-order]
+    steps:
+      - title: A flat file first
+        minutes: 10
+        think:
+          kind: predict
+          prompt: >-
+            Use the first version from the primer, which rewrites the whole table to cask.0 after every change, one key
+            and value per line. You run set a 1, then set b 2, then set a 3. How many lines does cask.0 hold
+            afterwards? Answer with one number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              The table in memory holds one value per key, so after the three sets it holds a with 3 and b with 2. The
+              file is overwritten with the whole table each time, so it ends with one line per key: 2 lines. Proof
+              script output: 2.
+        build:
+          prompt: >-
+            Build a command-line tool, ccbitcask, that takes a database directory with -db and keeps its data in a file
+            named cask.0 inside it, one Key:Value pair per line. After every set, write the whole table to the file,
+            replacing what was there, and read the file on startup to fill the table. Setting Key to Value and then
+            getting Key should print Value.
+        hints:
+          hint: The table keeps one value per key, and the file is a copy of the table.
+          example: >-
+            A whiteboard list of who has which room is wiped and rewritten whenever someone changes room, so it always
+            shows one line per person.
+
+      - title: Records in bytes
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            In your record layout every size is written as a 4-byte little-endian number. A key is 258 bytes long. What
+            is the first of the four bytes written for its key size? Answer with one number, in decimal.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              258 is 1 times 256 plus 2, so its bytes are 2 and 1 followed by two zeros, from least to most significant.
+              Little-endian writes the least significant byte first, so the first byte is 2. Big-endian would start with
+              0. Proof script output: 2.
+        build:
+          prompt: >-
+            Replace the flat file with an append-only log. Each set adds one record to the end of the active file: a
+            CRC-32 of the record's other fields, written first, followed by those fields packed into bytes, such as the
+            timestamp, the key size, the value size, the key and the value. Use little-endian numbers, which is what
+            the challenge's author believes Bitcask uses, and look at the file with xxd to check the bytes.
+        hints:
+          hint: Split 258 into how many whole 256s it holds and what is left over, then ask which part little-endian writes first.
+          example: >-
+            Writing a date as day, month, year puts the smallest part first, while year, month, day puts the largest
+            part first. Both hold the same date.
+
+      - title: Rotate the active file
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            In this test every record is exactly 30 bytes and the size limit is 100 bytes. Before each append, if the
+            record would take the active file past 100 bytes, the writer closes it and starts a new file. Starting from
+            an empty database, you run 7 sets of different keys. How many data files exist afterwards? Answer with one
+            number.
+          key:
+            match: number_exact
+            expected: 3
+            derivation: >-
+              Three records make 90 bytes. A fourth would make 120, past the limit, so the writer closes the first file
+              and starts the second. The same happens after the sixth record, so the seventh starts a third file. The
+              files hold 3, 3 and 1 records. Proof script output: 3.
+        build:
+          prompt: >-
+            Make the size limit configurable, and when a write would take the active file past it, close that file and
+            open the next one, numbered after it. Use a limit of a few hundred bytes in tests, where Riak's default is
+            2 GB. Closed files are never written again.
+        hints:
+          hint: Fill one file record by record and stop at the first record that would not fit.
+          example: >-
+            Lining up 40 cm boxes on shelves 100 cm long fits two to a shelf, because a third would make 120 cm, so
+            the third box starts a new shelf.
+
+      - title: What the checksum covers
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This set writes a record with a checksum, but some damaged records still pass the check when they are
+            read back, and a write can be lost after the user was told it succeeded. Find the problems and the fixes.
+          snippet: |-
+            on set key, value:
+                header = pack(timestamp(), size(key), size(value))
+                crc = crc32(value)
+                append(active_file, crc + header + key + value)
+                print("ok")
+          rubric:
+            - id: p1
+              point: "The CRC covers only the value, so a damaged timestamp, key size, value size or key is not detected"
+            - id: p2
+              point: "Compute the CRC over everything written after it, the header fields, the key and the value"
+            - id: p3
+              point: "It reports success before the record is forced to disk, so a crash right after can lose a write the user was told succeeded"
+        build:
+          prompt: >-
+            Compute the CRC over every byte after it, and decide when a set counts as done, for example after flushing
+            and syncing the file. Write a test that changes one byte of the key size in a record and checks that
+            reading it fails the CRC.
+        hints:
+          hint: Change one byte of the key size by hand. Which of the stored numbers would notice?
+          example: >-
+            A seal over only the contents of a parcel does not show that someone changed the address label.
+    teach_back:
+      prompt: >-
+        Explain why your store appends records instead of rewriting a file, what each record holds and in what order
+        its bytes go, and how you would know a record was damaged.
+      rubric:
+        - id: t1
+          concept: key-value-store
+          point: "Rewriting the whole table after every change costs more as the data grows, while appending writes only the new record"
+        - id: t2
+          concept: append-only-log
+          point: "Every set adds a record to the end of the active file, nothing written is changed, and a full file is closed and a new one started"
+        - id: t3
+          concept: byte-order
+          point: "The sizes and timestamp are fixed-width numbers in an agreed byte order, little-endian, so any reader decodes them the same way"
+        - id: t4
+          concept: checksums
+          point: "Each record starts with a CRC-32 over the rest of its bytes, which is computed again on reading, and a mismatch means the record is damaged"
+
+  # ------------------------------------------------------------------------------------------
+  - title: The keydir, reads and deletes
+    summary: Keep only metadata in memory, read values with one seek, and delete keys with tombstones.
+    concepts: [hash-index, append-only-log, tombstones]
+    steps:
+      - title: Metadata, not values
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            Use this layout: a 16-byte header holding the CRC, the timestamp, the key size and the value size, 4 bytes
+            each, then the key, then the value. Starting with an empty cask.0, you run set a one, set b two, set a six.
+            Counting from 0 at the start of the file, what value position does the keydir hold for a? Answer with one
+            number.
+          key:
+            match: number_exact
+            expected: 57
+            derivation: >-
+              Each record is 16 + 1 + 3 = 20 bytes, so the three records start at 0, 20 and 40. The keydir points at the
+              latest record for a, the third. Its value starts after the 16-byte header and the 1-byte key: 40 + 16 + 1
+              = 57. Proof script output: 57.
+        build:
+          prompt: >-
+            Change the hash table to hold metadata instead of the value: the file id, the value position, the value
+            size and the timestamp. Every set appends a record and points the key's entry at the new one.
+        hints:
+          hint: Find where the latest record for a starts, then step over everything that comes before its value.
+          example: >-
+            A library catalogue card holds the shelf and position of a book, not the book. When a new edition arrives,
+            the card is changed to point at the new copy.
+
+      - title: Read with one seek
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: >-
+            This get works in a fresh database but returns wrong values or crashes once there are several files. Find
+            the two problems.
+          snippet: |-
+            on get key:
+                entry = keydir[key]
+                file = open(active_file)
+                seek(file, entry.value_position)
+                value = read(file, entry.value_size)
+                print(value)
+          rubric:
+            - id: p1
+              point: "It always opens the active file, but the value may be in an older closed file, so it must open the file named by the entry's file id"
+            - id: p2
+              point: "It looks up the key without checking it is there, so a key that was never set or was deleted crashes or prints junk instead of nil"
+        build:
+          prompt: >-
+            Make get look up the key's entry, open the file it names, seek to the value position and read value size
+            bytes. Test with enough keys to spread over several files, and check that updating a key appends a new
+            record and that get then returns the new value.
+        hints:
+          hint: Set a key, write enough other keys to fill a file, then get the first key. Which file holds it?
+          example: >-
+            A filing cabinet with several drawers needs both the drawer and the folder number. The folder number alone
+            sends you to the wrong drawer.
+
+      - title: Delete with tombstones
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            Starting with an empty database, you run set a 1, set b 2, del a, set c 3, del b. No merge has run. How many
+            records are in the log? Answer with one number.
+          key:
+            match: number_exact
+            expected: 5
+            derivation: >-
+              The log is append-only, so a delete cannot remove anything. Each del appends a tombstone record instead.
+              Three sets and two deletes make 5 records, although only c still has a value. Proof script output: 5.
+        build:
+          prompt: >-
+            Add a del command that appends a tombstone record and marks the key as deleted in the keydir, or removes
+            its entry. Make get never
+            return a deleted key: after set Key Value, get prints Value, and after del Key, get prints nil.
+        hints:
+          hint: Can an append-only file make an old record go away? What does it write instead?
+          example: >-
+            In a paper ledger you never rub out an entry. To cancel a payment you add a new line saying it was
+            cancelled.
+    teach_back:
+      prompt: >-
+        Walk through what happens on disk and in memory when you set a key, update it, read it and then delete it.
+      rubric:
+        - id: t1
+          concept: append-only-log
+          point: "The set and the update each append a record, and the old record stays in the file"
+        - id: t2
+          concept: hash-index
+          point: "The keydir holds the file id, value position, value size and timestamp of the latest record, so get is one lookup, one seek and one read"
+        - id: t3
+          concept: tombstones
+          point: "Delete appends a tombstone and marks or removes the keydir entry, so get returns nil, and replaying the log later still sees the key as deleted"
+
+  # ------------------------------------------------------------------------------------------
+  - title: Merge, hint files and recovery
+    summary: Compact closed files into live data only, write hint files for fast startup, and recover from a crash mid-write.
+    concepts: [log-compaction, crash-recovery, checksums]
+    steps:
+      - title: Merge away dead values
+        minutes: 15
+        think:
+          kind: predict
+          prompt: >-
+            The closed files hold records for set a 1, set b 2, set a 3, del b and set c 4, in that order, and the active
+            file is empty. A merge rewrites all the closed files into one new file. How many records does the new file
+            hold? Answer with one number.
+          key:
+            match: number_exact
+            expected: 2
+            derivation: >-
+              Only the latest live value of each key survives. a keeps its value 3 and drops 1. b was deleted, so its
+              value and its tombstone both go, since no older copy of b is left anywhere. c keeps 4. That leaves 2
+              records. Proof script output: 2.
+        build:
+          prompt: >-
+            Add a merge that runs in the background over every closed file, writes new files holding only the live
+            value of each key, points the keydir at the new copies and then deletes the old files to free the space.
+        hints:
+          hint: For each key, ask which record the keydir points to now. Is anything else worth keeping?
+          example: >-
+            Moving house, you pack only the latest version of each document and leave the drafts and the notes saying
+            something was thrown away.
+
+      - title: Hint files
+        minutes: 15
+        think:
+          kind: explain
+          prompt: >-
+            A hint file holds, for each record in a merged file, the timestamp, the key size, the value size, the value
+            position and the key, but not the value. Why does reading hint files make startup faster, and why can a
+            merged file have one when the active file does not?
+          rubric:
+            - id: p1
+              point: "Rebuilding the keydir only needs where each value is, not the value, so the hint file is much smaller to read than the data file"
+            - id: p2
+              point: "Values can be large, so skipping them saves most of the reading at startup"
+            - id: p3
+              point: "A merged file is closed and never changes, so its hint file is written once and stays correct, while the active file is still growing"
+        build:
+          prompt: >-
+            Write a hint file next to each merged file, with the timestamp, key size, value size, value position and
+            key of every record in it, and use the hint files on startup to fill the keydir for merged files.
+        hints:
+          hint: What does the keydir need from each record, and which part of a record is usually the biggest?
+          example: >-
+            A book's index tells you which page each topic is on without making you read the book.
+
+      - title: Recover after a crash
+        minutes: 15
+        think:
+          kind: trace
+          prompt: >-
+            The active file holds complete records for set a 1 and set b 2. The program crashed while appending a third
+            record, for set a 3, and only the first 10 bytes of it reached the disk. On restart the store replays the
+            active file, checking each record's CRC. What does get a return? Answer with one number.
+          key:
+            match: number_exact
+            expected: 1
+            derivation: >-
+              The first two records are whole and pass their CRC, so the keydir gets a with 1 and b with 2. The third
+              record is cut short: 10 bytes is not even a full header, and the bytes that are there cannot pass a CRC
+              check. Recovery drops it, so the keydir still points at the old record and get a returns 1. Proof script
+              output: 1.
+        build:
+          prompt: >-
+            On startup, rebuild the keydir from the hint files of merged files and by replaying the other files from
+            the start. Check every record's CRC in the active file and drop any record that is incomplete or fails the
+            check, then carry on appending after the last good record.
+        hints:
+          hint: Which records are whole, and what did the keydir say about a before the third one started?
+          example: >-
+            A letter whose last page was torn off halfway is read up to the last full page, and the torn page is
+            thrown away rather than guessed at.
+
+      - title: A merge that is safe
+        minutes: 15
+        think:
+          kind: spot_bug
+          prompt: This merge loses data and keeps data it should drop. Find the problems.
+          snippet: |-
+            merge():
+                merged = new_file()
+                for file in all_files(db):
+                    for record in file:
+                        if record is not a tombstone:
+                            append(merged, record)
+                    delete(file)
+          rubric:
+            - id: p1
+              point: "It copies every value that is not a tombstone, including stale older values, so it should copy only the record the keydir points to for each key"
+            - id: p2
+              point: "It includes the active file, which is still being written, when merge should only touch closed files"
+            - id: p3
+              point: "It deletes each old file before the merged file is complete, synced and the keydir points at it, so a crash mid-merge loses data"
+        build:
+          prompt: >-
+            Make merge skip the active file, copy only the latest live record of each key, sync the new file and its
+            hint file and update the keydir before it deletes any old file.
+        hints:
+          hint: Pretend the power fails halfway through the outer loop. What is left on disk?
+          example: >-
+            When you move files to a new drive, you check the copy is complete before you wipe the old one.
+    teach_back:
+      prompt: >-
+        Your store has run for months and then crashes in the middle of a write. Explain how merging kept the disk from
+        filling up, and how the store comes back with a correct keydir on restart.
+      rubric:
+        - id: t1
+          concept: log-compaction
+          point: "Merge rewrites closed files keeping only the latest live value of each key, dropping stale values and tombstones, then deletes the old files"
+        - id: t2
+          concept: log-compaction
+          point: "Merge writes a hint file for each new file, listing where each key's value is, so the keydir can be rebuilt without reading the values"
+        - id: t3
+          concept: crash-recovery
+          point: "On restart the keydir is rebuilt from the hint files and by replaying the remaining files, with later records overriding earlier ones"
+        - id: t4
+          concept: checksums
+          point: "Each record in the active file is checked against its CRC, and the half-written last record fails the check and is dropped"

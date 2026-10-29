@@ -1069,18 +1069,65 @@ concepts:
         url: https://en.wikipedia.org/wiki/Prefix_code
 
   - slug: bit-packing
-    name: Packing bits into bytes
+    name: Packing flags into bits
     area: formats-parsing
     kind: foundation
     status: generated
     brief: >-
-      Files hold whole bytes, so single bits and codes of any length have to be packed eight to a byte. Bit n lives in
-      byte n divided by 8, at position n modulo 8. When the last byte is not full it is padded, so the reader needs to
-      know how many bits are real, from a stored count or the header.
+      Compact formats pack several small fields into one number: single-bit flags and short numbers at fixed bit
+      positions. Programs read and set them with masks and shifts, so one field can change without disturbing the
+      others.
     related: [ bytes-vs-characters ]
     resources:
-      - title: Bit array (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Bit_array
+      - title: Bit field (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Bit_field
+        opened: true
+      - title: Mask (computing) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Mask_(computing)
+        opened: true
+      - title: RFC 1035 (header section format)
+        url: https://www.rfc-editor.org/rfc/rfc1035
+        opened: true
+    lesson:
+      how_it_works: >-
+        A byte has 8 bits and a 16-bit field has 16, and a format can give each bit, or each small group of bits, its
+        own meaning. The DNS header's flags field is an example. Its top bit says whether the message is a query or a
+        response. The next four bits hold the operation code. Then come single bits for an authoritative answer, a
+        truncated message, recursion desired and recursion available, three reserved bits, and finally four bits for
+        the response code.
+
+
+        To work with such a field, a program uses masks. A mask is a number with ones only in the positions it cares
+        about. Combining the field with a mask using AND keeps only those bits, which tests a flag or extracts a
+        group. Combining with OR sets bits without touching the rest. Shifting moves a group of bits down to the low
+        end so it can be read as a small number, or up into its place before it is combined. For example, recursion
+        desired is bit 8 counting from zero at the low end, the mask 0x0100, and setting it on an otherwise empty
+        field gives the flags bytes 01 00.
+
+
+        Mistakes are silent: setting the wrong bit produces a valid-looking message that means something else, such as
+        a query marked as a response. Writing each mask once, with a name and a comment pointing at the specification,
+        and testing against known bytes catches them.
+
+
+        Packing saves space and bandwidth, which mattered when these formats were designed, and still matters for
+        hardware, network headers and dense storage.
+      examples:
+        - A teammate sets the top bit of the DNS flags instead of the recursion-desired bit, and servers ignore the
+          query because it now claims to be a response.
+        - File permissions on Unix pack read, write and execute for owner, group and others into nine bits, which is
+          why permissions are written as numbers like 644.
+        - A TCP header packs its SYN, ACK, FIN and other flags into single bits of one byte.
+      misconceptions:
+        - Each flag needs its own byte. Flags usually share bits of one field.
+        - Setting a flag means writing a number into the field. Writing replaces the other flags; OR with a mask sets
+          one and keeps the rest.
+        - Bit positions are obvious. Specifications number bits differently, from the top or from the bottom, so check
+          against known bytes.
+      elsewhere:
+        - Bloom filters and bitmaps store millions of yes or no facts as single bits.
+        - Image and audio formats pack colour channels and samples into bit fields.
+        - Feature flags and permission systems often store sets of options as bits in one integer.
 
   - slug: file-header-format
     name: Self-describing file headers
@@ -1096,17 +1143,60 @@ concepts:
         url: https://en.wikipedia.org/wiki/List_of_file_signatures
 
   - slug: byte-order
-    name: Byte order of numbers
+    name: Byte order
     area: formats-parsing
     kind: foundation
     status: generated
     brief: >-
-      A number larger than one byte is stored as several bytes, and the order of those bytes has to be agreed.
-      Big-endian puts the most significant byte first and is the usual order in file formats and network protocols;
-      little-endian puts it last and is what most processors use in memory.
+      A number wider than one byte can be stored with its most significant byte first, big-endian, or least
+      significant first, little-endian. Network protocols use big-endian, called network byte order, so programs must
+      write and read multi-byte fields explicitly.
     resources:
       - title: Endianness (Wikipedia)
         url: https://en.wikipedia.org/wiki/Endianness
+        opened: true
+      - title: Beej's Guide to Network Programming (byte order)
+        url: https://beej.us/guide/bgnet/html/
+        opened: true
+      - title: RFC 1035 (data transmission order)
+        url: https://www.rfc-editor.org/rfc/rfc1035
+        opened: true
+    lesson:
+      how_it_works: >-
+        Memory and files hold bytes, but many values need more than one byte: a 16-bit number spans two bytes and a
+        32-bit number four. There are two common ways to lay them out. Big-endian puts the most significant byte
+        first, the way we write numbers, so 22 as a 16-bit number is the bytes 00 16 in hexadecimal. Little-endian
+        puts the least significant byte first, so the same number is 16 00.
+
+
+        Most desktop and phone processors are little-endian, while internet protocols such as IP, TCP, UDP and DNS
+        specify big-endian, which is therefore called network byte order. A program that copies a number from memory
+        straight onto the wire sends it in the machine's order, which is wrong on most machines. The other side then
+        reads a different number: the bytes 16 00 read as big-endian are 5632.
+
+
+        The safe habit is to build and read every multi-byte field explicitly in the order the format specifies, byte
+        by byte or with the conversion functions every language provides, and never to depend on the machine's own
+        order. Formats define their order and stick to it: some file formats are little-endian, some big-endian, and a
+        few, like UTF-16 text, mark the order with a byte order mark at the start.
+
+
+        Byte order only applies to values wider than a byte. A sequence of single bytes, such as ASCII text, reads the
+        same either way.
+      examples:
+        - A DNS client writes its query ID 22 in the machine's order, the server echoes back the bytes it received,
+          and the client reads them as 5632 and rejects the reply as a mismatch.
+        - A file written by a program on one machine and read on another with a different byte order gives nonsense
+          numbers unless the format fixes the order.
+        - Network packet captures show port 53 as the bytes 00 35, because 53 is 0x35 in big-endian order.
+      misconceptions:
+        - Byte order affects every byte. It affects only values wider than one byte.
+        - The machine handles it for you. Only if you use the conversion explicitly, or build the bytes yourself.
+        - Big-endian is the norm everywhere. Most processors are little-endian; networks use big-endian.
+      elsewhere:
+        - Binary file formats such as images, archives and databases each state their byte order.
+        - UTF-16 text uses a byte order mark to say which order its 16-bit units are in.
+        - Hash and checksum outputs are defined as byte sequences so that every machine gets the same result.
 
   - slug: round-trip-testing
     name: Round-trip testing
@@ -1332,18 +1422,68 @@ concepts:
           start.
 
   - slug: udp-datagrams
-    name: UDP datagrams
+    name: UDP and datagrams
     area: networking-http
     kind: foundation
     status: generated
     brief: >-
-      UDP sends separate messages, called datagrams, with no connection. Each read returns exactly one datagram and
-      the address it came from, so a reply goes back to that address. Datagrams can be lost, duplicated or reordered,
-      and nothing retries them for you.
+      UDP sends separate messages called datagrams, each delivered whole or not at all, with no connection, no
+      ordering and no retransmission. It suits small request and reply exchanges such as DNS, where a lost message is
+      simply asked again.
     related: [ tcp-sockets ]
     resources:
-      - title: RFC 768, User Datagram Protocol
+      - title: "RFC 768: User Datagram Protocol"
         url: https://www.rfc-editor.org/rfc/rfc768
+        opened: true
+      - title: Beej's Guide to Network Programming
+        url: https://beej.us/guide/bgnet/html/
+        opened: true
+      - title: User Datagram Protocol (Wikipedia)
+        url: https://en.wikipedia.org/wiki/User_Datagram_Protocol
+        opened: true
+    lesson:
+      how_it_works: >-
+        UDP is the thin alternative to TCP. Instead of a connection that carries a stream of bytes, a program sends
+        datagrams: self-contained messages, each with the destination address and port attached. The receiver gets
+        each datagram as one unit. A receive call returns exactly one datagram together with the address and port it
+        came from, never half of one and never two glued together. That is the opposite of TCP, where the boundaries
+        between writes disappear.
+
+
+        UDP promises very little. A datagram can be lost, duplicated or arrive after one sent later, and nobody
+        resends it. There is no handshake, so there is also no notion of a connected client: a server simply receives
+        datagrams from many senders on one socket and must reply to the address that came with each one.
+
+
+        Size matters. A datagram has an 8-byte header and must fit in one IP packet, and a receive buffer smaller than
+        the datagram silently loses the rest of it on most systems. Large datagrams may be fragmented by IP, and
+        losing any fragment loses the whole datagram, so protocols over UDP keep messages small. Classic DNS limits a
+        UDP reply to 512 bytes and marks a reply that did not fit as truncated, telling the client to ask again over
+        TCP.
+
+
+        Because nothing is guaranteed, the application adds what it needs: a timeout and a limited number of retries
+        for requests, an ID to match replies to questions, and sometimes its own ordering. In return it gets low
+        latency, no connection setup and the ability to talk to many peers from one socket.
+      examples:
+        - A DNS lookup is one small datagram out and one back. If the reply is lost, the resolver waits a second or
+          two and asks again, which is cheaper than setting up a TCP connection for every lookup.
+        - "Video calls and online games use UDP because a late packet is useless: it is better to skip it than to
+          stall everything while it is resent."
+        - A logging agent that fires metrics over UDP keeps the application fast, at the price of losing a few metrics
+          when the network is busy.
+      misconceptions:
+        - UDP is unreliable, so it is broken. It is simply minimal; the application decides how much reliability it
+          needs.
+        - A UDP server has a connection per client. It has one socket and a stream of datagrams from many addresses,
+          and must reply to each sender's address.
+        - Datagrams can be any size. Large ones are fragmented or dropped, and a receive buffer that is too small cuts
+          them short.
+      elsewhere:
+        - QUIC, the transport under HTTP/3, runs over UDP and builds its own reliability and encryption on top.
+        - Service discovery and network time use small UDP exchanges for the same reasons DNS does.
+        - Firewalls and NAT routers keep a short-lived mapping for UDP flows, which is why some UDP replies never
+          arrive on restrictive networks.
 
   - slug: graceful-shutdown
     name: Graceful shutdown
@@ -1460,20 +1600,65 @@ concepts:
 
   # ---- added for wave 1: backends (URL shortener, rate limiter) ----
   - slug: rest-api-design
-    name: Designing a REST API
+    name: Designing a resource API over HTTP
     area: apis-backends
     kind: foundation
     status: generated
     brief: >-
-      A REST API names resources with paths and acts on them with HTTP methods: POST to create, GET to read, DELETE to
-      remove. The status code tells the client what happened, such as 201 for created, 400 for a bad request, 404 for
-      an unknown resource and 429 for too many requests, and the body explains it.
+      A REST-style API names resources with URLs and acts on them with HTTP methods, answering with status codes that
+      say what happened. Clear resources, the right method and honest status codes let any client, proxy or monitor
+      understand the API without reading its bodies.
     prerequisites: [ http-message-format ]
     resources:
+      - title: "Roy Fielding, Chapter 5: Representational State Transfer (REST)"
+        url: https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm
+        opened: true
       - title: MDN, HTTP request methods
         url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods
-      - title: MDN, HTTP response status codes
-        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status
+        opened: true
+      - title: "RFC 9110: HTTP Semantics (status codes)"
+        url: https://www.rfc-editor.org/rfc/rfc9110
+        opened: true
+    lesson:
+      how_it_works: >-
+        HTTP already has a vocabulary for working with things on a server. REST, the architectural style described by
+        Roy Fielding, uses it directly. Each thing the API offers, such as a short link, is a resource with its own
+        URL. Methods say what to do with it: GET reads it, POST to a collection creates a new member, PUT replaces it,
+        DELETE removes it. Requests carry everything needed to serve them, so the server does not depend on remembered
+        conversation state.
+
+
+        Status codes carry the outcome, and they matter more than the body. 200 OK means success with a body. 201
+        Created says a new resource exists, with a Location header naming it. 400 Bad Request says the client sent
+        something invalid, and a good error body names the problem, such as a missing field. 404 Not Found says the
+        resource does not exist. 409 Conflict says the request clashes with the current state. 5xx codes say the
+        server failed. Clients, retry logic, caches and monitoring all act on these codes, so an API that answers 200
+        with an error message inside defeats them all.
+
+
+        Representations, usually JSON, are what the resource looks like on the wire. Consistent field names, a stable
+        error shape and a clear content type make an API easy to use. Methods also bring promises: GET must not change
+        anything, and PUT and DELETE must be safe to repeat, so clients can retry them.
+
+
+        Good design is mostly about being predictable. A developer who has used one well-designed HTTP API can guess
+        how yours works.
+      examples:
+        - A mobile client treats every 200 as success, so an API that answers errors with 200 and a message inside
+          makes the app silently show broken data.
+        - A shortening service answers a POST with 201 Created and the new short URL, and answers a body without a url
+          field with 400 and a message naming url.
+        - Monitoring counts 5xx replies to alert on outages, which works only if the API uses them for its own
+          failures.
+      misconceptions:
+        - Any URL with JSON is a REST API. Resources, methods and status codes are what make it one.
+        - The status code is a detail; the body tells the story. Clients, proxies and monitors act on the code.
+        - POST is for everything that changes data. PUT and DELETE exist so that replacing and removing can be retried
+          safely.
+      elsewhere:
+        - Most public web APIs follow these conventions, which is why generic HTTP tools can explore them.
+        - API gateways route, cache and rate-limit by method and path.
+        - Specifications such as OpenAPI describe resources, methods and status codes so clients can be generated.
 
   - slug: http-redirects
     name: HTTP redirects
@@ -1481,29 +1666,123 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A redirect is a response with a 3xx status and a Location header that names where to go instead, and the browser
-      follows it by itself. A permanent redirect such as 301 may be cached by the browser, so later visits never reach
-      the server, while a temporary one such as 302 is asked for again each time.
+      A server can answer with a 3xx status and a Location header that sends the client to another URL. The status
+      says whether the move is permanent or temporary and whether the method is kept, and permanent redirects are
+      cached.
     prerequisites: [ http-message-format ]
     resources:
       - title: MDN, Redirections in HTTP
         url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Redirections
+        opened: true
+      - title: MDN, 301 Moved Permanently
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/301
+        opened: true
+      - title: MDN, 302 Found
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/302
+        opened: true
+      - title: OWASP Unvalidated Redirects and Forwards Cheat Sheet
+        url: https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html
+        opened: true
+    lesson:
+      how_it_works: >-
+        A redirect is a reply that says the content is elsewhere. The status code is in the 300 range and the Location
+        header holds the new URL, which may be relative to the URL that was requested. A client that follows it sends
+        a new request to that address, possibly on another host and with another scheme.
+
+
+        The codes differ in two ways. Permanence: 301 Moved Permanently and 308 Permanent Redirect say the old URL is
+        gone for good, so browsers and search engines may remember the new one and stop asking; 302 Found and 307
+        Temporary Redirect say it is temporary, so clients keep using the original URL. Method: 307 and 308 require
+        the client to repeat the same method and body, while for 301 and 302 clients historically changed a POST into
+        a GET, and 303 See Other asks for a GET explicitly.
+
+
+        Caching is the part that surprises people. A browser may cache a 301 indefinitely and go straight to the new
+        address on later visits, without contacting the original server at all. A 302 is not cached unless the server
+        says so. For a service that wants to see every visit, such as a link shortener counting clicks, that
+        difference is decisive.
+
+
+        Following redirects automatically has risks. A chain can loop, so clients limit the number of hops. A redirect
+        can lead to another host, so clients must not forward credentials or cookies meant for the first one, and
+        should be wary of moving from https to http.
+      examples:
+        - A link shortener switched from 302 to 301 to look more permanent, and its click counts stopped growing,
+          because browsers now skipped it.
+        - A site moves from http to https and answers every plain-http request with a 301 to the same path on https.
+        - A misconfigured server redirects a page to itself, and the browser gives up after about twenty hops with a
+          too many redirects error.
+      misconceptions:
+        - All redirects are the same. They differ in permanence, caching and whether the method is kept.
+        - A 301 can be undone instantly. Browsers that cached it keep using the new URL until their cache expires or
+          is cleared.
+        - Following a redirect is always safe. It can loop, change host, or downgrade to plain http.
+      elsewhere:
+        - Single sign-on flows bounce the browser between sites with redirects carrying codes in the URL.
+        - Open redirects, where a site redirects to any URL in a parameter, are abused in phishing.
+        - APIs use 303 See Other after a POST so that refreshing the page does not repeat the POST.
 
   - slug: short-id-generation
-    name: Generating short IDs
+    name: Short IDs, key spaces and collisions
     area: apis-backends
     kind: foundation
     status: generated
     brief: >-
-      A short ID can come from hashing the long value and keeping a few characters, from a counter, or from random
-      characters. Hashing gives the same ID for the same input, and a counter never collides but is guessable. Short
-      IDs from a hash or a random source can collide, so the store must check and pick another when the ID is taken.
+      Short identifiers are drawn from a limited key space, such as 6 characters of base62. The birthday effect makes
+      collisions likely long before the space is full, so a service must detect them and choose a strategy: rehash,
+      count, or pick at random and retry.
     related: [ hash-functions ]
     resources:
-      - title: Base62 (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Base62
       - title: Birthday problem (Wikipedia)
         url: https://en.wikipedia.org/wiki/Birthday_problem
+        opened: true
+      - title: Hash collision (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Hash_collision
+        opened: true
+      - title: Base62 (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Base62
+        opened: true
+      - title: URL shortening (Wikipedia)
+        url: https://en.wikipedia.org/wiki/URL_shortening
+        opened: true
+    lesson:
+      how_it_works: >-
+        A short link needs a short, unique key. Base62 uses the 62 characters a to z, A to Z and 0 to 9, which are
+        safe in URLs and easy to type. A key of length n has 62 to the power n possible values: about 56.8 billion for
+        6 characters and about 3.5 trillion for 7.
+
+
+        There are several ways to make keys. Hashing the long URL and writing the hash in base62, keeping the first
+        few characters, gives the same key for the same URL every time, which makes creation repeatable. A counter
+        written in base62 gives every new link the next key, which never collides but reveals how many links exist and
+        lets people guess others. A random key hides that, but must be checked against the store.
+
+
+        Collisions come sooner than intuition suggests. By the birthday effect, among randomly chosen keys a repeat
+        becomes likely once the number of keys reaches roughly the square root of the key space. For 6 base62
+        characters that is a few hundred thousand keys, not billions. A truncated hash behaves the same way. So every
+        scheme except a counter must detect when a key is already taken by a different URL and pick another, for
+        example by adding a counter or a salt to the input and hashing again.
+
+
+        The store should enforce uniqueness itself, with a unique constraint or an atomic insert-if-absent, so that
+        two requests racing for the same key cannot both win. Longer keys make collisions rarer but links longer, and
+        that trade-off is a product decision.
+      examples:
+        - A shortener cuts its keys to two characters for a test and sees collisions after a few dozen links, which
+          proves its collision handling works.
+        - A service that issues sequential keys lets anyone walk through every link by counting upwards.
+        - A team assumed 6-character keys would never collide and lost links when two URLs hashed to the same prefix.
+      misconceptions:
+        - Collisions only happen when the key space is nearly full. They become likely around the square root of its
+          size.
+        - A good hash never collides. Any hash cut to a few characters collides; the question is how often.
+        - Checking that a key is free, then inserting it, is safe. Two requests can pass the check at once unless the
+          store makes the insert atomic.
+      elsewhere:
+        - Git abbreviates commit hashes to the shortest prefix that is still unique in the repository.
+        - Order numbers, invite codes and ticket IDs face the same choice between counters, hashes and random codes.
+        - Unique IDs in distributed systems combine time, machine and sequence to avoid coordination and collisions.
 
   - slug: key-value-store
     name: Key-value stores
@@ -1565,18 +1844,63 @@ concepts:
         - Content-addressed storage, such as Git's object store, uses the hash of the content as the key.
 
   - slug: idempotency
-    name: Idempotent requests
+    name: Idempotent and safe requests
     area: apis-backends
     kind: foundation
     status: generated
     brief: >-
-      A request is idempotent when sending it twice leaves the system as sending it once does. Deleting the same item
-      twice, or shortening the same URL twice and getting the same key back, are examples. It matters because clients
-      retry when a reply is lost.
+      An operation is idempotent when doing it twice has the same effect as doing it once. In HTTP, GET, PUT and
+      DELETE are idempotent and POST is not, which decides which requests can be retried safely after a timeout.
     related: [ rest-api-design ]
     resources:
-      - title: MDN, Idempotent
+      - title: "RFC 9110: HTTP Semantics (idempotent methods)"
+        url: https://www.rfc-editor.org/rfc/rfc9110
+        opened: true
+      - title: "MDN Glossary: Idempotent"
         url: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+        opened: true
+      - title: "Stripe API Reference: Idempotent requests"
+        url: https://docs.stripe.com/api/idempotent_requests
+        opened: true
+    lesson:
+      how_it_works: >-
+        Networks lose replies. When a client sends a request and hears nothing back, it cannot tell whether the
+        request never arrived or the reply was lost after the work was done. Retrying is only safe if doing the work
+        twice causes no harm. That property is called idempotency: repeating the request leaves the system in the same
+        state as doing it once.
+
+
+        HTTP defines it per method. GET, HEAD and OPTIONS are safe, meaning they should not change anything, and
+        therefore idempotent. PUT replaces a resource with the given representation, so putting the same thing twice
+        ends in the same state. DELETE removes a resource, and deleting it again leaves it just as removed, even if
+        the second reply says it was not found. POST is not idempotent: posting an order twice usually creates two
+        orders.
+
+
+        Idempotency is about the effect on the server, not the reply. A second DELETE may answer 404 instead of 200
+        and still be idempotent. It is also a promise each service must keep: a GET that updates a counter or a PUT
+        that appends to a list breaks it.
+
+
+        For operations that must not run twice but are not naturally idempotent, services accept an idempotency key:
+        the client sends a unique value with the request, and the server remembers which keys it has completed and
+        returns the stored result for a repeat. Designing creation so that the same input returns the same result,
+        such as a shortener returning the existing key for a URL it has seen, achieves the same thing.
+      examples:
+        - A payment request times out on a train. Without an idempotency key, the app does not know whether to retry,
+          and retrying might charge the customer twice.
+        - A URL shortener that returns the existing key when the same long URL is posted again lets clients retry
+          freely.
+        - Automatic retries in HTTP clients and proxies are usually limited to idempotent methods for exactly this
+          reason.
+      misconceptions:
+        - Idempotent means the reply is always the same. It means the effect on the server is the same.
+        - POST can be retried like GET. It can create duplicates unless the service adds an idempotency key.
+        - A second DELETE must answer 200 to be idempotent. Answering 404 is fine; the state is the same.
+      elsewhere:
+        - Message queues deliver some messages more than once, so consumers are written to be idempotent.
+        - Database migrations and deployment scripts are written so that running them twice does no harm.
+        - Payment and order APIs commonly accept an idempotency key header.
 
   - slug: token-bucket
     name: Token bucket rate limiting
@@ -2290,19 +2614,70 @@ concepts:
 
   # ---- added for wave 2: network clients (curl, DNS resolver) ----
   - slug: url-parsing
-    name: The parts of a URL
+    name: Parsing and validating URLs
     area: networking-http
     kind: foundation
     status: generated
     brief: >-
-      A URL names a scheme, a host, an optional port and a path, as in http, eu.httpbin.org, 80 and /get. When the
-      port is missing the scheme's default is used, 80 for http and 443 for https, and an empty path means the root, a
-      single slash.
+      A URL has a defined structure: scheme, optional user information, host, optional port, path, query and fragment.
+      Parsing it correctly, applying defaults and percent-encoding, and validating untrusted URLs prevents both broken
+      requests and classic tricks.
     resources:
+      - title: "RFC 3986: Uniform Resource Identifier (URI): Generic Syntax"
+        url: https://www.rfc-editor.org/rfc/rfc3986
+        opened: true
+      - title: WHATWG URL Standard
+        url: https://url.spec.whatwg.org/
+        opened: true
       - title: MDN, What is a URL?
         url: https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL
-      - title: RFC 3986, URI generic syntax
-        url: https://www.rfc-editor.org/rfc/rfc3986
+        opened: true
+    lesson:
+      how_it_works: >-
+        A URL such as http://user@example.com:8080/docs/a%20b?lang=en#intro has parts with fixed roles. The scheme,
+        http, says which protocol to speak and implies a default port, 80 for http and 443 for https. After the two
+        slashes comes the authority: optional user information ending in an at sign, then the host, then an optional
+        colon and port. The path starts at the next slash. A question mark starts the query and a hash starts the
+        fragment.
+
+
+        The fragment is never sent to the server; it is used by the client, for example to scroll to a heading.
+        Everything else is used to build the request: the host and port to connect to, and the path and query to put
+        in the request line. A path with no characters becomes a single slash.
+
+
+        Only certain characters may appear as they are. Others, such as spaces, are percent-encoded as a percent sign
+        followed by two hexadecimal digits, so a space becomes %20. Decoding happens once, at the right time; decoding
+        twice, or decoding before splitting, lets an encoded slash or dot change the meaning of a path.
+
+
+        Untrusted URLs need care. In http://trusted.com@evil.example/ the trusted-looking part is user information and
+        the real host is evil.example. Schemes such as javascript: or data: are not web addresses at all. Hosts are
+        case-insensitive and can be written in many ways, so a service that compares or stores URLs should parse and
+        normalise them first, and should accept only the schemes it really supports.
+
+
+        Two standards describe URLs: RFC 3986 for the general syntax and the WHATWG URL Standard for how browsers
+        parse them. They differ in edge cases, which is one reason to use a well-tested parser when the input comes
+        from strangers.
+      examples:
+        - A link shortener that stores URLs as raw text gives http://Example.com/x and http://example.com/x two
+          different keys, although they name the same page.
+        - A phishing email shows a link that starts with the name of a real bank, followed by an at sign and the
+          attacker's domain.
+        - A client that forgets to encode a space in a query sends a request line with three spaces, and the server
+          rejects it as malformed.
+      misconceptions:
+        - The fragment is part of the request. It stays in the client.
+        - "Anything that starts with a scheme is a web address. javascript: and data: URLs run code or carry content
+          directly."
+        - Splitting on slashes is enough. User information, ports, IPv6 hosts in brackets and percent-encoding all
+          break naive splitting.
+      elsewhere:
+        - Every HTTP client, browser and proxy parses URLs, and differences between parsers have caused real security
+          bugs.
+        - Server-side request forgery attacks abuse services that fetch user-supplied URLs without validating the host.
+        - Database connection strings and many configuration files reuse the URL syntax.
 
   - slug: dns-message-format
     name: The DNS message format
@@ -2310,44 +2685,177 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A DNS message starts with a 12-byte header: an ID that pairs a reply with its query, a flags field with bits
-      such as query or response and recursion desired, and four counts. Then come the question, answer, authority and
-      additional sections, with every number big-endian.
+      Every DNS query and reply is one binary message: a 12-byte header with an ID, flags and four counts, then the
+      question, answer, authority and additional sections. Records have variable length, so a decoder walks them in
+      order.
     prerequisites: [ byte-order ]
     related: [ udp-datagrams ]
     resources:
-      - title: RFC 1035, Domain names, implementation and specification
+      - title: "RFC 1035: Domain names, implementation and specification"
         url: https://www.rfc-editor.org/rfc/rfc1035
+        opened: true
+      - title: Julia Evans, Implement DNS in a weekend
+        url: https://implement-dns.wizardzines.com/
+        opened: true
+      - title: Domain Name System (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Domain_Name_System
+        opened: true
+    lesson:
+      how_it_works: >-
+        DNS uses the same message layout for questions and answers. It starts with a fixed 12-byte header: a 16-bit ID
+        chosen by the client so it can match the reply to its query, a 16-bit flags field, and four 16-bit counts
+        giving the number of entries in each of the four sections that follow.
+
+
+        The question section holds the name being asked about, encoded as labels, followed by a type and a class. Type
+        1 asks for an A record, an IPv4 address, and class 1 means internet. The answer section holds resource records
+        that answer the question. The authority section holds records pointing at the servers responsible for the
+        name, which is how referrals work. The additional section holds helpful extras, such as the addresses of those
+        servers.
+
+
+        Each resource record has a name, a type, a class, a time to live in seconds, a data length, and then that many
+        bytes of data. For an A record the data is four bytes, shown as four numbers joined by dots. Because names and
+        data vary in length, there is no fixed offset for the second record: a decoder must read each record
+        completely to find where the next begins.
+
+
+        Names are written as a series of labels, each preceded by a byte giving its length, and ended by a zero byte,
+        so dns.google.com becomes 3 dns 6 google 3 com 0. Labels can be at most 63 bytes and a whole name at most 255.
+        Every number in the message is big-endian.
+      examples:
+        - A resolver that ignores the counts and assumes the answer starts right after the header misreads the
+          question as an answer.
+        - Tools such as dig print the five parts of a reply, the header and four sections, in exactly this order.
+        - "A reply with zero answers and records in the authority section is not an error: it is a referral to other
+          servers."
+      misconceptions:
+        - Records have fixed sizes, so you can jump to the answers. You must walk each record, because names and data
+          vary in length.
+        - The question is only in the query. Replies repeat it, and decoders must skip it.
+        - An empty answer section means the name does not exist. It can mean a referral; the response code says
+          whether the name exists.
+      elsewhere:
+        - Many binary protocols use the same pattern of a fixed header with counts followed by variable-length records.
+        - DNS over HTTPS and DNS over TLS carry these same binary messages inside other protocols.
+        - Email delivery depends on MX records and spam checks on TXT records, all carried in this format.
 
   - slug: dns-name-compression
-    name: Encoding and compressing DNS names
+    name: DNS name compression
     area: formats-parsing
     kind: foundation
     status: generated
     brief: >-
-      DNS writes a name as labels, each preceded by its length, ending with a zero byte, so dns.google.com becomes 3
-      dns 6 google 3 com 0. To save space, a reply can replace the end of a name with a two-byte pointer whose top two
-      bits are set, giving the offset where the rest of the name already appears.
+      To save space, a DNS name can end with a two-byte pointer to an earlier place in the message where the rest of
+      the name is written. Decoders must follow pointers and also guard against pointers that loop.
     prerequisites: [ dns-message-format ]
     resources:
-      - title: RFC 1035, Domain names, implementation and specification
+      - title: RFC 1035 (message compression)
         url: https://www.rfc-editor.org/rfc/rfc1035
+        opened: true
+      - title: Julia Evans, Implement DNS in a weekend
+        url: https://implement-dns.wizardzines.com/
+        opened: true
+    lesson:
+      how_it_works: >-
+        A DNS reply often repeats the same name many times: in the question, in every answer and in authority records.
+        Writing it out in full each time would waste most of a 512-byte message, so DNS compresses names with
+        pointers.
+
+
+        A name is normally a sequence of labels, each starting with a length byte between 0 and 63, ending with a zero
+        byte. Because 63 needs only six bits, the top two bits of a length byte are free. When both are set, the byte
+        is not a length but the start of a pointer: those two bits together with the next 14 bits form an offset,
+        counted from the start of the message, where the rest of the name continues. The pair c0 0c, for example,
+        points at offset 12, which is where the question's name starts, right after the 12-byte header.
+
+
+        A name may be written partly in full and finish with a pointer, such as a new label followed by a pointer to
+        an existing domain. A decoder reads labels, and when it meets a pointer it jumps to the offset and keeps
+        reading there. The name ends at a zero byte, wherever that is. After a pointer, the decoder must remember to
+        continue reading the record from just after the two pointer bytes, not from where the jump ended.
+
+
+        Pointers come from the network, so they are untrusted. A pointer that points at itself or at a later pointer
+        that points back creates a loop, and a naive decoder spins forever. Decoders defend themselves by checking
+        that every offset lies inside the message, by limiting the number of jumps, and by capping the decoded name at
+        255 bytes.
+      examples:
+        - The sample reply in the challenge uses c0 0c for every answer name, so each answer spends two bytes on its
+          name instead of sixteen.
+        - A fuzzing tool sends a reply whose pointer points at itself, and a resolver without a jump limit uses all
+          its CPU.
+        - A decoder that keeps reading the record from the jump target instead of after the pointer misreads the type
+          and TTL of every compressed answer.
+      misconceptions:
+        - After following a pointer, carry on reading from there. Return to just after the pointer for the rest of the
+          record.
+        - Pointers only appear at the start of a name. A name can start with labels and end with a pointer.
+        - Pointers from a server can be trusted. Anything off the network must be bounds-checked and loop-checked.
+      elsewhere:
+        - Compression by back-references to earlier data is the core of formats such as gzip.
+        - Parsers for any untrusted binary format need the same bounds and loop checks.
+        - Email and other protocols that carry domain names reuse DNS-style label encoding.
 
   - slug: iterative-resolution
-    name: Resolving a name from the root
+    name: Iterative resolution from the root
     area: networking-http
     kind: foundation
     status: generated
     brief: >-
-      A resolver that does the work itself starts at a root server, which does not know the answer but names the
-      servers for the top-level domain. It asks those, follows the next referral, and so on until an authoritative
-      server returns the address. A referral that names a server without its address means resolving that name first.
+      No single server knows every name. A resolver starts at a root server, which refers it to the servers for the
+      top-level domain, which refer it on, until a server responsible for the name answers. Glue records supply the
+      addresses of the servers it is referred to.
     prerequisites: [ dns-message-format ]
     resources:
-      - title: Domain Name System (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Domain_Name_System
-      - title: Root name server (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Root_name_server
+      - title: "RFC 1034: Domain names, concepts and facilities"
+        url: https://www.rfc-editor.org/rfc/rfc1034
+        opened: true
+      - title: IANA, Root Servers
+        url: https://www.iana.org/domains/root/servers
+        opened: true
+      - title: Julia Evans, Implement DNS in a weekend
+        url: https://implement-dns.wizardzines.com/
+        opened: true
+    lesson:
+      how_it_works: >-
+        DNS is a tree split into zones, each run by its own servers. The root servers know which servers handle each
+        top-level domain such as com. The com servers know which servers handle google.com. Those servers hold the
+        actual records for names under google.com. Resolving a name means walking down this tree.
+
+
+        A resolver that starts from scratch sends its query to a root server, with the recursion-desired flag cleared.
+        The root does not know the answer, so it replies with a referral: no answers, but NS records in the authority
+        section naming the servers for com, and, in the additional section, their addresses. Those addresses are
+        called glue; without them the resolver would first have to resolve the name server's own name. The resolver
+        repeats the query to one of the com servers, gets another referral to the google.com servers, asks one of
+        those, and finally receives an answer with the address.
+
+
+        Things go wrong in interesting ways. A referral may name a server with no glue, so the resolver must resolve
+        that server's name first, starting again from the root. A server may be down, so the resolver tries another. A
+        misconfiguration can send it round in circles, so it caps the number of queries. The response code says when a
+        name truly does not exist.
+
+
+        Most programs never do this themselves. They send one query with recursion desired to a recursive resolver,
+        such as the one their network provides or a public one, and that resolver does the whole walk, caching every
+        step so the next lookup is faster.
+      examples:
+        - "dig with the trace option shows the same walk: root, then com, then the domain's own servers."
+        - When a top-level domain's servers had an outage, every name under it failed to resolve for resolvers whose
+          caches had expired.
+        - A domain whose name servers live inside the domain itself depends on glue records, or no one could ever find
+          them.
+      misconceptions:
+        - Root servers know every name. They only know who runs each top-level domain.
+        - An answer with no records is a failure. It is usually a referral to the next servers down.
+        - Your computer walks the tree for every lookup. A recursive resolver normally does it and caches the results.
+      elsewhere:
+        - Recursive resolvers at internet providers and public services run this algorithm millions of times a second,
+          mostly from cache.
+        - Domain registrars set the NS records and glue in the parent zone when you register a domain.
+        - DNSSEC adds signatures that let a resolver check each step of the walk.
 
   # ---- added for wave 2: storage servers (Redis, Bitcask) ----
   - slug: resp-protocol
@@ -3537,4 +4045,280 @@ concepts:
         opened: true
       - title: HTTP pipelining (Wikipedia)
         url: https://en.wikipedia.org/wiki/HTTP_pipelining
+        opened: true
+  - slug: flow-control-backpressure
+    name: Flow control and backpressure
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: When a receiver reads more slowly than a sender writes, buffers fill and the sender is forced to slow down. TCP
+      does this with its receive window, and programs feel it as writes that block or would block. Handling it, rather
+      than buffering without limit, keeps a server alive.
+    lesson:
+      how_it_works: >-
+        Every TCP connection has buffers at both ends. Bytes a program writes go into its send buffer, travel to the
+        other machine, and wait in that machine's receive buffer until the receiving program reads them. The receiver
+        keeps telling the sender how much room is left in its receive buffer, the receive window, and the sender may
+        only have that much unacknowledged data in flight.
+
+
+        If the receiving program stops reading, its receive buffer fills and the window shrinks to zero. The sender
+        can no longer transmit, so its own send buffer fills too. From then on the sending program's write cannot
+        complete: a blocking write waits until space frees up, and a non-blocking write reports that it would block.
+        The sender has been slowed to the receiver's pace. That pressure flowing backwards from a slow consumer to a
+        fast producer is called backpressure.
+
+
+        Backpressure is a feature, but a server must respect it. A server that keeps reading from one side and
+        queueing what it cannot write in its own memory turns a slow client into unbounded memory growth. A thread
+        blocked on a write to a client that never reads is a thread lost. Good servers stop reading from a source
+        while they cannot write to its destination, cap how much they buffer per connection, and use timeouts so a
+        peer that never drains is eventually disconnected.
+
+
+        The same idea appears wherever data flows between parts that run at different speeds: pipes between programs,
+        message queues, streams in a program, and protocols that carry flow-control windows of their own.
+      examples:
+        - "An echo server whose client sends a large file but never reads the echoes: after a few hundred kilobytes
+          the server's writes stop going through, and a naive server either blocks that thread forever or keeps
+          queueing the echoes in memory."
+        - "A shell pipeline where the last program is slow: the earlier programs block on writes to the pipe and pause
+          instead of filling memory."
+        - A proxy that downloads from a fast server and sends to a phone on a slow network must pause reading from the
+          server, or it will hold the whole download in memory.
+      misconceptions:
+        - A write that returned has delivered the data. It only means the data is in the local send buffer.
+        - Bigger buffers solve slow consumers. They only delay the moment the buffers fill.
+        - Backpressure is an error. It is the normal signal that the other side needs time.
+      elsewhere:
+        - Stream libraries in most languages expose backpressure, for example a write that reports the buffer is full
+          and a later signal that it has drained.
+        - Message queues apply it by refusing or delaying producers when consumers fall behind.
+        - HTTP/2 and QUIC carry their own per-stream flow-control windows on top of the connection.
+    resources:
+      - title: Flow control (data) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Flow_control_(data)
+        opened: true
+      - title: "RFC 9293: Transmission Control Protocol (TCP)"
+        url: https://www.rfc-editor.org/rfc/rfc9293
+        opened: true
+      - title: Sliding window protocol (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Sliding_window_protocol
+        opened: true
+  - slug: name-resolution
+    name: Turning names into addresses
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: Before a program can connect to a host name it must turn the name into IP addresses, through the hosts file and
+      the system's DNS resolver. A name can have several addresses, IPv6 and IPv4, and how a client tries them affects
+      speed and reliability.
+    lesson:
+      how_it_works: >-
+        Sockets connect to IP addresses, not names. When a program is given a host name, it asks the operating
+        system's resolver to translate it. The resolver checks local sources first, such as the hosts file and a
+        cache, and otherwise sends a DNS query to a recursive resolver, usually run by the network or a public
+        service, which does the full lookup and returns the answer.
+
+
+        The answer is often a list. A name can have several IPv4 addresses for load spreading and several IPv6
+        addresses as well. The resolver orders them by rules about which address families work best, and a
+        well-written client tries them in turn: if connecting to the first fails or takes too long, it moves to the
+        next. Modern clients race IPv6 and IPv4 attempts a fraction of a second apart, a technique called Happy
+        Eyeballs, so a broken IPv6 path does not cost the user a long timeout.
+
+
+        Resolution takes time and can fail separately from connecting. A name may not exist, the resolver may be
+        unreachable, or the answer may be cached and out of date. Errors should say which step failed, because "could
+        not resolve host" and "connection refused" point to very different problems.
+
+
+        Because answers carry a time to live, resolvers cache them. That is what makes the second lookup of a name
+        instant, and also why a changed address can take a while to reach everyone.
+      examples:
+        - A command-line tool hangs for twenty seconds on a server but not on a laptop because the server gets an IPv6
+          address first and has no working IPv6 route, so every connection waits for a timeout before trying IPv4.
+        - A developer adds a line to the hosts file to point a production name at a test machine, and forgets to
+          remove it.
+        - An outage at a public DNS service makes many sites unreachable even though their servers are fine.
+      misconceptions:
+        - A host name maps to exactly one address. It often maps to several, of both families.
+        - Every lookup goes out to the internet. Most are answered from caches on the machine or at the resolver.
+        - If the name resolves, the server is up. Resolution and connection are separate steps that fail separately.
+      elsewhere:
+        - Browsers and HTTP clients keep their own DNS caches and connection pools keyed by host.
+        - Service discovery in clusters works by answering name lookups with the addresses of healthy instances.
+        - Content delivery networks answer the same name with different addresses depending on where the user is.
+    resources:
+      - title: getaddrinfo(3), Linux manual page
+        url: https://man7.org/linux/man-pages/man3/getaddrinfo.3.html
+        opened: true
+      - title: "MDN Glossary: DNS"
+        url: https://developer.mozilla.org/en-US/docs/Glossary/DNS
+        opened: true
+      - title: Domain Name System (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Domain_Name_System
+        opened: true
+  - slug: chunked-transfer-encoding
+    name: Chunked transfer encoding
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: HTTP/1.1 can send a body whose total length is not known in advance as a series of chunks, each preceded by its
+      size in hexadecimal and ended by a chunk of size zero. A client must strip the size lines and join the data.
+    lesson:
+      how_it_works: >-
+        An HTTP/1.1 reply needs a way to say where its body ends while the connection stays open. Content-Length gives
+        the exact number of bytes, but a server that generates its output on the fly may not know that number when it
+        starts sending. Chunked transfer encoding solves this. The server sends the header Transfer-Encoding: chunked
+        and then the body as a sequence of chunks.
+
+
+        Each chunk starts with a line holding its size in hexadecimal, followed by a carriage return and line feed,
+        then exactly that many bytes of data, then another carriage return and line feed. The body ends with a chunk
+        of size zero, which may be followed by trailer headers and a final empty line. So a chunk line reading 1f8
+        announces 504 bytes of data.
+
+
+        A client reading such a body loops: read a size line, convert it from hexadecimal, read exactly that many
+        bytes, read the line ending, and stop at size zero. The size lines are framing, not content, so they must
+        never be printed as part of the body. The bytes of one chunk can still arrive across several reads, which is
+        why the reader must count bytes rather than rely on read boundaries.
+
+
+        Chunked encoding and Content-Length must not be combined. Servers and proxies that disagree about which one
+        wins have been tricked into reading one request as two, an attack called request smuggling. HTTP/2 and HTTP/3
+        do not use chunked encoding; they frame data in their own way.
+      examples:
+        - A search page that streams results as it finds them sends each batch as a chunk, so the browser can start
+          showing results before the search finishes.
+        - A hand-written HTTP client prints stray lines such as 1f8 and 0 around the JSON it fetched, because it
+          printed the chunk sizes along with the data.
+        - A server that compresses its output on the fly cannot know the compressed size in advance, so it uses
+          chunked encoding.
+      misconceptions:
+        - The chunk size is in decimal. It is hexadecimal.
+        - One chunk arrives in one read. A chunk can be split across reads, and one read can hold several chunks.
+        - A body is either chunked or has no end. Content-Length and closing the connection are the other two ways to
+          end one.
+      elsewhere:
+        - Streaming APIs, including servers that stream model output, use chunked replies over HTTP/1.1.
+        - Proxies must rewrite or pass through the encoding correctly, and bugs here cause request smuggling.
+        - The same length-prefixed framing idea appears in many binary protocols.
+    resources:
+      - title: "RFC 9112: HTTP/1.1 (chunked transfer coding)"
+        url: https://www.rfc-editor.org/rfc/rfc9112
+        opened: true
+      - title: MDN, Transfer-Encoding header
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Transfer-Encoding
+        opened: true
+  - slug: tls-basics
+    name: "TLS: encrypted, authenticated connections"
+    area: networking-http
+    kind: foundation
+    status: generated
+    brief: TLS sits between TCP and HTTP. A handshake agrees on keys and lets the client check the server's certificate
+      before any request is sent, and then every byte is encrypted and protected against tampering. https is HTTP over
+      TLS, normally on port 443.
+    lesson:
+      how_it_works: >-
+        Plain HTTP travels as readable text, so anyone on the path, such as a shared Wi-Fi network or a compromised
+        router, can read the request, the reply and any password or cookie, and can change them. TLS fixes this by
+        adding a layer between the TCP connection and the HTTP messages.
+
+
+        When the TCP connection opens, client and server first run a handshake. The client says which host it wants,
+        using an extension called server name indication, because one address can serve many sites. The server sends
+        its certificate, which binds its name to a public key and is signed by a certificate authority. The client
+        checks that the signature chains up to an authority it trusts, that the certificate is still valid, and that
+        the name matches the host it meant to reach. The two sides then agree on fresh secret keys. In TLS 1.3 this
+        takes one round trip before data can flow.
+
+
+        After the handshake, every byte of HTTP is encrypted and carries an integrity check, so an eavesdropper sees
+        only sizes and timing, and any change is detected. The request itself is unchanged: the same request line and
+        headers, just sent inside the encrypted channel.
+
+
+        Certificate checking is the part that gives security. Encryption with a server whose identity was not checked
+        only protects you from everyone except the attacker you are talking to. Turning off verification to make an
+        error go away removes the protection entirely.
+      examples:
+        - A user on café Wi-Fi logs in to a plain-http site, and anyone on the same network can read the password from
+          the traffic.
+        - "A tool that speaks plain HTTP on port 80 cannot fetch an https URL: the server on port 443 expects a TLS
+          handshake first, not a request line."
+        - An expired certificate makes browsers show a full-page warning, because the server can no longer prove who
+          it is.
+      misconceptions:
+        - TLS hides which site you visit. The server name is usually visible in the handshake, and the address always
+          is.
+        - Encryption alone makes a connection safe. Without checking the certificate, you may be encrypting to an
+          attacker.
+        - https changes the HTTP messages. They are the same messages, carried inside an encrypted channel.
+      elsewhere:
+        - Email, databases and message brokers use TLS for their own protocols.
+        - Mutual TLS, where the client also presents a certificate, is common between services inside companies.
+        - Let's Encrypt issues free certificates automatically, which is why most sites now use https.
+    resources:
+      - title: "RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3"
+        url: https://www.rfc-editor.org/rfc/rfc8446
+        opened: true
+      - title: MDN, Transport Layer Security (TLS)
+        url: https://developer.mozilla.org/en-US/docs/Web/Security/Transport_Layer_Security
+        opened: true
+  - slug: dns-caching-ttl
+    name: Caching and time to live
+    area: state-storage
+    kind: foundation
+    status: generated
+    brief: Every DNS record carries a time to live in seconds. Resolvers keep and reuse a record until it expires, which
+      makes lookups fast and also delays changes. Negative answers are cached too.
+    lesson:
+      how_it_works: >-
+        Looking a name up from the root every time would be slow and would overload the root and top-level servers.
+        Instead, every resource record carries a time to live, a number of seconds chosen by the owner of the zone. A
+        resolver that receives a record may keep it in its cache and answer later questions from the cache until that
+        many seconds have passed. When it hands out a cached record it reduces the TTL by the time already spent in
+        the cache.
+
+
+        Caching happens at several levels: in the recursive resolver, often in the operating system, and in
+        applications such as browsers. Referral records are cached too, so after one lookup under com a resolver no
+        longer needs the root for other com names. Negative answers, saying a name does not exist, are cached for a
+        time taken from the zone's settings, so a typo is not looked up again and again.
+
+
+        The price is that changes spread slowly. If a record has a TTL of a day and its address changes, resolvers
+        that cached it keep handing out the old address until their copy expires. Teams planning a move lower the TTL
+        well in advance, at least one old TTL before the change, make the change, and raise the TTL again afterwards.
+
+
+        A short TTL means fresher answers and more queries; a long one means fewer queries and slower changes. Values
+        from a minute to a day are common.
+      examples:
+        - A company moves its website to a new server, and for hours some customers keep reaching the old one because
+          their resolvers cached the old address with a long TTL.
+        - A resolver that has just looked up one name under com answers the next com name faster, because it cached
+          the referral to the com servers.
+        - Someone mistypes a domain, then registers it, and finds it does not work for a while because the "does not
+          exist" answer was cached.
+      misconceptions:
+        - Changing a DNS record takes effect at once. Caches keep the old record until its TTL runs out.
+        - Only positive answers are cached. Answers saying a name does not exist are cached too.
+        - The TTL is set by the resolver. It is set by the zone owner on each record.
+      elsewhere:
+        - Every cache, from HTTP to databases, faces the same trade-off between freshness and load.
+        - Content delivery networks use short TTLs so they can move traffic between locations quickly.
+        - Service discovery in clusters often relies on very short DNS TTLs so clients notice when instances come and
+          go.
+    resources:
+      - title: "RFC 1034: Domain names, concepts and facilities (caching)"
+        url: https://www.rfc-editor.org/rfc/rfc1034
+        opened: true
+      - title: "RFC 2308: Negative Caching of DNS Queries"
+        url: https://www.rfc-editor.org/rfc/rfc2308
+        opened: true
+      - title: Time to live (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Time_to_live
         opened: true

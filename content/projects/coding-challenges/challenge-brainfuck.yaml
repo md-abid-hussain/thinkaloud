@@ -1,13 +1,9 @@
-# Coding Challenges, Build your own Brainfuck interpreter.
-# Source: https://codingchallenges.fyi/challenges/challenge-brainfuck
-# Written in our own words. The source page is linked, not copied.
-# Every predict and trace key is proven by content/proofs/challenge-brainfuck.mjs, which holds a tiny interpreter,
-# a compiler with a jump table, a run-length merger and a clear-loop rewrite.
-# Cells are bytes that wrap around (255 plus one is 0, 0 minus one is 255). Only key 3.2 depends on that, and its
-# prompt says so.
+# Coding Challenges, Build your own Brainfuck interpreter. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-brainfuck . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-brainfuck
@@ -17,42 +13,30 @@ project:
   status: generated
   figure:
     kind: tape
-  summary: >-
-    An interpreter for Brainfuck, a language of eight one-character commands that work on a tape of 30,000 byte
+  summary: An interpreter for Brainfuck, a language of eight one-character commands that work on a tape of 30,000 byte
     cells. It starts as a REPL and a file runner, then compiles programs to bytecode for a small virtual machine and
     speeds it up with run-length merging and pattern rewrites, timed on a Mandelbrot program.
   requirements:
     - Start a REPL with no arguments, and run a program file when one is named
     - Run all eight commands on 30,000 cells that start at zero, ignoring every other character
     - Pair loop brackets correctly, including nested loops, and report unbalanced brackets
-    - Compile the program to bytecode with comments removed and jump targets worked out, and run it on a virtual machine
-    - Merge runs of the same command into one instruction, and turn common loops such as clearing a cell into single instructions
+    - Compile the program to bytecode with comments removed and jump targets worked out, and run it on a virtual
+      machine
+    - Merge runs of the same command into one instruction, and turn common loops such as clearing a cell into single
+      instructions
     - Time the Mandelbrot program at each stage and check that its picture never changes
-  restate_rubric:
-    - id: r1
-      point: "The tool runs Brainfuck programs, from a REPL or from a file, on a tape of cells with a data pointer"
-    - id: r2
-      point: "It first interprets the source directly, then compiles it to bytecode that a small virtual machine runs"
-    - id: r3
-      point: "It adds optimisations such as merging repeated commands and replacing common loops, and measures the speedup on a Mandelbrot program"
-  reflection_prompt: >-
-    In your own words, where did your interpreter spend its time at the start, which change gave the biggest speedup,
-    and what would you try next?
   primer:
-    what: >-
-      Brainfuck is a tiny programming language with only eight commands, each a single character. A program works on
-      a long row of 30,000 cells, each holding a number that starts at zero, and a data pointer that marks one cell
-      as the current one. Plus and minus add or take one from the current cell, the greater-than and less-than signs
-      move the pointer one cell right or left, a full stop prints the current cell as a character, and a comma reads
-      one character into it. Square brackets make a loop that repeats its body while the current cell is not zero.
-    why: >-
-      With so few commands you can write a working interpreter in an afternoon, and then spend the rest of the
-      project on the ideas behind real language runtimes: compiling to bytecode, resolving jumps ahead of time, and
-      optimising the instructions that run most often.
-    example: >-
-      Take the program plus, plus, greater-than, plus, plus, plus. The first two commands make the first cell 2, the
-      greater-than moves the pointer to the second cell, and the three pluses make that cell 3. The program ends with
-      the pointer on the second cell. Any letter, space or digit in the program would simply be skipped.
+    what: Brainfuck is a tiny programming language with only eight commands, each a single character. A program works on a
+      long row of 30,000 cells, each holding a number that starts at zero, and a data pointer that marks one cell as
+      the current one. Plus and minus add or take one from the current cell, the greater-than and less-than signs move
+      the pointer one cell right or left, a full stop prints the current cell as a character, and a comma reads one
+      character into it. Square brackets make a loop that repeats its body while the current cell is not zero.
+    why: "With so few commands you can write a working interpreter in an afternoon, and then spend the rest of the project
+      on the ideas behind real language runtimes: compiling to bytecode, resolving jumps ahead of time, and optimising
+      the instructions that run most often."
+    example: Take the program plus, plus, greater-than, plus, plus, plus. The first two commands make the first cell 2,
+      the greater-than moves the pointer to the second cell, and the three pluses make that cell 3. The program ends
+      with the pointer on the second cell. Any letter, space or digit in the program would simply be skipped.
     words:
       - term: cell
         meaning: One slot on the tape, holding a small number. Usually a byte, from 0 to 255.
@@ -64,311 +48,276 @@ project:
         meaning: A body between square brackets that runs again and again until the current cell is zero at a bracket.
       - term: bytecode
         meaning: A compact list of instructions made from the source ahead of time, which a small virtual machine runs.
-
+  restate_rubric:
+    - id: r1
+      point: The tool runs Brainfuck programs, from a REPL or from a file, on a tape of cells with a data pointer
+    - id: r2
+      point: It first interprets the source directly, then compiles it to bytecode that a small virtual machine runs
+    - id: r3
+      point: It adds optimisations such as merging repeated commands and replacing common loops, and measures the speedup on
+        a Mandelbrot program
+  reflection_prompt: In your own words, where did your interpreter spend its time at the start, which change gave the
+    biggest speedup, and what would you try next?
+  reference_tool: Your own first, simple interpreter, once it passes the challenge's test scripts. Any widely used
+    Brainfuck interpreter with 30,000 wrapping byte cells also works.
+  done_when: The REPL and the file runner work; Hello!, the test scripts and Mandelbrot give the expected output at
+    every stage; unbalanced brackets are reported before anything runs; the optimised VM matches the first interpreter
+    byte for byte on every program; and your notes hold a timing table for Mandelbrot across the stages and explain
+    your memory-model choices.
+  open_checks:
+    - Whether the Mandelbrot program and the test scripts rely on cells wrapping from 255 to 0.
+    - What the input command should do at the end of input for the programs you run, and what your choice breaks.
+    - Whether any test program moves the pointer left of the first cell.
+    - How much of your timing is start-up and compilation rather than running.
+learning_map:
+  - concept: interpreter-loop
+    where: Your first ccbf reads the program one command at a time with a program counter, does what the command says to
+      the tape, and moves on, skipping every character that is not a command.
+    explain_back:
+      prompt: Explain what a simple interpreter does on every turn of its main loop, using Brainfuck as the example, and why
+        it is usually much slower than the same program compiled ahead of time.
+      rubric:
+        - id: e1
+          point: Each turn fetches the command at the program counter, works out what it is, carries it out on the tape or the
+            pointers, and advances the counter, until the program ends
+        - id: e2
+          point: The fetching and deciding is paid again for every command executed, including skipping comment characters, so a
+            loop body is decoded afresh on every pass
+        - id: e3
+          point: Without preparation, a jump at a bracket means searching for the matching bracket each time
+        - id: e4
+          point: Compiling does the decoding and the searching once, before the program runs, so running only does the work
+            itself
+  - concept: tape-memory-model
+    where: The program works on 30,000 cells that start at zero, a data pointer that moves left and right, and one byte
+      per cell, so you choose what happens at the tape's ends and when a cell goes past 255 or below 0.
+    explain_back:
+      prompt: A Brainfuck program written for another interpreter prints garbage on yours. Explain which memory-model
+        choices differ between interpreters, and how each can change what a program does.
+      rubric:
+        - id: e1
+          point: "Cell size: one byte that wraps from 255 to 0 and from 0 to 255, or a larger cell that does not wrap; many
+            programs rely on wrapping"
+        - id: e2
+          point: "Tape length, and what happens when the pointer moves past either end: an error, wrapping round, or growing the
+            tape"
+        - id: e3
+          point: "What the input command does at the end of input: leave the cell alone, set it to 0, or set it to 255"
+        - id: e4
+          point: The fix is to pick the common conventions, such as 30,000 wrapping byte cells, and document every choice
+  - concept: bracket-matching
+    where: Loops are square brackets, so every opening bracket needs its partner, including nested loops. You pair them
+      all with a stack before running, and refuse a program whose brackets do not balance.
+    explain_back:
+      prompt: Your interpreter scans forward for the matching bracket on every pass through a loop, and a program with long
+        nested loops runs painfully slowly. Explain why, how pairing every bracket once before running fixes it, and
+        how the same pass finds unbalanced brackets.
+      rubric:
+        - id: e1
+          point: Scanning for the partner re-reads the loop body every time the loop runs, so the cost grows with the size of
+            the loop multiplied by the number of passes
+        - id: e2
+          point: One pass with a stack pushes the position of each opening bracket and, at each closing bracket, pops its
+            partner and records both positions as each other's jump target
+        - id: e3
+          point: At run time a jump is then a lookup in that table, with no searching
+        - id: e4
+          point: A closing bracket that finds an empty stack, or opening brackets left on the stack at the end, means the
+            program is unbalanced, and it is reported with a position before anything runs
+  - concept: bytecode-compilation
+    where: Instead of interpreting the source text, ccbf compiles it to a list of instructions with comments removed and
+      jump targets worked out, and a small virtual machine runs that list.
+    explain_back:
+      prompt: Explain what changes when an interpreter first compiles a program to bytecode and then runs the bytecode, and
+        what an instruction can carry that the raw source text cannot.
+      rubric:
+        - id: e1
+          point: "Compiling happens once: comments are dropped and each command becomes an instruction, so the virtual machine
+            never reads text again"
+        - id: e2
+          point: An instruction can carry operands worked out ahead of time, such as a repeat count or the position of its
+            matching bracket
+        - id: e3
+          point: "The virtual machine's loop becomes simpler and faster: fetch an instruction, act on it, with no searching or
+            skipping"
+        - id: e4
+          point: Separating translating from running creates a place to improve the instruction list before it runs, which is
+            where optimisation happens
+  - concept: peephole-optimization
+    where: You shrink the instruction list by merging runs of the same command and replacing common loop patterns, such as
+      the clear-cell loop, with one instruction, checking that the output never changes.
+    explain_back:
+      prompt: Explain how merging runs of plus signs and recognising the clear-cell loop can make a program several times
+        faster, and what you must check to be sure an optimisation never changes the output.
+      rubric:
+        - id: e1
+          point: A run of the same command becomes one instruction with a count, so the machine does one step where it did many
+        - id: e2
+          point: A loop that only takes one from the current cell always ends with that cell at zero, so it can become a single
+            set-to-zero instruction
+        - id: e3
+          point: A rewrite must be safe for every possible input and cell value, and jump targets must be worked out again after
+            the list changes
+        - id: e4
+          point: You check it by running the same programs before and after the optimisation and comparing the output byte for
+            byte
+  - concept: benchmarking
+    where: You time the Mandelbrot program after each stage, simple interpreter, bytecode and optimised bytecode, to see
+      what each change actually bought.
+    explain_back:
+      prompt: One run of Mandelbrot suggests your optimised interpreter is three times faster than before. Explain how to
+        measure the speed-up so that the number can be trusted.
+      rubric:
+        - id: e1
+          point: Time several runs of each version and report a typical value, such as the median, rather than a single run
+        - id: e2
+          point: "Keep everything else the same: the machine, the program, the input, and no other heavy work running"
+        - id: e3
+          point: Check that both versions produced identical output, so you are timing the same work
+        - id: e4
+          point: Say what the time includes, such as start-up and compilation, and compare like with like
+  - concept: differential-testing
+    where: Each optimisation is checked by running the same programs on your first, simple interpreter and on the
+      optimised one, and comparing their output.
+    explain_back:
+      prompt: Explain why the simple interpreter you wrote first is still valuable after you have built a much faster one,
+        and how you would use it to test every new optimisation.
+      rubric:
+        - id: e1
+          point: The simple interpreter is easy to trust because it does exactly what each command says, so it can act as the
+            reference
+        - id: e2
+          point: Run the same programs, such as Hello!, the test scripts and Mandelbrot, through both and compare the output
+            byte for byte
+        - id: e3
+          point: Any difference points straight at the optimisation that broke something
+        - id: e4
+          point: Keep a set of test programs that exercise nested loops, wrapping cells and the tape's edges, and add every
+            program that ever exposed a bug
+  - concept: cli-subcommands
+    where: With no arguments ccbf starts a REPL, and with a file name it runs the file. A missing file or unbalanced
+      brackets are reported on standard error with a non-zero exit status.
+    explain_back:
+      prompt: Explain how one program can act both as a REPL and as a file runner, and what each mode should do when the
+        code it is given has unbalanced brackets.
+      rubric:
+        - id: e1
+          point: "The arguments decide the mode: with none, the program loops reading and running lines typed by the user; with
+            a file name, it reads and runs the file once"
+        - id: e2
+          point: In the REPL a bad line is reported and the session carries on, so the user can try again
+        - id: e3
+          point: When running a file, the program prints a message with the position on standard error and exits with a non-zero
+            status without running anything
+        - id: e4
+          point: The Brainfuck program's own output goes to standard output, so it can be piped into other tools
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: A REPL and a direct interpreter
-    summary: Read code from a REPL or a file, then run it character by character on the tape, loops included.
-    concepts: [cli-subcommands, interpreter-loop, bracket-matching]
+    summary: Read code from a REPL or a file, run the eight commands on a tape, and pair the brackets before running.
     steps:
-      - title: Read code and move on the tape
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            The program is "+++>+<-" and it runs on fresh cells. What value does the first cell hold when the program
-            ends? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The three pluses make the first cell 3. The greater-than moves to the second cell and the plus makes it
-              1. The less-than moves back to the first cell, and the minus takes it down to 2. Proof script output: 2.
-        build:
-          prompt: >-
-            Make ccbf with no arguments start a REPL that reads a line of code and, for now, prints it back. Make ccbf
-            test.bf print the contents of the file instead, using a test.bf that holds the Hello! program from the
-            challenge page. Report a file that cannot be opened on the error stream with a non-zero exit status.
+      - title: Read code from a REPL or a file
+        minutes: 30
+        build: Make ccbf with no arguments start a REPL that reads a line and, for now, prints it back. With a file name, read
+          the file instead, using a test.bf that holds the Hello! program from the challenge page.
+        outcome: ccbf with no arguments echoes a typed line, ccbf test.bf prints the program, and a missing file gives a
+          message on standard error and a non-zero exit status.
+        concepts:
+          - cli-subcommands
         hints:
-          hint: Keep two things in your head, the value in each cell and which cell the pointer is on, and update them one command at a time.
-          example: >-
-            Think of a row of boxes and one finger pointing at a box. Adding a pebble always goes into the box under
-            your finger, wherever that finger has moved to.
-
-      - title: Run the loop
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The program is "+++[>++<-]" and it runs on fresh cells. What value does the second cell hold when the
-            program ends? Answer with one number.
-          key:
-            match: number_exact
-            expected: 6
-            derivation: >-
-              The first cell is set to 3 before the loop. Each pass of the body adds 2 to the second cell and takes 1
-              from the first, so the body runs 3 times before the first cell is zero at the closing bracket. The
-              second cell ends at 6. Proof script output: 6.
-        build:
-          prompt: >-
-            Interpret the program one character at a time with 30,000 cells starting at zero, a program counter and a
-            data pointer, skipping every character that is not one of the eight commands. Run the challenge's first
-            test script and check that it prints its short message ending in a question. Then run the Mandelbrot
-            program linked from the page with its output thrown away and time it; an unoptimised interpreter usually
-            takes somewhere around 20 to 40 seconds. Run it once more with output shown and check that it draws the
-            Mandelbrot set. Write the time down, because later milestones compare against it.
+          hint: Decide the mode from the arguments in one place, before anything else runs.
+      - title: Run the commands
+        minutes: 60
+        build: Interpret the program one character at a time with 30,000 cells starting at zero, a program counter and a data
+          pointer, skipping every character that is not one of the eight commands. Decide how cells wrap and what
+          happens at the tape's ends, and write the choices down.
+        outcome: The Hello! program prints Hello!, and the challenge's first test script gives the output the page shows.
+        concepts:
+          - interpreter-loop
+          - tape-memory-model
         hints:
-          hint: Write down both cells after every pass of the loop, and ask which cell the closing bracket looks at.
-          example: >-
-            A baker with 4 trays who puts 3 buns on the counter for every tray emptied ends with 12 buns, because the
-            trays decide how many times the work is done.
-
+          hint: "Write down, for each of the eight commands, exactly what it changes: a cell, the data pointer or the program
+            counter."
       - title: Pair the brackets
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This interpreter runs simple loops correctly but goes wrong on some programs. Find the two problems and
-            say how to fix them.
-          snippet: |-
-            pc = 0
-            while pc < length(code):
-                c = code[pc]
-                run_simple_command(c)
-                if c is "[" and cells[dp] is 0:
-                    pc = position of the next "]" after pc
-                if c is "]" and cells[dp] is not 0:
-                    pc = position of the previous "[" before pc
-                pc = pc + 1
-          rubric:
-            - id: p1
-              point: "Jumping to the next or previous bracket ignores nesting, so with a loop inside a loop the jump lands on the inner loop's bracket"
-            - id: p2
-              point: "Pairing the brackets with a stack, or counting how deep it is while scanning, finds the matching bracket instead"
-            - id: p3
-              point: "An unbalanced program, such as a closing bracket with no opening one, is never detected, so the search finds nothing and the interpreter misbehaves; it should check the pairs before running and report an error"
-        build:
-          prompt: >-
-            Pair every bracket with its partner before the program runs, using a stack, and refuse to run a program
-            with unbalanced brackets, printing a message that says where the problem is. Check that a program with a
-            loop inside a loop gives the right answer.
+        minutes: 45
+        build: Before running, pair every bracket with its partner using a stack, and refuse to run a program whose brackets
+          do not balance, saying where the problem is.
+        outcome: A program with a loop inside a loop runs correctly, and programs with an extra opening or closing bracket are
+          refused with a position, before any output.
+        concepts:
+          - bracket-matching
         hints:
-          hint: Try the program on a loop that contains another loop, and see which bracket the search stops at.
-          example: >-
-            In a sentence with brackets inside brackets, the first closing bracket you meet belongs to the inner pair,
-            not the outer one. You only know which is which by counting how deep you are.
-    teach_back:
-      prompt: >-
-        Explain what your interpreter does from the moment it is given a program file until the program ends,
-        including what happens at each square bracket.
-      rubric:
-        - id: t1
-          concept: cli-subcommands
-          point: "With a file name it reads and runs that file, with no arguments it starts a REPL, and a missing file or bad program gives a message on the error stream and a non-zero exit status"
-        - id: t2
-          concept: interpreter-loop
-          point: "A loop fetches the command under the program counter, carries it out on the cell under the data pointer, and moves the counter on, skipping any character that is not a command"
-        - id: t3
-          concept: bracket-matching
-          point: "The brackets are paired before running with a stack, so an opening bracket on a zero cell jumps past its partner and a closing bracket on a non-zero cell jumps back to its partner"
-
-  # ------------------------------------------------------------------------------------------
+          hint: "Record both directions: each opening bracket needs to know its closer, and each closer its opener."
   - title: Bytecode and a virtual machine
-    summary: Compile the source into a list of instructions with comments gone and jumps resolved, and run it on a VM.
-    concepts: [bytecode-compilation, bracket-matching, benchmarking]
+    summary: Compile the program to bytecode with comments removed and jumps resolved, run it on a virtual machine, and
+      time it.
     steps:
-      - title: One instruction per command
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your compiler emits one bytecode instruction per command and drops everything else. How many instructions
-            does it emit for the source "Set two ++ Loop [>+<-] Show it >." Answer with the total.
-          key:
-            match: number_exact
-            expected: 10
-            derivation: >-
-              The words Set two, Loop and Show it hold none of the eight commands, so they vanish. What is left is
-              two pluses, the six commands of the loop including both brackets, and a greater-than and a full stop:
-              2 + 6 + 2 = 10. Proof script output: 10.
-        build:
-          prompt: >-
-            Design a small bytecode with one instruction for each of the eight commands, and write a compiler that
-            turns a source file into a list of these instructions, dropping comments as it goes.
+      - title: Compile to bytecode
+        minutes: 45
+        build: Design a small bytecode with one instruction for each of the eight commands, and write a compiler that turns a
+          source file into a list of these instructions, dropping comments.
+        outcome: The compiled Hello! program has exactly one instruction for each command character in the source, and none
+          for comments.
+        concepts:
+          - bytecode-compilation
         hints:
-          hint: Cross out every character that is not one of the eight commands, then count what is left, brackets included.
-          example: >-
-            A recipe card with notes in the margin still has the same number of steps once you ignore the notes.
-
+          hint: An instruction is a kind plus, later, an operand. Leave room for the operand now.
       - title: Resolve the jumps
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            The source is "x + y [ inner [ - ] outer ]" and it is compiled with comments removed. The instructions are
-            numbered from 0, and each opening bracket stores the number of its matching closing bracket. What number
-            does the first opening bracket store? Answer with one number.
-          key:
-            match: number_exact
-            expected: 5
-            derivation: >-
-              The letters and spaces are dropped, leaving plus, opening bracket, opening bracket, minus, closing
-              bracket, closing bracket, numbered 0 to 5. The inner pair is 2 and 4, so the outer opening bracket at 1
-              pairs with the closing bracket at 5. Proof script output: 5.
-        build:
-          prompt: >-
-            Work out every jump target in the compiler with a stack, and store it with its bracket instruction, so
-            that taking a jump in the VM is just setting the program counter.
+        minutes: 30
+        build: Work out every jump target in the compiler with a stack, and store it with its bracket instruction, so taking a
+          jump in the virtual machine is just setting the program counter.
+        outcome: Every bracket instruction holds the position of its partner, and the compiler refuses unbalanced programs.
+        concepts:
+          - bracket-matching
+          - bytecode-compilation
         hints:
-          hint: Number the instructions after the comments are gone, not the characters of the source.
-          example: >-
-            Page numbers in a printed book are counted after the editor removes the draft notes, so a reference to
-            page 5 means the fifth page you can actually see.
-
+          hint: The positions are now instruction positions, not character positions in the source.
       - title: Run it on a VM and time it
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            You time the Mandelbrot program on your new VM and on your first interpreter. One run takes 31 seconds
-            while a video plays, the next takes 24. How do you get timings you can trust and fairly compare?
-          rubric:
-            - id: p1
-              point: "Run each version several times on the same quiet machine and compare a typical value, such as the median, not one run"
-            - id: p2
-              point: "Throw the output away or send it to a file, so the time spent drawing in the terminal is not measured"
-            - id: p3
-              point: "Compare the same kind of time for both, such as wall-clock time against wall-clock time, on the same program"
-            - id: p4
-              point: "Check that both versions print exactly the same picture, because a faster version with different output is broken"
-        build:
-          prompt: >-
-            Write a VM with its own program counter and data pointer that reads each instruction and its jump target
-            and updates the cells or the counter. Check that the Hello! program and the first test script still work,
-            then time the Mandelbrot program again and compare with the time from milestone 1.
+        minutes: 60
+        build: Write a virtual machine with its own program counter and data pointer that runs the instruction list. Check
+          Hello! and the test script, then time the Mandelbrot program on the first interpreter and on the VM.
+        outcome: Hello! and the test script give the same output as before, the Mandelbrot picture is identical on both, and
+          your notes record the time of each.
+        concepts:
+          - bytecode-compilation
+          - benchmarking
+          - differential-testing
         hints:
-          hint: List everything that changed between the two runs other than the interpreter itself.
-          example: >-
-            Timing two runners on different days, one into a headwind, tells you about the weather as much as the
-            runners. Race them on the same track, more than once.
-    teach_back:
-      prompt: >-
-        Explain what your compiler does before the VM runs a single instruction, why that makes the VM faster than
-        your first interpreter, and how you showed it.
-      rubric:
-        - id: t1
-          concept: bytecode-compilation
-          point: "The compiler turns the source into a list with one instruction per command, so comments are removed once and the VM never sees them"
-        - id: t2
-          concept: bracket-matching
-          point: "Jump targets are worked out once with a stack and stored in the bracket instructions, so a jump is a direct move instead of a search"
-        - id: t3
-          concept: benchmarking
-          point: "The speedup is shown by timing the same Mandelbrot program on both versions, several runs each on the same machine, with identical output"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Run each timing several times and keep the middle value.
   - title: Optimising the instructions
-    summary: Merge repeated commands, replace common loops with single instructions, and measure the gain.
-    concepts: [peephole-optimization, interpreter-loop, benchmarking]
+    summary: Merge repeated commands, replace common loops with single instructions, and prove the output never changes.
     steps:
       - title: Merge repeated commands
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your compiler now merges each run of the same plus, minus, greater-than or less-than command into one
-            instruction with a count. Every other command stays one instruction. How many instructions does it emit
-            for "++++[>+++<-]>." Answer with the total.
-          key:
-            match: number_exact
-            expected: 9
-            derivation: >-
-              The four pluses become one add of 4, then the opening bracket, the greater-than, the three pluses as one
-              add of 3, the less-than, the minus, the closing bracket, the greater-than and the full stop. That is 9
-              instructions instead of 14 commands. Proof script output: 9.
-        build:
-          prompt: >-
-            Merge runs of the same command into one instruction with a count. The Hello! program has 70 commands and
-            should shrink to about 26 instructions (27 if you merge only plus, minus and the two moves, 26 if you
-            also merge repeated full stops). Check it still prints Hello! and time Mandelbrot again.
+        minutes: 45
+        build: Merge each run of the same command into one instruction with a count, for plus, minus and both moves, and
+          optionally for repeated output commands.
+        outcome: Hello! shrinks from 70 commands to about 26 or 27 instructions with unchanged output, and the new Mandelbrot
+          time is in your notes.
+        concepts:
+          - peephole-optimization
+          - benchmarking
         hints:
-          hint: Go left to right and start a new instruction whenever the command changes or a bracket or full stop appears.
-          example: >-
-            A shopping list reading apple, apple, apple, pear becomes three apples and one pear: two lines instead of
-            four, and the same shopping.
-
-      - title: The clear-cell loop
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Cells are bytes that wrap around: adding one to 255 gives 0, and taking one from 0 gives 255. The current
-            cell holds 254 and the loop [+] runs. How many times does its body run? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The first pass takes 254 to 255 and the second takes 255 round to 0, so the closing bracket sees zero and
-              the loop ends after 2 passes. Like a minus loop, it always leaves the cell at zero, which is why both
-              can become one clear instruction. Proof script output: 2.
-        build:
-          prompt: >-
-            Recognise the loop that only takes one from the current cell, and the one that only adds one, and compile
-            each to a single clear instruction that sets the cell to zero. Run Hello! and Mandelbrot to check the
-            output is unchanged.
+          hint: Merge before resolving jumps, or every target moves.
+      - title: Replace the clear-cell loop
+        minutes: 45
+        build: Recognise a loop that only takes one from the current cell, and, if your cells wrap, a loop that only adds one,
+          and compile each to a single instruction that sets the cell to zero.
+        outcome: Both loop patterns compile to one clear instruction, and Hello! and Mandelbrot give exactly the same output
+          as before.
+        concepts:
+          - peephole-optimization
+          - tape-memory-model
         hints:
-          hint: Follow the cell value through each pass, and remember what happens just after the largest byte.
-          example: >-
-            A car odometer showing 99998 that drives two more miles rolls over to 00000, then keeps going from zero.
-
+          hint: Why does the adding loop also end at zero, and only when cells wrap?
       - title: Rewrite patterns safely
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This optimiser turns the clear-cell loop into one instruction, but some programs now go wrong. Find the
-            two problems and say how to fix them.
-          snippet: |-
-            ops = compile(source)      # one op per command, jump targets already stored
-            out = []
-            i = 0
-            while i < length(ops):
-                if ops[i] is "[" and ops[i + 1] is "-":
-                    out.add(CLEAR)
-                    i = i + 3
-                else:
-                    out.add(ops[i])
-                    i = i + 1
-            return out
-          rubric:
-            - id: p1
-              point: "It only checks that a minus follows the opening bracket, so a longer loop such as one that moves a value to the next cell is wrongly replaced by a clear and part of it is skipped"
-            - id: p2
-              point: "The fix is to match the exact three instructions opening bracket, minus, closing bracket before rewriting"
-            - id: p3
-              point: "The jump targets were worked out before the list shrank, so the stored targets now point at the wrong instructions; work them out after all rewrites"
-        build:
-          prompt: >-
-            Also compile the clear-and-move-right pattern, a clear loop followed by a greater-than, into one
-            instruction. Resolve jump targets only after all rewrites, time Mandelbrot once more, and compare the
-            output with the first interpreter's output byte for byte. The page expects a large speedup over your
-            first version.
+        minutes: 60
+        build: Also compile the clear-and-move-right pattern into one instruction. Resolve jump targets only after all
+          rewrites, then compare the output of your first interpreter and your optimised VM on every program you have,
+          and time Mandelbrot once more.
+        outcome: Every program gives byte-identical output on the first interpreter and the optimised VM, and your notes hold
+          a timing table covering every stage.
+        concepts:
+          - peephole-optimization
+          - differential-testing
+          - benchmarking
         hints:
-          hint: Feed it a loop that has more than a minus inside, and then ask where each surviving bracket's stored target points.
-          example: >-
-            Renumbering the pages of a book after cutting some out breaks every cross-reference written before the
-            cut, unless the references are redone afterwards.
-    teach_back:
-      prompt: >-
-        Explain how your optimisations cut the work the VM does on Mandelbrot, and how you know they did not change
-        what the program prints.
-      rubric:
-        - id: t1
-          concept: peephole-optimization
-          point: "Runs of the same command become one instruction with a count, and the clear loop becomes one clear instruction, each doing exactly what the longer form did"
-        - id: t2
-          concept: interpreter-loop
-          point: "Every instruction costs a trip round the VM's fetch-and-run loop, so fewer instructions, and a clear that replaces many loop passes, mean far fewer trips"
-        - id: t3
-          concept: benchmarking
-          point: "Each change is timed on the same program and machine against the version before, and its output is compared with the original to prove nothing broke"
+          hint: Make the comparison a script, so you can rerun it after every new rewrite.

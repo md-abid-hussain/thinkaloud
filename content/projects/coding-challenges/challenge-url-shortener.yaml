@@ -1,11 +1,9 @@
-# Coding Challenges, Build your own URL shortener.
-# Source: https://codingchallenges.fyi/challenges/challenge-url-shortener
-# Written in our own words. The source page is linked, not copied.
-# The page's two optional step 4s (a web form and a build pipeline) are offered in the last Build prompt.
-# Every predict and trace key is proven by content/proofs/challenge-url-shortener.mjs.
+# Coding Challenges, Build your own URL shortener. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-url-shortener . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-url-shortener
@@ -15,45 +13,32 @@ project:
   status: generated
   figure:
     kind: short
-  summary: >-
-    A small web service that gives a long URL a short key, stores the pair, sends visitors of the short URL on to the
-    long one, and lets the owner delete a short URL, all through a REST API.
+  summary: A small web service that gives a long URL a short key, stores the pair, sends visitors of the short URL on to
+    the long one, and lets the owner delete a short URL, all through a REST API.
   requirements:
-    - POST to the root with a JSON body holding url creates a key and answers with the key, the long URL and the short URL
+    - POST to the root with a JSON body holding url creates a key and answers with the key, the long URL and the short
+      URL
     - Posting the same long URL again returns the same key and changes nothing
     - A body without a url field gets 400 Bad Request with a message naming the missing field
-    - GET for a key answers 302 Found with a Location header holding the long URL, and an unknown key gets 404 Not Found
+    - GET for a key answers 302 Found with a Location header holding the long URL, and an unknown key gets 404 Not
+      Found
     - DELETE for a key removes it from storage and answers 200 OK
     - Keys and long URLs are kept in storage that survives a restart
-  restate_rubric:
-    - id: r1
-      point: "It turns a long URL into a short key and stores the two together"
-    - id: r2
-      point: "Visiting the short URL redirects the browser to the long URL, and unknown keys get 404"
-    - id: r3
-      point: "It is a REST API with POST to create, GET to follow and DELETE to remove a short URL"
-  reflection_prompt: >-
-    In your own words, how does your service choose keys that stay unique, and what would you change if it had to
-    hold a hundred million links?
   primer:
-    what: >-
-      A URL shortener gives a long web address a short key, saves the pair, and when anyone visits the short address
+    what: A URL shortener gives a long web address a short key, saves the pair, and when anyone visits the short address
       it sends their browser on to the long one. You build it as a small web service, an API, that other programs talk
       to over HTTP. Each request names a method, such as POST to create, GET to read and DELETE to remove, and every
       reply starts with a status code saying what happened.
-    why: >-
-      Short links are easier to share, type and print, and they let the owner count visits or retire a link. Building
+    why: Short links are easier to share, type and print, and they let the owner count visits or retire a link. Building
       one teaches how a web API reports what happened, and how to make short names that stay unique.
-    example: >-
-      A client sends a POST to the service's root with a JSON body whose url field holds https://www.example.com. The
-      service picks a key, say Y3S9wb, saves it with the long address, and answers with the key and the short address
-      http://localhost/Y3S9wb. Visiting that short address later takes the browser to example.com.
+    example: A client sends a POST to the service's root with a JSON body whose url field holds https://www.example.com.
+      The service picks a key, say Y3S9wb, saves it with the long address, and answers with the key and the short
+      address http://localhost/Y3S9wb. Visiting that short address later takes the browser to example.com.
     words:
       - term: status code
-        meaning: >-
-          A three-digit number at the start of every reply. Codes in the 200s mean it worked, the 300s mean look
-          somewhere else, and the 400s mean the client's request was at fault, such as 400 when the request is malformed
-          or missing something and 404 when nothing exists at that address.
+        meaning: A three-digit number at the start of every reply. Codes in the 200s mean it worked, the 300s mean look
+          somewhere else, and the 400s mean the client's request was at fault, such as 400 when the request is
+          malformed or missing something and 404 when nothing exists at that address.
       - term: key
         meaning: The short name the service makes up, such as Y3S9wb, used as the last part of the short address.
       - term: JSON
@@ -62,320 +47,248 @@ project:
         meaning: A recipe that turns any text into a number, always giving the same number for the same text.
       - term: redirect
         meaning: A reply that tells the browser to go to another address, which the browser then does by itself.
-
+  restate_rubric:
+    - id: r1
+      point: It turns a long URL into a short key and stores the two together
+    - id: r2
+      point: Visiting the short URL redirects the browser to the long URL, and unknown keys get 404
+    - id: r3
+      point: It is a REST API with POST to create, GET to follow and DELETE to remove a short URL
+  reflection_prompt: In your own words, how does your service choose keys that stay unique, and what would you change if
+    it had to hold a hundred million links?
+  reference_tool: curl with -i to see status codes and headers and -L to follow redirects, plus a web browser to see how
+    redirects are cached.
+  done_when: The service creates, resolves and deletes short URLs through its REST API with the right status codes,
+    returns the same key for the same long URL even under concurrent requests, rejects invalid URLs, keeps its keys
+    across restarts, handles collisions, and redirects with 302; and your notes explain, in your own words, why
+    idempotency and the choice of redirect status matter.
+  open_checks:
+    - Which success status your service answers when the URL already exists, 200 or 201, and why you chose it.
+    - How your browser caches a 301, and how to clear it again.
+    - Whether your store offers a unique constraint or an atomic insert-if-absent.
+    - What a DELETE for an unknown key should answer in your API.
+learning_map:
+  - concept: rest-api-design
+    where: "The service treats each short key as a resource: POST to the root creates one, GET for a key resolves it,
+      DELETE removes it, each with a status code that says what happened."
+    explain_back:
+      prompt: "A mobile team integrating your API asks: what does POST answer when a URL is created, when it already exists,
+        and when the body has no url field, and why can't every reply just be 200 with a message inside? Answer them."
+      rubric:
+        - id: e1
+          point: A new URL gets a success status, ideally 201 Created, with the key and short URL in the body
+        - id: e2
+          point: An existing URL gets the same key back with a success status, so the client does not need to care whether it
+            was new
+        - id: e3
+          point: A body without url gets 400 Bad Request with a message naming the missing field, and an unknown key later gets
+            404
+        - id: e4
+          point: Clients, retry logic and monitoring act on the status code, so a 200 that hides an error makes failures
+            invisible
+  - concept: idempotency
+    where: Posting the same long URL again returns the same key and changes nothing, and deleting a key twice leaves the
+      same result as deleting it once.
+    explain_back:
+      prompt: A phone on a bad network sends the same "shorten this URL" request three times because it never saw the reply.
+        Explain what your service does, why that matters, and how DELETE fits the same idea.
+      rubric:
+        - id: e1
+          point: Repeating an idempotent request has the same effect as sending it once
+        - id: e2
+          point: The service finds the long URL already stored and returns its existing key, so no duplicate keys pile up
+        - id: e3
+          point: That makes it safe for clients to retry after a timeout
+        - id: e4
+          point: "DELETE is idempotent too: after a second delete the key is just as gone, even if the reply says it was not
+            found"
+  - concept: short-id-generation
+    where: Keys come from a hash of the long URL written in base62 and cut to a few characters, so the service must choose
+      a length and handle collisions.
+    explain_back:
+      prompt: You use 6-character base62 keys taken from a hash. Explain how many keys that allows, why collisions appear
+        long before they are used up, and two ways to handle a collision.
+      rubric:
+        - id: e1
+          point: Six base62 characters allow 62 to the power 6, about 56.8 billion keys
+        - id: e2
+          point: By the birthday effect, collisions become likely around the square root of that number, a few hundred thousand
+            keys
+        - id: e3
+          point: On a collision with a different URL, add a counter or salt to the input and hash again until the key is free
+        - id: e4
+          point: Alternatively issue keys from a counter or at random and rely on a unique check in the store
+  - concept: key-value-store
+    where: Each key maps to a long URL in storage that survives a restart, and creation also needs the reverse lookup from
+      long URL to key.
+    explain_back:
+      prompt: Your service keeps its keys in memory, so they vanish on every deploy, and checking whether a long URL was
+        already shortened scans every entry. Explain what storage the service needs and which lookups it must make
+        fast.
+      rubric:
+        - id: e1
+          point: The pairs must live in durable storage, such as a file, SQLite or Redis with persistence, so restarts keep them
+        - id: e2
+          point: Lookup by key, used by every redirect, must be fast, which means an index or hash on the key
+        - id: e3
+          point: Lookup by long URL, used for idempotent creation, needs a second index from URL to key
+        - id: e4
+          point: A write must be stored durably before the service replies that the key exists
+  - concept: concurrent-connections
+    where: Two requests for the same new long URL can arrive at the same moment and race to create a key.
+    explain_back:
+      prompt: Two users shorten the same long URL at the same instant, and the store ends up with two different keys for it.
+        Explain how that happens and how to make creation safe.
+      rubric:
+        - id: e1
+          point: "Both requests check whether the URL exists, both see it missing, and both insert: a check-then-act race"
+        - id: e2
+          point: The check and the insert must become one atomic step in the store
+        - id: e3
+          point: A unique constraint on the long URL, a transaction or an atomic insert-if-absent does that
+        - id: e4
+          point: On a conflict, the losing request reads the existing key and returns it
+  - concept: url-parsing
+    where: The service must check that a submitted long URL really is an http or https URL with a host, and normalise it
+      before looking it up.
+    explain_back:
+      prompt: Someone shortens javascript:alert(1), and someone else shortens a fake login page on a look-alike domain.
+        Explain what your service should validate, what it cannot judge from the URL alone, and why this matters for a
+        redirect service.
+      rubric:
+        - id: e1
+          point: "Parse the URL and accept only http and https with a host, rejecting schemes such as javascript: or data:"
+        - id: e2
+          point: Normalise the scheme and host to lower case before storing, so one page gets one key
+        - id: e3
+          point: A well-formed URL can still lead to a phishing page; the shortener hides the destination, so it needs
+            reporting, blocking or a preview
+  - concept: http-redirects
+    where: A GET for a known key answers 302 Found with a Location header, and choosing 302 rather than 301 decides
+      whether later visits still reach your service.
+    explain_back:
+      prompt: Marketing wants click counts for each short link, but after switching the redirects to 301 the counts stopped
+        growing while traffic did not. Explain why, and when 301, 302, 307 or 308 is the right choice.
+      rubric:
+        - id: e1
+          point: Browsers may cache a 301 permanently and go straight to the long URL, so later visits never reach the service
+        - id: e2
+          point: A 302 is temporary and not cached by default, so every visit comes back and can be counted, and the target can
+            still change
+        - id: e3
+          point: 301 and 308 suit content that has moved for good; 307 and 308 also keep the method and body
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Create a short URL
-    summary: Accept a long URL over the API, reject bad requests, and store each key with its URL.
-    concepts: [rest-api-design, idempotency, key-value-store]
+    summary: Accept a long URL, validate it, and return the same key every time it is posted.
     steps:
       - title: Accept a long URL
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A client sends a POST to your service with a JSON body holding a field called link, set to
-            https://www.example.com, instead of a field called url. What status code should your service answer?
-          key:
-            match: number_exact
-            expected: 400
-            derivation: >-
-              The service needs a url field and the body has none, so the request itself is at fault. That is 400 Bad
-              Request, not 404, because nothing was looked up and missed. Proof script output: 400.
-        build:
-          prompt: >-
-            Accept a POST to the root with a JSON body holding url. Answer with a 2xx status and a JSON body holding
-            key, long_url and short_url, for example the key Y3S9wb, the long URL https://www.example.com and the short
-            URL http://localhost/Y3S9wb. A body without url gets 400 Bad Request and a message such as Missing field:
-            url.
+        minutes: 45
+        build: Accept a POST to the root with a JSON body holding url, and answer with a success status and a JSON body
+          holding key, long_url and short_url. Answer a body without url with 400 Bad Request and a message naming the
+          missing field.
+        outcome: curl -i with a POST and a JSON body holding url answers with a success status and the three fields, and a
+          body without url answers 400 with a message that names url.
+        concepts:
+          - rest-api-design
+          - url-parsing
         hints:
-          hint: Is something missing at an address on the server, or is the request itself not what the service asked for?
-          example: >-
-            A clerk handed a form with your phone number in the box marked email hands the form back for you to fix.
-            The office is not missing anything, your form is.
-
+          hint: Write down every status code your service can answer before you write the handler.
+      - title: Validate and normalise
+        minutes: 30
+        build: Accept only http and https URLs that have a host. Lower-case the scheme and host before storing or looking up.
+        outcome: "A javascript: URL and an ftp URL are rejected with 400, and HTTP://Example.com/x gets the same key as
+          http://example.com/x."
+        concepts:
+          - url-parsing
+        hints:
+          hint: Use a URL parser rather than string matching, and test it with an at sign in the URL.
       - title: The same URL twice
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The store starts empty. A client posts https://example.com, then https://example.org, then
-            https://example.com again, and your service follows the challenge's rule for a URL it has already
-            shortened. How many entries does the store hold at the end?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The first two posts are new URLs, so each gets a key and an entry. The third post is a URL the store
-              already holds, so the service answers with the existing key and adds nothing. That leaves 2 entries.
-              Proof script output: 2.
-        build:
-          prompt: >-
-            When a long URL is posted that you have already shortened, answer with the same key, the same short URL
-            and the same status as the first time, and leave the store unchanged.
+        minutes: 30
+        build: When a long URL is posted that you have already shortened, answer with the same key and short URL as the first
+          time, and leave the store unchanged.
+        outcome: Posting the same long URL twice returns the same key both times, and the store holds one entry for it.
+        concepts:
+          - idempotency
         hints:
-          hint: What should happen to the store when a URL it already knows arrives a second time?
-          example: >-
-            A coat check that already holds your coat gives you the same ticket number again when you ask, instead of
-            hanging up a second coat that is not there.
-
-      - title: Keep the keys
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            While developing, you keep keys and long URLs in a map in memory. What happens to the short links people
-            have shared when the server restarts, and what does a persistent key-value store give you?
-          rubric:
-            - id: p1
-              point: "A map in memory is lost when the process stops, so every short link already shared stops working after a restart"
-            - id: p2
-              point: "A persistent store such as Redis, a database or a file keeps each key and its long URL on disk, so links survive a restart"
-            - id: p3
-              point: "The service only ever looks up a long URL by its key, so a simple key-value store is enough and needs no queries across entries"
-        build:
-          prompt: >-
-            Store each key with its long URL in storage that survives a restart, such as a file, SQLite or Redis. The
-            Redis server from another Coding Challenge works too. Restart your service and check that the entries are
-            still there.
-        hints:
-          hint: Where does a map in memory live, and what happens to that place when the program stops?
-          example: >-
-            Notes written on a whiteboard are wiped at the end of the day, while notes in a notebook are there the next
-            morning.
-    teach_back:
-      prompt: >-
-        Explain what your service does with a POST, from checking the body to answering, and what happens when the
-        same URL is posted twice or the server restarts.
-      rubric:
-        - id: t1
-          concept: rest-api-design
-          point: "A POST to the root creates a short URL. A body without url is the client's fault and gets 400 with a message, and success gets a 2xx with the key, the long URL and the short URL"
-        - id: t2
-          concept: idempotency
-          point: "Posting a URL that is already stored returns the existing key and leaves the store unchanged, so a client can safely send the request again"
-        - id: t3
-          concept: key-value-store
-          point: "Each key is kept with its long URL in a persistent key-value store, so links keep working after a restart"
-
-  # ------------------------------------------------------------------------------------------
-  - title: Make the keys
-    summary: Turn a long URL into a short key with a hash, and handle two URLs that want the same key.
-    concepts: [hash-functions, short-id-generation, idempotency]
+          hint: Look the URL up before you make a key, not after.
+  - title: Make and keep the keys
+    summary: Hash URLs into base62 keys, handle collisions, persist the pairs, and survive concurrent requests.
     steps:
-      - title: How many keys
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A toy shortener makes keys from the letters a, b and c only. How many different keys of 2 characters can
-            it make, and how many of 3 characters? Give the first, then the second.
-          key:
-            match: numbers_all
-            expected: [9, 27]
-            derivation: >-
-              With 2 characters there are 3 choices for the first and 3 for the second, so 3 times 3 is 9: aa, ab, ac,
-              ba, bb, bc, ca, cb and cc. A third character multiplies by 3 again, giving 27. Each extra character
-              multiplies the number of keys by the size of the alphabet. Proof script output: [9, 27].
-        build:
-          prompt: >-
-            Hash the long URL with a fixed hash function, write the result in base62, the 62 characters a to z, A to Z
-            and 0 to 9, and keep the first few characters as the key. Choose a key length and note how many keys it
-            allows.
+      - title: Hash to a key
+        minutes: 45
+        build: Hash the long URL with a fixed hash function, write the result in base62 and keep the first few characters as
+          the key. Choose a key length and work out how many keys it allows.
+        outcome: The same URL gets the same key on every run, and your notes state the key length, the number of possible keys
+          and roughly when collisions become likely.
+        concepts:
+          - short-id-generation
         hints:
-          hint: Write a few keys out. For each choice of first letter, how many second letters can follow it?
-          example: >-
-            A bike lock with two dials, each showing 0 to 9, has ten settings for the first dial and ten for the
-            second, so a hundred codes. Adding a third dial multiplies by ten again.
-
-      - title: When two URLs want one key
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Your store is empty. Both https://a.example and https://b.example hash to the key Y3S9wb. When a key is
-            taken by a different URL, your service adds a counter to the URL and hashes again, and b.example with the
-            counter hashes to Q7kx2T. The client posts a.example, then b.example, then a.example, then b.example. Which
-            key does the last request get back?
-          key:
-            match: text_ci
-            expected: Q7kx2T
-            derivation: >-
-              a.example takes Y3S9wb. b.example also wants Y3S9wb, finds it holding a different URL, adds the counter
-              and takes Q7kx2T. a.example again finds Y3S9wb holding itself and gets Y3S9wb back. b.example again finds
-              Y3S9wb holding a.example, moves on to Q7kx2T, finds it holding b.example and returns it. Proof script
-              output: Q7kx2T.
-        build:
-          prompt: >-
-            Handle collisions: when the key is taken by a different long URL, add a counter or another unique value to
-            the input and hash again, until the key is free or already holds this same URL.
+          hint: Work out 62 to the power of your key length, then its square root.
+      - title: Handle collisions
+        minutes: 45
+        build: When a key is already taken by a different long URL, add a counter or other unique value to the input and hash
+          again, until the key is free or already holds this same URL.
+        outcome: With keys cut to two characters for a test, 500 different URLs all get distinct keys, and each key redirects
+          to its own URL.
+        concepts:
+          - short-id-generation
         hints:
-          hint: At each of the four posts, ask whether the first key is free, holds this same URL, or holds a different one.
-          example: >-
-            If your usual hook at the gym holds someone else's coat, you use the next hook. Next time you look at your
-            usual hook first, see the other coat again, and find yours on the next one.
-
-      - title: Keys that stay put
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            With this code some old short links start leading to the wrong site, and after a restart the same URL gets
-            a new key. Find the two problems and say how to fix each.
-          snippet: |-
-            def shorten(long_url):
-                key = first(base62(builtin_hash(long_url)), 6)
-                store.put(key, long_url)
-                return key
-          rubric:
-            - id: p1
-              point: "When two URLs give the same key, put overwrites the first URL, so the older short link now leads to the other site"
-            - id: p2
-              point: "Check the store first: reuse the key if it already holds this URL, and add a counter and hash again if it holds a different one"
-            - id: p3
-              point: "A built-in hash can change between runs or versions of the language, so use a fixed algorithm such as FNV-1a or SHA-256 to get the same key every time"
-        build:
-          prompt: >-
-            Make sure the same URL gets the same key after a restart. Then test collision handling by cutting the key
-            down to one character for a moment, so that collisions happen after a handful of URLs.
+          hint: Make collisions happen on purpose with very short keys before you trust the code.
+          example: A cloakroom that hands out numbered tickets checks the hook before hanging a coat, and moves to the next
+            number if it is taken.
+      - title: Keys that survive a restart
+        minutes: 45
+        build: Store each key with its long URL in storage that survives a restart, such as a file, SQLite or Redis, with fast
+          lookups both by key and by long URL.
+        outcome: After restarting the service, every key still redirects, and posting an existing long URL still returns its
+          old key.
+        concepts:
+          - key-value-store
         hints:
-          hint: Ask what put does when the key already holds something, and whether the built-in hash promises the same number tomorrow.
-          example: >-
-            Two people given the same locker number will find each other's things inside, and a locker number that
-            changes every morning means nobody finds their things at all.
-    teach_back:
-      prompt: >-
-        Explain how your service turns a long URL into a key, what it does when two URLs want the same key, and why the
-        same URL always gets the same key back.
-      rubric:
-        - id: t1
-          concept: hash-functions
-          point: "A fixed hash function turns the long URL into a number, the same URL always gives the same number, and different URLs can still give the same one"
-        - id: t2
-          concept: short-id-generation
-          point: "A few base62 characters of the hash form the key, and each extra character multiplies the number of possible keys, so short keys collide more often"
-        - id: t3
-          concept: short-id-generation
-          point: "When the key is taken by a different URL, a counter is added and the URL hashed again until a free key or the URL's own entry is found"
-        - id: t4
-          concept: idempotency
-          point: "Because the hash is stable, posting the same URL again leads back to its own entry and returns the same key"
-
-  # ------------------------------------------------------------------------------------------
+          hint: List the two lookups your service makes, and check each one is fast without scanning everything.
+      - title: Two requests at once
+        minutes: 30
+        build: Make creating a key safe when two requests for the same new URL arrive together, using a unique constraint, a
+          transaction or an atomic insert-if-absent.
+        outcome: Twenty simultaneous POSTs of one new long URL all return the same key, and the store holds one entry for it.
+        concepts:
+          - concurrent-connections
+          - idempotency
+        hints:
+          hint: Find the moment between checking and inserting, and make it disappear.
   - title: Redirect and delete
-    summary: Send visitors of a short URL on to the long one, and let the owner delete a short URL.
-    concepts: [http-redirects, rest-api-design, key-value-store, idempotency]
+    summary: Send visitors on with the right redirect, and let owners delete keys.
     steps:
       - title: Send the visitor on
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            Someone visits a short URL whose key is in the store. Your service answers with a redirect. Which response
-            header tells the browser where to go next?
-          key:
-            match: text_ci
-            expected: Location
-            derivation: >-
-              A redirect is a 3xx status plus a Location header holding the address to go to, and the browser follows
-              it by itself. Proof script output: Location.
-        build:
-          prompt: >-
-            Answer a GET for a known key with 302 Found and a Location header holding the long URL, and an unknown key
-            with 404 Not Found and the body URL not found. curl -i should show the 302 and the location, and curl -L
-            should follow it to the long URL's page.
+        minutes: 45
+        build: Answer a GET for a known key with 302 Found and a Location header holding the long URL, and an unknown key with
+          404 Not Found and the body URL not found.
+        outcome: curl -i shows 302 and the long URL in Location, curl -L ends up at the long URL, and an unknown key gives 404
+          with the body URL not found.
+        concepts:
+          - http-redirects
+          - rest-api-design
         hints:
-          hint: The status says go somewhere else. Which header names the somewhere?
-          example: >-
-            A note on a shop door saying we have moved is only useful if it also gives the new address.
-
+          hint: Check the Location header carries the full long URL, exactly as stored.
       - title: Why 302 and not 301
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            The challenge uses 302 Found for the redirect, not 301 Moved Permanently. What would go wrong for a URL
-            shortener that answered with 301?
-          rubric:
-            - id: p1
-              point: "A 301 is permanent, so the browser may remember it and send later visits straight to the long URL without asking the service"
-            - id: p2
-              point: "The service then cannot count visits, and a short URL that is deleted or changed keeps leading to the old address from the cache"
-            - id: p3
-              point: "A 302 is temporary, so the browser asks the service every time and the service stays in control of where the link goes"
-        build:
-          prompt: >-
-            Log every redirect your service sends, visit the same short URL three times in a browser, and check that
-            all three visits reach your service.
+        minutes: 30
+        build: Log every redirect your service sends. Visit the same short URL three times in a browser, then try one key with
+          301 and see what the browser does on later visits.
+        outcome: Three browser visits with 302 appear as three log entries, and your notes record that later visits to the 301
+          key no longer reached the service.
+        concepts:
+          - http-redirects
         hints:
-          hint: What is a browser allowed to remember about a permanent move, and who never hears about the next visit?
-          example: >-
-            When a shop puts up a sign saying it has moved for good, regular customers stop going to the old door at
-            all, so if it moves again nobody at the old door can tell them.
-
+          hint: Use a fresh browser profile or clear its cache after the 301 test.
       - title: Delete a short URL
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A client creates a short URL with the key Y3S9wb, then sends GET for Y3S9wb, then DELETE for Y3S9wb, which
-            succeeds, then GET for Y3S9wb again. What status code does each of the two GETs get, in order?
-          key:
-            match: numbers_all
-            expected: [302, 404]
-            derivation: >-
-              The first GET finds the key and redirects with 302. The DELETE removes the key and its URL from the
-              store. The second GET finds nothing under that key, so it gets 404. Proof script output: [302, 404].
-        build:
-          prompt: >-
-            Accept DELETE for a key: remove the key and its long URL from the persistent store and answer 200 OK with
-            an empty body. A GET for that key afterwards must give 404 Not Found with the body URL not found, even after
-            a restart.
+        minutes: 45
+        build: "Accept DELETE for a key: remove the key and its long URL from the store and answer 200 OK. Decide what a
+          DELETE for a key that does not exist answers, and test deleting the same key twice."
+        outcome: After DELETE, a GET for the key gives 404, also after a restart, and a second DELETE of the same key changes
+          nothing and answers the way your notes say it should.
+        concepts:
+          - idempotency
+          - rest-api-design
+          - key-value-store
         hints:
-          hint: Write down what the store holds before each request, and what each GET finds there.
-          example: >-
-            Once a phone number has been disconnected, calling it gets you the number is not in service, not the
-            person who used to have it.
-
-      - title: Delete twice
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            A client sends DELETE for a key, but the reply is lost on the way back, so the client sends the same DELETE
-            again. What should the second request do to the store, and why does that matter for clients?
-          rubric:
-            - id: p1
-              point: "The second DELETE finds nothing and changes nothing, so the store ends up the same as after one delete"
-            - id: p2
-              point: "Clients retry when a reply is lost, so repeating a request must not cause harm or an error the client cannot handle"
-            - id: p3
-              point: "Whether the second answer is 200 or 404, the client can treat the key as gone"
-        build:
-          prompt: >-
-            Decide what a DELETE for a key that does not exist answers, since the challenge only says it should change
-            nothing, and write a test that deletes the same key twice. If you want to go on, the challenge's optional
-            extras are a web page with a form that calls your API and shows the short URL with a copy button, and a
-            pipeline that builds, tests and deploys every change to the main branch only when the tests pass.
-        hints:
-          hint: Compare the store after one delete with the store after two. Is there any difference?
-          example: >-
-            Pressing a lift button that is already lit does not call a second lift, so pressing it again when unsure is
-            safe.
-    teach_back:
-      prompt: >-
-        Follow one short URL through its life: someone visits it, its owner deletes it, and someone visits it again.
-        Explain what your service does and answers each time.
-      rubric:
-        - id: t1
-          concept: http-redirects
-          point: "The first visit gets 302 Found with a Location header holding the long URL, and 302 rather than 301 so the browser asks the service each time"
-        - id: t2
-          concept: rest-api-design
-          point: "The DELETE on the key answers 200, and a GET for a deleted or unknown key answers 404 with a message"
-        - id: t3
-          concept: key-value-store
-          point: "The delete removes the key and its URL from the persistent store, so the short URL stays gone after a restart"
-        - id: t4
-          concept: idempotency
-          point: "Sending the same delete again leaves the store as it was, so a retried request does no harm"
+          hint: The state after one delete and after two must be the same. Is the reply allowed to differ?

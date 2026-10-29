@@ -1,11 +1,9 @@
-# Coding Challenges, Build your own compression tool (Huffman coding).
-# Source: https://codingchallenges.fyi/challenges/challenge-huffman
-# Written in our own words. Every predict and trace key is proven by content/proofs/challenge-huffman.mjs.
-# Keys only use totals and code lengths that every valid Huffman tree shares, or codes the prompt states outright,
-# so no key depends on how ties between equal weights are broken.
+# Coding Challenges, Build your own compression tool (Huffman). Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-huffman . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-huffman
@@ -15,10 +13,9 @@ project:
   status: generated
   figure:
     kind: tree
-  summary: >-
-    A command-line tool that compresses a file with Huffman coding. It counts how often each symbol appears, builds
-    a tree that gives common symbols short codes, writes a header and the packed bits, and decompresses the result
-    back into an exact copy of the original.
+  summary: A command-line tool that compresses a file with Huffman coding. It counts how often each symbol appears,
+    builds a tree that gives common symbols short codes, writes a header and the packed bits, and decompresses the
+    result back into an exact copy of the original.
   requirements:
     - Read a file named on the command line and report an error if it cannot be read
     - Count how often each symbol occurs and build a Huffman tree from the counts
@@ -26,360 +23,261 @@ project:
     - Write a compressed file with a header the decoder can rebuild the table from, followed by the packed bits
     - Decompress the file back into an exact copy of the original, with the output file name given as an option
     - Check that the test novel gets smaller and comes back byte for byte
-  restate_rubric:
-    - id: r1
-      point: "The tool compresses a file by counting symbols, building a Huffman tree and replacing each symbol with its bit code"
-    - id: r2
-      point: "The compressed file holds a header that lets the decoder rebuild the codes, followed by the codes packed into bytes"
-    - id: r3
-      point: "Decompressing gives back exactly the original file, byte for byte"
-  reflection_prompt: >-
-    In your own words, what does your compressed file contain and in what order, and what would you change to make
-    the header smaller for short files?
   primer:
-    what: >-
-      Huffman coding stores data in fewer bits by giving frequent symbols short codes and rare symbols long ones. You
+    what: Huffman coding stores data in fewer bits by giving frequent symbols short codes and rare symbols long ones. You
       count how often each symbol occurs, build a binary tree by joining the two rarest entries again and again, and
       read each symbol's code off the path from the root to its leaf. You will build a tool that compresses a file
       this way and decompresses it back to the original.
-    why: >-
-      Plain text spends eight bits on every character, however common it is. Fitting the length of a code to how
-      often a symbol is used is the idea behind part of the compression in ZIP files, PNG images and JPEG photos.
-    example: >-
-      In the word banana, a appears three times, n twice and b once, so the frequency table has three entries, one
-      per different letter. The tree joins the rarest entries first, so a never ends up with a longer code than n
-      or b. Reading each code as a path of 0 for left and 1 for right, the whole word fits in 9 bits instead of the
-      48 that eight bits per letter would need.
+    why: Plain text spends eight bits on every character, however common it is. Fitting the length of a code to how often
+      a symbol is used is the idea behind part of the compression in ZIP files, PNG images and JPEG photos.
+    example: In the word banana, a appears three times, n twice and b once, so the frequency table has three entries, one
+      per different letter. The tree joins the rarest entries first, so a never ends up with a longer code than n or
+      b. Reading each code as a path of 0 for left and 1 for right, the whole word fits in 9 bits instead of the 48
+      that eight bits per letter would need.
     words:
       - term: frequency table
         meaning: A list of each different symbol in the input with the number of times it occurs.
       - term: Huffman tree
-        meaning: A binary tree whose leaves are the symbols, built by repeatedly joining the two lightest nodes into one whose weight is their sum.
+        meaning: A binary tree whose leaves are the symbols, built by repeatedly joining the two lightest nodes into one whose
+          weight is their sum.
       - term: prefix-free code
-        meaning: A set of codes in which no code is the start of another, so a stream of bits can be read back without separators.
+        meaning: A set of codes in which no code is the start of another, so a stream of bits can be read back without
+          separators.
       - term: priority queue
         meaning: A collection that always hands back its smallest item first, whatever order the items went in.
       - term: bit packing
         meaning: Putting codes of any length into whole bytes, eight bits to a byte, and padding the last byte.
       - term: header
         meaning: The start of the compressed file, holding what the decoder needs before it can read the data.
-
+  restate_rubric:
+    - id: r1
+      point: The tool compresses a file by counting symbols, building a Huffman tree and replacing each symbol with its bit
+        code
+    - id: r2
+      point: The compressed file holds a header that lets the decoder rebuild the codes, followed by the codes packed into
+        bytes
+    - id: r3
+      point: Decompressing gives back exactly the original file, byte for byte
+  reflection_prompt: In your own words, what does your compressed file contain and in what order, and what would you
+    change to make the header smaller for short files?
+  done_when: The tool compresses the test novel to a clearly smaller file, decompresses it back byte for byte, refuses
+    files that are not its own, and passes a round-trip test over empty, single-symbol, all-bytes and random inputs;
+    and your notes explain entropy, prefix codes and your header layout in your own words.
+  open_checks:
+    - How your tie-breaking rule affects the code table, and whether the decoder reproduces it exactly.
+    - How small the compressed novel gets compared with the entropy you measured, and with gzip on the same file.
+    - What your tool does with an empty file and with a file of one repeated byte.
+learning_map:
+  - concept: information-entropy
+    where: Your tool shrinks a novel because some characters are far more common than others. Measuring that skew tells
+      you how far compression can possibly go.
+    explain_back:
+      prompt: A colleague runs your compressor on a folder of photos and zip files, and they barely shrink, while text files
+        shrink to about half. Explain why, and whether a cleverer algorithm could compress the photos much further.
+      rubric:
+        - id: e1
+          point: Compression works by giving common symbols shorter codes, so it needs some symbols to be much more frequent
+            than others
+        - id: e2
+          point: Photos and zip files are already compressed, so their bytes are close to evenly spread and their entropy is
+            near 8 bits per byte
+        - id: e3
+          point: No lossless method can go below the entropy on average, so no algorithm can shrink every file, and already
+            compressed data has almost no room left
+  - concept: prefix-codes
+    where: The compressed file is one long run of bits with no separators. The decoder can split it back into symbols only
+      because no code is the start of another.
+    explain_back:
+      prompt: A teammate proposes codes a = 0, b = 01 and c = 11 to save bits. Explain what goes wrong when you decode the
+        bits 011, and what rule the codes must follow.
+      rubric:
+        - id: e1
+          point: The bits 011 could be read as a then c, or as b followed by a stray 1, so the decoding is ambiguous
+        - id: e2
+          point: The rule is that no code may be the beginning of another code, which is called prefix-free
+        - id: e3
+          point: With prefix-free codes the decoder can stop as soon as the bits so far match a code, so the stream needs no
+            separators
+        - id: e4
+          point: Prefix-free codes are exactly the leaves of a binary tree, which is why Huffman builds a tree
+  - concept: huffman-coding
+    where: You build the tree from the symbol counts by repeatedly joining the two lightest nodes, and read each symbol's
+      code from its path.
+    explain_back:
+      prompt: Your compressor and a friend's give different codes for the same file, but both outputs have exactly the same
+        size. Explain how both can be correct, and what a decoder must know to rebuild your tree.
+      rubric:
+        - id: e1
+          point: Huffman joins the two lightest nodes each time, and when weights tie there is more than one valid choice
+        - id: e2
+          point: Different tie choices give different codes with the same total length, so both are equally optimal
+        - id: e3
+          point: The decoder must rebuild exactly the same tree, so it needs the same counts and the same tie-breaking rule, or
+            the codes themselves
+  - concept: priority-queue
+    where: Building the tree needs the lightest node over and over, while new parent nodes keep arriving. A priority queue
+      makes that fast.
+    explain_back:
+      prompt: Your tree builder sorts the whole list of nodes again every time it joins two of them, and it is slow on files
+        with many distinct symbols. Explain what a priority queue does instead, and why it is faster.
+      rubric:
+        - id: e1
+          point: A priority queue always hands back the smallest item and accepts new items at any time
+        - id: e2
+          point: A binary heap keeps only the smallest item on top, so removing it or adding one costs time in proportion to the
+            logarithm of the number of items
+        - id: e3
+          point: Re-sorting after every join costs far more each time, so with many symbols the heap is much faster
+  - concept: bit-packing
+    where: Codes are a few bits long, but files hold whole bytes. You pack the codes eight bits to a byte, pad the last
+      byte, and must know where the real bits end.
+    explain_back:
+      prompt: Your decompressed output has one or two extra characters at the end, but only for some files. Explain the
+        likely cause and how to fix it.
+      rubric:
+        - id: e1
+          point: The codes rarely fill the last byte exactly, so the last byte is padded with extra bits
+        - id: e2
+          point: The decoder reads the padding bits as if they were codes and produces extra symbols
+        - id: e3
+          point: Store the number of real bits or of symbols in the header, and stop decoding there
+  - concept: file-header-format
+    where: The decoder needs the code table before it can read the data, so your compressed file starts with a header
+      holding an identifier, a version and the frequency table.
+    explain_back:
+      prompt: Someone runs your decompressor on a plain text file by mistake, and it prints garbage instead of an error.
+        Explain what your header should contain and what the decoder should check first.
+      rubric:
+        - id: e1
+          point: The header should start with a fixed identifier and a version number
+        - id: e2
+          point: The decoder should check the identifier and the version before reading anything else, and refuse a file that
+            does not match
+        - id: e3
+          point: The header then holds what the decoder needs to rebuild the codes, such as the frequency table, and the length
+            of the data, each in a fixed size and order
+  - concept: byte-order
+    where: Counts in the header take several bytes each, so you choose the order of those bytes and keep it the same in
+      the compressor and the decompressor.
+    explain_back:
+      prompt: Your files decompress fine on your machine, but a decoder a friend wrote in another language reads a count of
+        1 as 16,777,216. Explain what happened and what the file format must say.
+      rubric:
+        - id: e1
+          point: A count stored in four bytes can be written most significant byte first or least significant byte first
+        - id: e2
+          point: The two programs used opposite orders, so the friend read the bytes backwards
+        - id: e3
+          point: The format must state one byte order, often big-endian, and every reader and writer must follow it
+        - id: e4
+          point: One program always agrees with itself, so this bug only shows when another program reads the file
+  - concept: round-trip-testing
+    where: You prove the tool works by compressing and decompressing many files and checking that each comes back
+      identical, byte for byte.
+    explain_back:
+      prompt: Your compressor passes a round-trip test on the novel. Explain which other inputs the round trip must cover,
+        and why a passing round trip alone does not prove your compressor compresses.
+      rubric:
+        - id: e1
+          point: The round trip should also cover an empty file, one symbol repeated many times, and every byte value at least
+            once
+        - id: e2
+          point: It must compare the result byte for byte with the original, not just look at it
+        - id: e3
+          point: A tool that copied the input unchanged would also pass, so you must also check the compressed file is smaller
 milestones:
-  # ------------------------------------------------------------------------------------------
-  - title: Counting and building the tree
-    summary: Count every symbol in one pass, then build the Huffman tree by always joining the two lightest nodes.
-    concepts: [frequency-map, priority-queue, huffman-coding]
+  - title: Counting and the tree
+    summary: Read the file, count every symbol, and build the Huffman tree with a priority queue.
     steps:
       - title: Count the symbols
-        minutes: 10
-        think:
-          kind: predict
-          prompt: You count the symbols in the word mississippi. How many entries does the frequency table hold?
-          key:
-            match: number_exact
-            expected: 4
-            derivation: >-
-              m occurs once, i four times, s four times and p twice. The table has one entry per different letter,
-              however often it repeats, so it holds 4 entries even though the word has 11 letters. Also checked with
-              fold, sort, uniq and wc in Git Bash. Proof script output: 4.
-        build:
-          prompt: >-
-            Take a file name on the command line, report an error and exit with a non-zero status if the file is
-            missing or cannot be read, and count how often each symbol occurs in a single pass. Counting bytes rather
-            than characters works for any file and keeps decoding simple. On the challenge's Les Misérables text, X
-            should occur 333 times and t 223000 times.
+        minutes: 45
+        build: Take a file name on the command line, report an error and exit with a non-zero status if it cannot be read, and
+          count how often each byte occurs in one pass. Work out the entropy of the counts.
+        outcome: For the challenge's test novel your counts match the challenge's examples for the letters X and t, and your
+          notes record the entropy in bits per byte next to the 8 bits a byte uses.
+        concepts:
+          - information-entropy
         hints:
-          hint: One entry per different letter, however many times it repeats.
-          example: A tally of votes has one line per candidate, not one line per vote.
-
+          hint: Count bytes, not characters, so the counts match what is actually in the file.
       - title: Build the tree
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The word abracadabra gives a 5, b 2, r 2, c 1 and d 1. You build the tree by always joining the two
-            lightest nodes into a new node whose weight is the sum of the two. List the weights of the new nodes in
-            the order you create them.
-          key:
-            match: numbers_all
-            expected: [2, 4, 6, 11]
-            derivation: >-
-              First c and d, 1 and 1, join into 2. That leaves 2, 2, 2 and 5, so two of the 2s join into 4; which two
-              depends on the tie rule, but the new weight is 4 either way. That leaves 2, 4 and 5, so 2 and 4 join
-              into 6. Last, 5 and 6 join into 11, the root, which equals the number of letters. Proof script output:
-              [2, 4, 6, 11].
-        build:
-          prompt: >-
-            Build the Huffman tree from your frequency table with a priority queue that always hands back the
-            lightest node. Use the worked examples in the OpenDSA Huffman tutorial linked from the challenge as unit
-            tests for your builder.
+        minutes: 60
+        build: Build the Huffman tree from the counts with a priority queue that always hands back the lightest node, joining
+          the two lightest until one remains. Pick and write down a tie-breaking rule.
+        outcome: Your tree for the worked example in the OpenDSA tutorial has the same total weight at the root and the same
+          code lengths, and an empty file and a one-symbol file are handled without a crash.
+        concepts:
+          - huffman-coding
+          - priority-queue
         hints:
-          hint: After each join, put the new node back with the others and look again for the two lightest.
-          example: >-
-            Merging piles of sand by always combining the two smallest piles: when two piles are the same size, it
-            does not matter which you pick, because the merged pile weighs the same.
-
-      - title: Keep the queue in order
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This tree builder gives a wrong tree on some inputs and crashes on one kind of file. Find the two
-            problems and say how to fix them.
-          snippet: |-
-            nodes = leaves sorted by weight, lightest first
-            while length(nodes) > 1:
-                a = nodes[0]
-                b = nodes[1]
-                remove the first two items from nodes
-                add node(a, b, a.weight + b.weight) to the end of nodes
-            root = nodes[0]
-          rubric:
-            - id: p1
-              point: "The new node goes to the end of the list without regard to its weight, so the list stops being sorted and later joins may not take the two lightest nodes"
-            - id: p2
-              point: "The fix is a priority queue such as a min-heap, or inserting the new node at its place by weight"
-            - id: p3
-              point: "An empty file leaves no nodes, so taking the first one fails, and the case needs its own handling"
-        build:
-          prompt: >-
-            Make your builder handle an empty file, and a file that holds one symbol many times. A single symbol still
-            needs a code at least one bit long, or the data would take no bits at all.
-        hints:
-          hint: After the first join, is the list still in order of weight? Then run the builder in your head on the smallest input you can think of.
-          example: >-
-            A ticket desk that sends every newly arrived urgent case to the back of the queue no longer serves the
-            most urgent person first.
-    teach_back:
-      prompt: >-
-        Explain how you get from the input file to a Huffman tree, and why the tree ends up giving frequent symbols
-        short codes.
-      rubric:
-        - id: t1
-          concept: frequency-map
-          point: "One pass over the input fills a map from each symbol to its count, and the map grows with the number of different symbols, not with the file size"
-        - id: t2
-          concept: priority-queue
-          point: "A priority queue always hands back the two lightest nodes, and each joined node goes back into the queue by its weight"
-        - id: t3
-          concept: huffman-coding
-          point: "Rare symbols are joined early, so they end up deep in the tree with long codes, while frequent symbols are joined late and stay near the root with short codes"
-
-  # ------------------------------------------------------------------------------------------
-  - title: Codes, bits and the file format
-    summary: Read the codes off the tree, pack them into bytes, and write a header the decoder can rely on.
-    concepts: [prefix-codes, bit-packing, file-header-format, byte-order]
+          hint: A file with one distinct symbol still needs a code at least one bit long.
+          example: A tournament that always pairs the two weakest teams first ends with the strongest team playing the fewest
+            rounds.
+  - title: Codes and the compressed file
+    summary: Turn the tree into codes, write a header the decoder can trust, and pack the bits.
     steps:
       - title: The code table
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            The text aaaabbc has a 4, b 2 and c 1. After you build a Huffman tree and read off the codes, how many
-            bits does the encoded text take, not counting the header or any padding?
-          key:
-            match: number_exact
-            expected: 10
-            derivation: >-
-              c and b join first, then that node joins a, so a gets a 1-bit code and b and c get 2-bit codes. The
-              four a's take 4 bits, the two b's 4 bits and the c 2 bits, which is 10. Every valid Huffman tree for
-              these counts gives the same total, even when the tie rule changes the codes themselves. Two bits for
-              every letter would take 14, and eight bits per letter 56. Proof script output: 10.
-        build:
-          prompt: >-
-            Walk the tree from the root, adding 0 for a left turn and 1 for a right turn, and record each leaf's code
-            in a table. Check that no symbol has a longer code than a rarer one.
+        minutes: 45
+        build: "Walk the tree from the root, adding 0 for one branch and 1 for the other, and record each leaf's code. Check
+          the table mechanically: no code may be the start of another."
+        outcome: For the test novel no code is a prefix of another, and no symbol has a longer code than a rarer symbol.
+        concepts:
+          - prefix-codes
+          - huffman-coding
         hints:
-          hint: Find how long each letter's code is, then add up the bits that every copy of every letter uses.
-          example: >-
-            In a busy kitchen, the dish ordered most often gets the shortest name on the order slip, and the rare
-            special gets written out in full.
-
-      - title: Why prefix-free matters
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Someone picks the codes x 1, y 01 and z 10 by hand instead of reading them off a tree. How many different
-            texts could the bits 101 stand for?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              Reading 1 and then 01 gives xy, and reading 10 and then 1 gives zx. There are two readings because the
-              code for x is the start of the code for z. Codes read off the leaves of a tree never have this problem,
-              since no leaf sits on the path to another. Proof script output: 2.
-        build:
-          prompt: >-
-            Add a test that checks no code in your table is the start of another code, and run it on every table your
-            tool builds.
-        hints:
-          hint: Start from the left and try every code that matches the first bit or the first two bits, then see what is left.
-          example: >-
-            If one phone extension is 12 and another is 123, the switchboard cannot tell whether you have finished
-            dialling after you press the 2.
-
-      - title: Pack the bits
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            You encode aaaabbc into 10 bits and pack them into whole bytes, filling the rest of the last byte with 0
-            bits. The code for a is the single bit 0. The decoder is not told how many bits are real and decodes every
-            bit it reads. How many extra a characters appear at the end of its output?
-          key:
-            match: number_exact
-            expected: 6
-            derivation: >-
-              Ten bits fill the first byte and 2 bits of the second, so 6 padding bits follow. Each padding bit is a 0,
-              and 0 on its own is the whole code for a, so the decoder turns the padding into 6 extra a characters.
-              Storing the number of real bits or symbols in the header stops this. Proof script output: 6.
-        build:
-          prompt: >-
-            Replace each symbol with its code, pack the bits eight to a byte, pad the last byte, and write the bytes
-            after the header. Store the number of real bits or the number of symbols, so the decoder knows where to
-            stop.
-        hints:
-          hint: Work out how many bits are left unused in the last byte, and what the decoder makes of each one.
-          example: >-
-            A tape whose song ends halfway along keeps playing silence to the end of the side, unless something tells
-            the player when the song is over.
-
+          hint: Codes live only at the leaves. What does that guarantee?
       - title: Write the header
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This header writer works on short test strings, but the decoder fails on the novel. Find the problems.
-          snippet: |-
-            write_byte(out, number of entries in table)
-            for each symbol, count in table:
-                write_byte(out, symbol)
-                write_byte(out, count)
-            write_bytes(out, packed_bits)
-          rubric:
-            - id: p1
-              point: "Each count is stored in a single byte, so any count over 255, such as the novel's 223000 t characters, is cut short; counts need a wider fixed-size field"
-            - id: p2
-              point: "A count stored in several bytes needs an agreed byte order, such as big-endian, so the decoder reads it the same way on any machine"
-            - id: p3
-              point: "Nothing records how many bits or symbols are real, so the decoder cannot tell the padding in the last byte from data"
-        build:
-          prompt: >-
-            Add an option for the output file name. Write a header that starts with a fixed identifier and a version,
-            then the frequency table with each count in a fixed number of bytes in big-endian order, then the number
-            of symbols, so the decoder can rebuild the tree and knows exactly where the data begins.
+        minutes: 45
+        build: Add an option for the output file name. Write a header with a fixed identifier, a version, the frequency table
+          with each count in a fixed number of bytes in one stated byte order, and the number of symbols.
+        outcome: A hex dump of the output shows your identifier, then your version, then the counts in the byte order you
+          documented.
+        concepts:
+          - file-header-format
+          - byte-order
         hints:
-          hint: Ask how big the largest count in the novel is, and how many different values one byte can hold.
-          example: A car's mileage counter with only three digits rolls back to zero after 999 miles.
-    teach_back:
-      prompt: >-
-        Explain what your compressed file contains from the first byte to the last, and why a decoder can read it
-        without guessing.
-      rubric:
-        - id: t1
-          concept: prefix-codes
-          point: "The codes come from the leaves of the tree, so none is the start of another and the bits can be decoded without separators"
-        - id: t2
-          concept: bit-packing
-          point: "The codes are packed eight bits to a byte, the last byte is padded, and the number of real bits or symbols is stored so the padding is never decoded"
-        - id: t3
-          concept: file-header-format
-          point: "The header starts with an identifier and version, holds the frequency table or the tree, and its layout or a stored length says where the data begins"
-        - id: t4
-          concept: byte-order
-          point: "Numbers wider than one byte are written in one agreed order, such as big-endian, so the file reads the same on every machine"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Write down the layout before you code it, field by field, with sizes.
+      - title: Pack the bits
+        minutes: 45
+        build: Replace each symbol with its code, pack the bits eight to a byte, pad the last byte and write the bytes after
+          the header.
+        outcome: The compressed test novel is clearly smaller than the original, and its data part is within a byte of the
+          total code length divided by 8.
+        concepts:
+          - bit-packing
+        hints:
+          hint: Keep a small store of bits not yet written, and flush a byte each time it holds eight.
   - title: Decoding and the round trip
-    summary: Rebuild the codes from the header, decode the data, and prove the tool returns every file unchanged.
-    concepts: [file-header-format, huffman-coding, round-trip-testing]
+    summary: Rebuild the tree from the header, decode the bits, and prove the round trip.
     steps:
       - title: Rebuild from the header
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            Your file stores only the frequency table, and the decompressor rebuilds the tree from it. The compressor
-            and the decompressor were written separately and break ties between equal weights in different ways.
-            What goes wrong, and how do you prevent it?
-          rubric:
-            - id: p1
-              point: "Equal weights can be joined in a different order, giving a different tree and different codes, so the decoder reads the bits with the wrong table and produces garbage"
-            - id: p2
-              point: "Both sides must use the same fixed tie rule, ideally the very same tree-building code, for example ordering equal weights by symbol"
-            - id: p3
-              point: "Another fix is for the header to store the tree or each symbol's code length, so the decoder does not have to repeat the choice"
-        build:
-          prompt: >-
-            Read the header back: check the identifier and version, read the frequency table and the number of
-            symbols, and rebuild exactly the same tree and code table the compressor used.
+        minutes: 45
+        build: "Read the header back: check the identifier and version first, refuse a file that fails, then read the counts
+          and rebuild exactly the same tree and code table."
+        outcome: Running the decompressor on a plain text file gives a clear error and a non-zero exit status, and on your
+          compressed file it rebuilds the same code table the compressor printed.
+        concepts:
+          - file-header-format
+          - byte-order
+          - huffman-coding
         hints:
-          hint: With three nodes that all weigh 1, how many different pairs could be joined first?
-          example: >-
-            Two people sorting the same hand of cards, each with their own rule for cards of equal rank, can end up
-            with different orders.
-
+          hint: The decoder must make the same tie-breaking choices as the encoder.
       - title: Decode the data
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The codes are a 0, b 10 and c 11. Decode the bits 1001110 by walking the tree: start at the root, go left
-            on 0 and right on 1, write down a letter at each leaf and go back to the root. Give the letters as one
-            word with no spaces.
-          key:
-            match: text_ci
-            expected: bacb
-            derivation: >-
-              1 then 0 reaches the leaf b. The next 0 is a straight away. 1 then 1 reaches c, and the last 1 then 0
-              reaches b again. Every bit is used, so the word is bacb. Proof script output: bacb.
-        build:
-          prompt: >-
-            Decode the data after the header bit by bit, walking the tree and going back to the root after each leaf.
-            Stop after the stored number of symbols, and write the result to the output file.
+        minutes: 45
+        build: Read the data bit by bit, walking the tree and returning to the root after each leaf, stop after the stored
+          number of symbols, and write the output file.
+        outcome: Decompressing the compressed test novel gives a file with exactly the same size as the original.
+        concepts:
+          - prefix-codes
+          - bit-packing
         hints:
-          hint: Each time you reach a leaf, write its letter down and return to the root before you read the next bit.
-          example: >-
-            Following left and right turns at each fork of a path until you reach a house, then walking back to the
-            start for the next address.
-
-      - title: The round trip
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            One of your round-trip test files holds every possible byte value exactly once. How long, in bits, is
-            the Huffman code for each byte value? Answer with a single number.
-          key:
-            match: number_exact
-            expected: 8
-            derivation: >-
-              All 256 weights are equal, so the lightest nodes are always pairs of equal weight. The leaves join in
-              pairs into 128 nodes, those into 64, and so on, halving each time until one root is left after 8 levels.
-              Every leaf sits at depth 8, so every code is 8 bits, the same as the original, and with the header the
-              compressed file is larger than the input. Proof script output: 8.
-        build:
-          prompt: >-
-            Write a round-trip test that compresses and decompresses many files, including an empty file, one symbol
-            repeated many times, every byte value once and the Les Misérables text, and compares each result with the
-            original byte for byte. Check that the novel's compressed file is smaller than the original.
+          hint: What tells you to stop, given that the last byte holds padding?
+      - title: Prove the round trip
+        minutes: 45
+        build: Write a test that compresses and decompresses many files, including an empty file, one symbol repeated many
+          times, every byte value once and the test novel, and compares each result byte for byte with its original.
+        outcome: Every file comes back byte for byte identical, and the test fails if you deliberately change one bit of a
+          compressed file.
+        concepts:
+          - round-trip-testing
         hints:
-          hint: When every weight is the same, the tree has nothing to favour. What shape does it take?
-          example: >-
-            In a knockout tournament of equally matched teams where the number of teams is a power of two, every team
-            plays the same number of rounds to reach the final.
-    teach_back:
-      prompt: >-
-        Explain how your decompressor gets from the compressed file back to the original, and how you know the whole
-        tool works.
-      rubric:
-        - id: t1
-          concept: file-header-format
-          point: "It checks the identifier and version, reads the table and the symbol count from the header, and knows from the header where the data begins and when to stop"
-        - id: t2
-          concept: huffman-coding
-          point: "It rebuilds exactly the same tree with the same tie rule, then walks it bit by bit from the root and writes a symbol at each leaf"
-        - id: t3
-          concept: round-trip-testing
-          point: "Many files go through compress and decompress, including an empty file, one repeated symbol, every byte value and the novel, and each result is compared with the original byte for byte"
+          hint: Generate some inputs at random as well as the hand-picked ones.

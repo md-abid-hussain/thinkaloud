@@ -1,10 +1,9 @@
-# Coding Challenges, Build your own spell checker using a Bloom filter.
-# Source: https://codingchallenges.fyi/challenges/challenge-bloom
-# Written in our own words. The source page is linked, not copied.
-# Every predict and trace key is proven by content/proofs/challenge-bloom.mjs.
+# Coding Challenges, Build your own spell checker using a Bloom filter. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-bloom . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-bloom
@@ -14,37 +13,24 @@ project:
   status: generated
   figure:
     kind: bits
-  summary: >-
-    A command-line spell checker that squeezes a dictionary into a Bloom filter, saves it as a small binary file with
-    its own header, loads it again and reports which words are probably spelt wrong, without ever storing the word
-    list itself.
+  summary: A command-line spell checker that squeezes a dictionary into a Bloom filter, saves it as a small binary file
+    with its own header, loads it again and reports which words are probably spelt wrong, without ever storing the
+    word list itself.
   requirements:
     - Size a Bloom filter from the number of words and the false positive rate you accept
     - Insert words by setting the bits chosen by several hash functions, such as FNV-1a
     - Build the filter from a dictionary file with a build option
-    - Save it as a CCBF file, a big-endian header followed by the packed bits, and load it back after checking the header
+    - Save it as a CCBF file, a big-endian header followed by the packed bits, and load it back after checking the
+      header
     - Check the words given as arguments and print the ones that are probably spelt wrong
-  restate_rubric:
-    - id: r1
-      point: "It stores a dictionary as a Bloom filter, a bit array set by several hash functions, instead of the words"
-    - id: r2
-      point: "A build option reads a dictionary and saves the filter to a file with a header, and the checker loads that file"
-    - id: r3
-      point: "Words given on the command line are checked and the ones that are not in the filter are reported as spelt wrong"
-  reflection_prompt: >-
-    In your own words, what did you give up by storing bits instead of words, what did you get for it, and how would
-    you choose the size differently for a different use?
   primer:
-    what: >-
-      A Bloom filter answers one question about a set, is this item in it, using only a row of bits and a few hash
+    what: A Bloom filter answers one question about a set, is this item in it, using only a row of bits and a few hash
       functions. Adding a word runs it through each hash function, and each one picks a bit to turn on. Checking a
       word looks at the same bits. You will use one to build a spell checker that keeps a whole dictionary in a file
       far smaller than the word list.
-    why: >-
-      Storing every word takes a lot of space. A Bloom filter takes a fraction of it and answers fast, at the price
-      of sometimes saying yes to a word that was never added. For a spell checker that trade is often fine.
-    example: >-
-      Picture a filter of 8 bits, all zero. Adding the word sun, its two hash functions point at bits 0 and 3, so
+    why: Storing every word takes a lot of space. A Bloom filter takes a fraction of it and answers fast, at the price of
+      sometimes saying yes to a word that was never added. For a spell checker that trade is often fine.
+    example: Picture a filter of 8 bits, all zero. Adding the word sun, its two hash functions point at bits 0 and 3, so
       those two bits become one. Checking the word sky, its hashes point at bits 3 and 5. Bit 5 is still zero, so sky
       was definitely never added. A bit can be turned on by more than one word, and turning on a bit that is already
       one changes nothing.
@@ -52,7 +38,8 @@ project:
       - term: bit array
         meaning: A row of bits, each zero or one, numbered from 0. A new filter starts with every bit at zero.
       - term: hash function
-        meaning: A recipe that turns any word into a number, always the same number for the same word. FNV-1a is a simple, fast one.
+        meaning: A recipe that turns any word into a number, always the same number for the same word. FNV-1a is a simple,
+          fast one.
       - term: false positive
         meaning: The filter saying a word is probably there when it was never added.
       - term: false negative
@@ -60,359 +47,266 @@ project:
       - term: header
         meaning: The first bytes of a file, which say what kind of file it is and the numbers needed to read the rest.
       - term: big-endian
-        meaning: Writing a number of several bytes with its most significant byte first, so 7 in two bytes is a zero byte, then a byte holding 7.
-
-milestones:
-  # ------------------------------------------------------------------------------------------
-  - title: Insert and look up
-    summary: Build the filter in memory, set bits for each word with several hash functions, and answer lookups.
-    concepts: [bloom-filter, hash-functions, bit-packing]
-    steps:
-      - title: Set the bits
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            An empty filter has 10 bits, numbered 0 to 9. Adding cat sets the bits its hashes choose: 1, 4 and 6.
-            Adding dog sets bits 2, 4 and 7. How many bits are one after both words are added? Answer with the count.
-          key:
-            match: number_exact
-            expected: 5
-            derivation: >-
-              cat turns on bits 1, 4 and 6. dog turns on bits 2 and 7, and bit 4, which is already one and stays one.
-              The bits that are one are 1, 2, 4, 6 and 7, so 5. Proof script output: 5.
-        build:
-          prompt: >-
-            Create a filter with a given number of bits, all zero, and a given number of hash functions. Write an add
-            operation that sets the bit each hash function picks for the word. Writing a few tests first, by hand on a
-            tiny filter like this one, makes the later steps easier to trust.
-        hints:
-          hint: Count the distinct bits that were turned on, not the number of times a bit was set.
-          example: >-
-            Two people switching on lights in the same room may both reach for the same switch. The room ends up with
-            fewer lights on than switches pressed.
-
-      - title: Ask the filter
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Keep the filter holding cat and dog from the last step. You look up cow, whose hashes point at bits 1, 2
-            and 7, and fox, whose hashes point at bits 1, 3 and 6. Neither word was ever added. How many of the two
-            does the filter report as probably present? Answer with the count.
-          key:
-            match: number_exact
-            expected: 1
-            derivation: >-
-              The bits that are one are 1, 2, 4, 6 and 7. cow checks 1, 2 and 7, all one, so the filter says probably
-              present even though cow was never added: a false positive. fox checks 1, 3 and 6, and bit 3 is zero, so
-              fox is definitely absent. One of the two is reported present. Proof script output: 1.
-        build:
-          prompt: >-
-            Write a lookup that answers definitely not present when any of the word's bits is zero, and probably
-            present when all of them are one. Test it with a word you added, which must always be found, and with
-            words you did not add.
-        hints:
-          hint: Check each word's three bits one by one against the bits that are on. A single zero settles the answer.
-          example: >-
-            A guest list kept only as the first letters of surnames can say for sure that a Zhang is not invited, but
-            seeing an S does not prove that Smith is.
-
-      - title: Several hashes from one
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This code should give k different bit positions for a word in a filter of m bits. Every lookup and insert
-            uses it, and the filter misbehaves. Find the two problems and say how to fix them.
-          snippet: |-
-            function positions(word, k, m):
-                result = []
-                for i from 0 to k - 1:
-                    h = fnv1a(word)
-                    result.append(h)
-                return result
-          rubric:
-            - id: p1
-              point: "Every pass computes the same hash of the same word, so all k positions are the same bit and the filter behaves as if it had one hash function"
-            - id: p2
-              point: "Each pass should give a different value, for example by seeding the hash with i or by combining two hashes as the first plus i times the second"
-            - id: p3
-              point: "The hash is a large number used as a position without being reduced, so it must be taken as the remainder after dividing by m to land inside the bit array"
-        build:
-          prompt: >-
-            Implement the FNV-1a hash yourself, and if you like a second variant such as FNV-1, from the description on
-            its reference page. Use it to produce the k positions for a word, each within the bit count, and check that
-            the same word always gives the same positions.
-        hints:
-          hint: Run the loop by hand for k equal to 3. What changes from one pass to the next, and how big can h be?
-          example: >-
-            Asking the same person the same question three times does not give you three opinions. You need three
-            different people, or one person asked three different questions.
-
-      - title: Pack the bits
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            The filter keeps its bits packed eight to a byte, in bytes numbered from 0, with positions 0 to 7 inside
-            each byte. Bit 0 is position 0 of byte 0 and bit 8 is position 0 of byte 1. Which byte holds bit 21, and at
-            which position inside that byte?
-          key:
-            match: numbers_all
-            expected: [2, 5]
-            derivation: >-
-              Bytes 0 and 1 hold bits 0 to 15 and byte 2 holds bits 16 to 23. Bit 21 is the sixth bit of byte 2,
-              counting from position 0, so it is position 5. Proof script output: [2, 5].
-        build:
-          prompt: >-
-            Store the bits in an array of bytes, eight per byte, rather than one whole byte or more per bit. Setting and
-            testing a bit then means finding its byte and its position in that byte. Check that a filter of 4,000,000
-            bits takes 500,000 bytes.
-        hints:
-          hint: Each byte covers a block of eight bit numbers. Find the block that contains 21, then count from its start.
-          example: >-
-            In a hotel with eight rooms on every floor, numbered from 0 on the ground floor, room 13 is on floor 1 and is
-            the room at position 5 on that floor.
-    teach_back:
-      prompt: >-
-        Explain how your filter adds a word and answers a lookup, why it can wrongly say yes but never wrongly say no,
-        and how its bits are kept in memory.
+        meaning: Writing a number of several bytes with its most significant byte first, so 7 in two bytes is a zero byte,
+          then a byte holding 7.
+  restate_rubric:
+    - id: r1
+      point: It stores a dictionary as a Bloom filter, a bit array set by several hash functions, instead of the words
+    - id: r2
+      point: A build option reads a dictionary and saves the filter to a file with a header, and the checker loads that file
+    - id: r3
+      point: Words given on the command line are checked and the ones that are not in the filter are reported as spelt wrong
+  reflection_prompt: In your own words, what did you give up by storing bits instead of words, what did you get for it,
+    and how would you choose the size differently for a different use?
+  done_when: The tool builds words.bf from a dictionary, saves it in the CCBF format with a correct big-endian header,
+    refuses files that are not filters, never flags a dictionary word, and measures a false positive rate close to the
+    one you sized for; and your notes explain why a Bloom filter has false positives but no false negatives, in your
+    own words.
+  open_checks:
+    - Whether your dictionary has Windows line endings, capital letters or duplicate words, and how each affects the
+      filter.
+    - How close your measured false positive rate is to the sized rate, and how it changes if you add twice as many
+      words.
+    - Exactly how many bytes the version, hash count and bit count each take in the challenge's header layout.
+learning_map:
+  - concept: bloom-filter
+    where: Your spell checker keeps a compact filter instead of the whole dictionary. It can wrongly accept a misspelling,
+      but it never flags a real word.
+    explain_back:
+      prompt: A user complains that your spell checker missed a typo, and another asks whether it could ever flag a
+        correctly spelt dictionary word. Answer both, using how a Bloom filter adds and looks up a word.
       rubric:
-        - id: t1
-          concept: bloom-filter
-          point: "Adding sets the bit each hash picks, and a lookup says absent if any of its bits is zero, so a word that was added is always found"
-        - id: t2
-          concept: bloom-filter
-          point: "Other words can turn on all the bits of a word never added, so a lookup can say probably present wrongly, which is a false positive"
-        - id: t3
-          concept: hash-functions
-          point: "Each hash function gives the same number for the same word, and k different values reduced to the bit count give the positions"
-        - id: t4
-          concept: bit-packing
-          point: "The bits are packed eight to a byte, so bit n lives in byte n divided by 8 at position n modulo 8"
-
-  # ------------------------------------------------------------------------------------------
+        - id: e1
+          point: Adding a word sets the bits its hash functions choose, and a lookup checks those same bits
+        - id: e2
+          point: If any of the bits is zero the word was never added, so a dictionary word is never flagged, because its bits
+            were all set
+        - id: e3
+          point: "A typo can find all its bits already set by other words, so the filter wrongly says it is probably a word: a
+            false positive"
+        - id: e4
+          point: The filter stores no words, only bits, so it cannot tell which case it is in
+  - concept: false-positive-rate
+    where: You size the filter from the number of dictionary words and the error rate you accept, which fixes the bit
+      count and the number of hash functions.
+    explain_back:
+      prompt: A teammate sized your filter for 100,000 words at 1 in 100, then loaded a dictionary of 500,000 words into it.
+        Explain what happens to the false positive rate and how you would size it properly.
+      rubric:
+        - id: e1
+          point: Each word sets several bits, so loading five times more words sets far more of the bits to one
+        - id: e2
+          point: A lookup for a word that was never added is then much more likely to find all its bits set, so the rate gets
+            far worse than 1 in 100
+        - id: e3
+          point: The bit count and hash count must be computed from the real number of words and the chosen rate, about 9.6 bits
+            per word and 7 hash functions for 1 in 100
+        - id: e4
+          point: You can check the result by measuring the rate on words you know were never added
+  - concept: hash-functions
+    where: Each word must map to the same k bit positions every time, spread evenly over the whole filter. You implement
+      FNV-1a and derive k positions from it.
+    explain_back:
+      prompt: Your filter uses one hash function and takes k positions from it by adding 1, 2, 3 and so on to the first
+        position. The measured false positive rate is far above what you sized for. Explain why, and a better way to
+        get k positions.
+      rubric:
+        - id: e1
+          point: "Consecutive positions are not independent: two words that collide on the first position collide on all of
+            them"
+        - id: e2
+          point: The positions should look independent and spread evenly over the whole bit array
+        - id: e3
+          point: A standard approach combines two different hashes as the first plus i times the second, or uses differently
+            seeded hashes
+        - id: e4
+          point: The same word must always give the same positions, so the hashes must not depend on anything but the word
+  - concept: bit-packing
+    where: The filter holds millions of bits, so you store eight bits per byte and find each bit by its byte and its
+      position inside that byte.
+    explain_back:
+      prompt: Your first filter used one byte per bit and the saved file was eight times bigger than expected. Explain how
+        to store and find bit number 21 when bits are packed eight to a byte.
+      rubric:
+        - id: e1
+          point: Packing stores eight bits in each byte, so a filter of 4,000,000 bits takes 500,000 bytes
+        - id: e2
+          point: Bit 21 lives in byte 2, because 21 divided by 8 rounded down is 2, at position 5 inside it, the remainder
+        - id: e3
+          point: Setting or testing a bit changes or reads only that one bit with a mask, leaving the other seven untouched
+        - id: e4
+          point: The format must say which end of the byte counts as position 0
+  - concept: file-header-format
+    where: words.bf starts with the identifier CCBF and a version, then the hash count and bit count the loader needs
+      before reading the bits.
+    explain_back:
+      prompt: Someone passes your spell checker an old filter file built with a different hash count, and another person
+        passes it a text file. Explain what your header must contain and what the loader must check before trusting
+        any bits.
+      rubric:
+        - id: e1
+          point: The header starts with the fixed identifier CCBF and a version number, so the loader can recognise its own
+            files
+        - id: e2
+          point: It also stores the hash count and the bit count used to build the filter, so lookups use the same settings
+        - id: e3
+          point: The loader checks the identifier and version first and refuses a file that does not match, and checks the file
+            holds as many bytes as the bit count needs
+  - concept: byte-order
+    where: The header numbers are written big-endian, as the format says, so a hex dump shows them most significant byte
+      first.
+    explain_back:
+      prompt: A hex dump of your words.bf shows 01 00 where the version should be, and the challenge author's file shows 00
+        01. Explain what your writer did wrong, and why your own loader did not notice.
+      rubric:
+        - id: e1
+          point: The format stores numbers big-endian, most significant byte first, so version 1 in two bytes is 00 01
+        - id: e2
+          point: Your writer used little-endian, which puts the low byte first and gives 01 00
+        - id: e3
+          point: Your loader read with the same wrong order, so it agreed with itself; only another program reveals the bug
+  - concept: line-endings
+    where: The dictionary is a text file with one word per line, and a file saved with Windows line endings leaves an
+      invisible carriage return on every word.
+    explain_back:
+      prompt: After building the filter from a dictionary downloaded on Windows, your checker flags almost every word as
+        misspelt, even hello. Explain the likely cause and the fix.
+      rubric:
+        - id: e1
+          point: Windows text files end lines with a carriage return and a newline, not just a newline
+        - id: e2
+          point: Splitting on newline alone leaves a carriage return at the end of every word, so the filter holds hello plus an
+            invisible character
+        - id: e3
+          point: Strip the carriage return, and surrounding spaces, from each word before adding or checking it
+  - concept: round-trip-testing
+    where: You check the saved file by saving a filter, loading it back, and confirming every dictionary word is still
+      found.
+    explain_back:
+      prompt: Your save and load functions both run without errors. Explain how you would prove the saved file is right, and
+        what number you would measure besides.
+      rubric:
+        - id: e1
+          point: Build a filter, save it, load it back and check that every word that was added is still reported present
+        - id: e2
+          point: Compare the loaded bits or the answers with the original filter, not just that loading did not crash
+        - id: e3
+          point: Look up many random strings that were never added and compare the measured false positive rate with the rate
+            you sized for
+  - concept: cli-subcommands
+    where: "One tool has two modes: a build option that makes words.bf, and a check mode that takes words as arguments and
+      prints the misspelt ones."
+    explain_back:
+      prompt: A script runs your spell checker on a document and needs to know whether any word was misspelt, without
+        reading every line of output. Explain what the tool should print, where, and what exit status it should
+        return.
+      rubric:
+        - id: e1
+          point: The misspelt words go to standard output, one per line, so other programs can use them
+        - id: e2
+          point: Errors such as a missing or invalid filter file go to standard error
+        - id: e3
+          point: "The exit status tells the script the result: zero when all is well, and a different status for errors, so
+            scripts can act without parsing text"
+milestones:
+  - title: A filter in memory
+    summary: Add and look up words with several hash functions over a packed bit array.
+    steps:
+      - title: Add and look up
+        minutes: 45
+        build: Create a filter with a given number of bits and hash functions. Adding a word sets the bit each hash picks;
+          looking it up answers definitely not present if any bit is zero, and probably present if all are one. Test
+          it by hand on a tiny filter first.
+        outcome: Every word you added is always found, and on a tiny filter you can show a word you never added that is
+          reported probably present.
+        concepts:
+          - bloom-filter
+        hints:
+          hint: Work through a 10-bit filter on paper before trusting the code.
+      - title: Hash functions
+        minutes: 45
+        build: Implement FNV-1a yourself from its reference page, and derive k positions for a word within the bit count, for
+          example by combining two hashes.
+        outcome: Your FNV-1a gives the published test values from its reference page, and the same word always gives the same
+          k positions.
+        concepts:
+          - hash-functions
+        hints:
+          hint: Check the hash against published test values before using it.
+      - title: Pack the bits
+        minutes: 30
+        build: Store the bits eight to a byte and find each bit by its byte and its position in that byte.
+        outcome: A filter of 4,000,000 bits takes 500,000 bytes, and setting one bit never changes its neighbours.
+        concepts:
+          - bit-packing
+        hints:
+          hint: Which byte holds bit n, and which position inside it?
   - title: Build from a dictionary and save
-    summary: Size the filter for a real dictionary, fill it from the word file, and write it to disk with a header.
-    concepts: [line-endings, file-header-format, byte-order]
+    summary: Size the filter, read the dictionary, and save it in the CCBF format.
     steps:
       - title: Size the filter
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            Before building, you choose how many bits the filter has and how many hash functions it uses. Explain what
-            goes wrong if you pick far too few bits, and why adding more and more hash functions stops helping and
-            starts to hurt.
-          rubric:
-            - id: p1
-              point: "With too few bits for the number of words, most bits end up as one, so almost any lookup finds all its bits set and false positives become common"
-            - id: p2
-              point: "Each extra hash function sets more bits per word, which fills the array faster, so past a best number the false positive rate rises again"
-            - id: p3
-              point: "So the bit count is worked out from the number of words and the false positive rate you accept, and the best hash count follows from the bits per word"
-        build:
-          prompt: >-
-            Count the words in your dictionary file, choose a false positive rate you can live with, such as 1 in 100,
-            and work out the bit count and the hash count with the formulas on the Bloom filter reference page. Print
-            both so you can see them.
+        minutes: 30
+        build: Count the words in your dictionary, choose a false positive rate such as 1 in 100, and compute the bit count
+          and hash count from the formulas on the Bloom filter reference page. Print both.
+        outcome: For your dictionary the printed numbers match an online Bloom filter calculator for the same word count and
+          rate.
+        concepts:
+          - false-positive-rate
         hints:
-          hint: Think about a filter where nearly every bit is already one. What does a lookup find, whatever the word?
-          example: >-
-            A car park with too few spaces fills up quickly, and once every space is taken it no longer tells you
-            anything about which cars came in.
-
+          hint: Use the real word count, not a guess.
       - title: Read the dictionary
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This build step reads a dictionary file that was saved with Windows line endings and ends with a newline.
-            Afterwards, checking hello, which is in the file, says it is spelt wrong. Find the two problems and the fixes.
-          snippet: |-
-            text = read_text("dict.txt")
-            for word in split(text, "\n"):
-                filter.add(word)
-            save(filter, "words.bf")
-          rubric:
-            - id: p1
-              point: "Windows line endings put a carriage return before each newline, so every word is stored with a carriage return on the end and never matches a word typed on the command line"
-            - id: p2
-              point: "Strip the carriage return, or trim whitespace, from each line before adding it"
-            - id: p3
-              point: "The final newline leaves an empty last piece, which is added as a word, so empty lines should be skipped"
-        build:
-          prompt: >-
-            Add a build option, for example ccspellcheck -build dict.txt, that reads every word from the dictionary and
-            inserts it. Use the system word list or a downloaded English word list as the dictionary.
+        minutes: 30
+        build: Add a build option that reads every word from the dictionary, one per line, and adds it, trimming line endings
+          and spaces.
+        outcome: Built from a dictionary with Windows line endings, the filter still finds hello and every other word you
+          spot-check.
+        concepts:
+          - line-endings
+          - cli-subcommands
         hints:
-          hint: Look at the exact bytes at the end of each line in a file written on Windows, and at what comes after the last newline.
-          example: >-
-            Cutting a ribbon at every mark leaves one more piece than marks, and if the last mark is at the very end,
-            that last piece has nothing on it.
-
+          hint: Print the length of the first word you read; is it longer than it looks?
       - title: Write the file
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A filter of 20 bits is saved in the CCBF format: 4 bytes of identifier, 2 bytes of version, 2 bytes of
-            hash count, 4 bytes of bit count, then the bits packed eight to a byte. How many bytes long is the whole file? Answer with one number.
-          key:
-            match: number_exact
-            expected: 15
-            derivation: >-
-              The header is 4 + 2 + 2 + 4 = 12 bytes. 20 bits fill two whole bytes and spill 4 bits into a third, which
-              is padded with zero bits, so the bits take 3 bytes. 12 + 3 = 15. Proof script output: 15.
-        build:
-          prompt: >-
-            Save the filter to words.bf: the four letters CCBF, a version number of 1, the hash count, the bit count,
-            all big-endian, then the packed bits. The file should be far smaller than the dictionary; the challenge
-            author's was about a fifth of the size.
+        minutes: 45
+        build: "Save the filter to words.bf: the identifier CCBF, version 1, the hash count and the bit count, all big-endian,
+          then the packed bits."
+        outcome: A hex dump of the start of words.bf shows CCBF, then 00 01 for the version, then your hash count and bit
+          count most significant byte first, and the file is far smaller than the dictionary.
+        concepts:
+          - file-header-format
+          - byte-order
         hints:
-          hint: Add up the header fields first, then ask how many whole bytes are needed to hold 20 bits.
-          example: >-
-            Eggs come in boxes of eight. Twenty eggs need three boxes, and the last box is only half full.
-
-      - title: Get the byte order right
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your writer stores the version, 1, in bytes 4 and 5 of the file in big-endian order, as the format says. A
-            reader written in a hurry reads those two bytes as a little-endian number. What version number does it
-            think it found? Answer with one number.
-          key:
-            match: number_exact
-            expected: 256
-            derivation: >-
-              Big-endian puts the most significant byte first, so bytes 4 and 5 hold 0 then 1. A little-endian reader
-              treats the first byte as the low one and the second as the high one, so it reads 0 plus 1 times 256,
-              which is 256. Proof script output: 256.
-        build:
-          prompt: >-
-            Look at the start of your file with a hex dump, for example xxd with a limit of 32 bytes. You should see
-            the bytes of CCBF, then 0001 for the version, then your hash count and bit count written most significant
-            byte first. The author's file showed 4 hash functions and a bit count of 003d0900 in hex.
-        hints:
-          hint: Write down the two bytes in the order they sit in the file, then decide which one a little-endian reader treats as the larger.
-          example: >-
-            Read a date written day first as if it were month first and the third of April becomes the fourth of
-            March, from the same two numbers.
-    teach_back:
-      prompt: >-
-        Explain how your build turns a dictionary file into words.bf, so that any program on any machine could read
-        the file back and know exactly what it holds.
-      rubric:
-        - id: t1
-          concept: line-endings
-          point: "Each line is stripped of its carriage return and newline and empty lines are skipped, so the stored words match what users type"
-        - id: t2
-          concept: file-header-format
-          point: "The file starts with a header, the identifier CCBF, a version, the hash count and the bit count, and the packed bits follow it"
-        - id: t3
-          concept: byte-order
-          point: "The header numbers are written big-endian, most significant byte first, so a reader on any processor gets the same values"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Write the expected bytes on paper, then compare with the hex dump.
   - title: Load and check words
-    summary: Read the filter back safely, check the words given on the command line, and test that it behaves as designed.
-    concepts: [cli-subcommands, round-trip-testing, differential-testing]
+    summary: Load the saved filter safely, check words from the command line, and test what you built.
     steps:
       - title: Load the filter
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This loader reads words.bf back into a filter. Given the format from the last milestone, find the two
-            problems and say how to fix them.
-          snippet: |-
-            data = read_bytes("words.bf")
-            hashes = number_from_bytes(data[6..8], little_endian)
-            bits = number_from_bytes(data[8..12], little_endian)
-            filter = new_filter(bits, hashes, data[12..])
-          rubric:
-            - id: p1
-              point: "It never checks that the first four bytes are CCBF and that the version is one it understands, so any other or newer file is silently misread"
-            - id: p2
-              point: "It should stop with a clear message on the error stream and a non-zero exit status when the identifier or version is wrong"
-            - id: p3
-              point: "It reads the numbers as little-endian, but the header is big-endian, so the hash count and bit count come out wrong"
-        build:
-          prompt: >-
-            Load words.bf: read the header, check the identifier and version before anything else, then read the hash
-            count, the bit count and the bits. Refuse a file that fails the check, and test that with a file that is
-            not a filter at all.
+        minutes: 30
+        build: "Load words.bf: check the identifier and version before anything else, then read the hash count, bit count and
+          bits. Refuse any file that fails the checks."
+        outcome: Loading a text file or a truncated filter gives a clear error on standard error and a non-zero exit status,
+          and loading your own file succeeds.
+        concepts:
+          - file-header-format
         hints:
-          hint: What does the loader do with bytes 0 to 5, and in which order does the format store its numbers?
-          example: >-
-            A bank checks the name on a cheque before reading the amount. Reading the amount from someone else's
-            cheque, or with the digits in the wrong order, is worse than refusing it.
-
-      - title: Check words from the command line
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your dictionary holds hello, world, apple, river and stone. You run the checker on hello, helo, world,
-            wrld, apple and river. Depending on the filter's size and on luck, what is the fewest and what is the most
-            words it could list as spelt wrong?
-          key:
-            match: numbers_all
-            expected: [0, 2]
-            derivation: >-
-              hello, world, apple and river were added, and a Bloom filter never misses a word that was added, so they
-              are never listed. helo and wrld were not added. Each is listed when one of its bits is zero, but either
-              can be a false positive. So anything from 0, both wrongly found, to 2, both caught, is possible. The
-              proof builds real FNV-1a filters of many sizes and finds 0 and 2. Proof script output: [0, 2].
-        build:
-          prompt: >-
-            Without the build option, load words.bf and treat every argument as a word to check, then print the words
-            that are probably spelt wrong. In the author's run, checking hi, hello, word, concurrency, coding,
-            challenges, imadethis and up listed coding, challenges and imadethis, the first two only because their
-            dictionary did not contain them.
+          hint: What should happen if the file is shorter than the bit count requires?
+      - title: Check words
+        minutes: 30
+        build: Without the build option, load words.bf, check every argument and print the words that are probably misspelt.
+        outcome: Checking a mix of dictionary words and made-up words prints only the made-up ones, plus any real words your
+          dictionary lacks.
+        concepts:
+          - bloom-filter
+          - cli-subcommands
         hints:
-          hint: Split the six words into the ones that were added and the ones that were not, and ask what each group can produce.
-          example: >-
-            A smoke alarm that never misses a fire but sometimes goes off for burnt toast might ring for every piece of
-            toast, or for none of them.
-
+          hint: A real word that is flagged means your dictionary lacks it, or a word was stored wrongly.
       - title: Test what you built
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            How would you convince yourself that the filter you load from words.bf answers exactly like the one you
-            built, and that its false positive rate is close to the one you chose?
-          rubric:
-            - id: p1
-              point: "Build a filter, save it, load it, and check that the header values and every byte of bits are the same, or that every word gives the same answer"
-            - id: p2
-              point: "Compare against an exact set of the dictionary words: every dictionary word must be reported present, with no exceptions"
-            - id: p3
-              point: "Check many words known not to be in the dictionary, such as random strings, and see that the share wrongly reported present is near the chosen rate"
-        build:
-          prompt: >-
-            Write tests that save and reload a filter, check every dictionary word against the loaded one, and count
-            how many random strings are reported present. Print the measured false positive rate next to the one you
-            chose.
+        minutes: 45
+        build: Write tests that save and reload a filter, check every dictionary word against the loaded copy, and look up
+          many random strings to measure the false positive rate.
+        outcome: Every dictionary word is found after reloading, and the measured false positive rate is close to the rate you
+          sized for.
+        concepts:
+          - round-trip-testing
+          - false-positive-rate
         hints:
-          hint: You have the original word list on hand. What can it tell you that the filter alone cannot?
-          example: >-
-            To test a photocopier, copy a page and lay the copy over the original. To test a scale, weigh things whose
-            weight you already know.
-    teach_back:
-      prompt: >-
-        Explain how ccspellcheck decides what to do from its arguments, and how you showed that saving, loading and
-        checking all work.
-      rubric:
-        - id: t1
-          concept: cli-subcommands
-          point: "The build option takes a dictionary file and writes words.bf, otherwise every argument is a word to check, and errors go to the error stream with a non-zero exit status"
-        - id: t2
-          concept: round-trip-testing
-          point: "A filter that is saved and loaded again gives the same header, the same bits and the same answers as the one that was built"
-        - id: t3
-          concept: differential-testing
-          point: "Its answers are compared with an exact word set: no dictionary word is ever reported wrong, and the false positive rate on non-words is near the chosen one"
+          hint: Use random strings long enough that they are very unlikely to be real words.

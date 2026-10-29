@@ -1,11 +1,9 @@
-# Coding Challenges, Build your own sort.
-# Source: https://codingchallenges.fyi/challenges/challenge-sort
-# Written in our own words. The source page is linked, not copied.
-# Every predict and trace key is proven by content/proofs/challenge-sort.mjs and was cross-checked with GNU sort 8.32
-# and uniq 8.32 in Git Bash on the same tiny inputs, with LC_ALL=C for byte order.
+# Coding Challenges, Build your own sort. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-sort . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-sort
@@ -15,8 +13,7 @@ project:
   status: generated
   figure:
     kind: sort
-  summary: >-
-    A command-line tool that reads the lines of a file or of piped text and prints them in sorted order, with an
+  summary: A command-line tool that reads the lines of a file or of piped text and prints them in sorted order, with an
     option to drop duplicate lines, a choice of sorting algorithm and a random order that still keeps equal lines
     together.
   requirements:
@@ -25,27 +22,14 @@ project:
     - Let the user choose between sorting algorithms such as merge sort, quicksort, heapsort and radix sort
     - Shuffle lines with -R so that equal lines still end up next to each other
     - Give the same output as the real sort, with the locale set to C, on the word list from the challenge
-  restate_rubric:
-    - id: r1
-      point: "The tool reads lines from a file or standard input and prints them in sorted order"
-    - id: r2
-      point: "An option removes duplicate lines, and another lets the user pick the sorting algorithm"
-    - id: r3
-      point: "A random sort option shuffles the lines but keeps identical lines together"
-  reflection_prompt: >-
-    In your own words, how does your design decide the order of two lines, where does it remove duplicates, and what
-    would you change to sort a file far bigger than memory?
   primer:
-    what: >-
-      sort is a small command-line tool that reads lines of text and prints them back in order. You give it a file
+    what: sort is a small command-line tool that reads lines of text and prints them back in order. You give it a file
       name, or pipe text into it, and it compares the lines two at a time to decide which goes first. You will build
       your own version that matches the real one, then add options to drop duplicates, pick the algorithm and shuffle.
-    why: >-
-      Sorting is everywhere: file listings, logs, leaderboards, and as the step that lets other tools such as uniq
-      do their job. Building it makes you decide what order text really has, and what a sorting algorithm costs.
-    example: >-
-      Given the lines dog, ant and cat, sort prints ant, cat, dog. To compare two lines it walks along them letter by
-      letter, and the first letter that differs decides. Apple and apricot share a, p, then the third letters are p
+    why: "Sorting is everywhere: file listings, logs, leaderboards, and as the step that lets other tools such as uniq do
+      their job. Building it makes you decide what order text really has, and what a sorting algorithm costs."
+    example: Given the lines dog, ant and cat, sort prints ant, cat, dog. To compare two lines it walks along them letter
+      by letter, and the first letter that differs decides. Apple and apricot share a, p, then the third letters are p
       and r, and p comes first in the alphabet, so apple goes before apricot.
     words:
       - term: line
@@ -60,468 +44,288 @@ project:
         meaning: A line that is exactly the same, byte for byte, as another line in the input.
       - term: stable sort
         meaning: A sort that keeps items which compare as equal in the order they arrived.
-
+  restate_rubric:
+    - id: r1
+      point: The tool reads lines from a file or standard input and prints them in sorted order
+    - id: r2
+      point: An option removes duplicate lines, and another lets the user pick the sorting algorithm
+    - id: r3
+      point: A random sort option shuffles the lines but keeps identical lines together
+  reflection_prompt: In your own words, how does your design decide the order of two lines, where does it remove
+    duplicates, and what would you change to sort a file far bigger than memory?
+  reference_tool: GNU sort with LC_ALL=C, so lines are compared byte by byte.
+  done_when: Sorting, -u, file and piped input match the real sort with LC_ALL=C on the word list and tiny files; every
+    algorithm you offer passes one shared test suite; -R keeps equal lines together; and your notes explain, in your
+    own words, byte order versus locale order, stability, and what each algorithm costs.
+  open_checks:
+    - Whether the reference sort -R gives a different order on each run on your machine.
+    - Which line the reference keeps when -u meets lines that compare equal but are not identical, for example under a
+      case-insensitive option.
+    - How the reference treats a last line without a final newline and an empty input.
+    - What buffer size and temporary folder the reference uses for large inputs on your machine.
+learning_map:
+  - concept: lexicographic-order
+    where: Your sort compares lines character by character and decides at the first difference. In byte order every
+      capital comes before every lowercase letter.
+    explain_back:
+      prompt: A release script sorts version folders named 1.9 and 1.10 and picks the last one as the newest, but it deploys
+        1.9. Explain why, and what the script should do instead.
+      rubric:
+        - id: e1
+          point: Text order compares character by character and decides at the first difference
+        - id: e2
+          point: 1.10 and 1.9 first differ at the 1 and the 9, and 1 comes before 9, so 1.10 sorts first and 1.9 last
+        - id: e3
+          point: The script needs a comparison that reads the numbers as numbers, part by part, instead of as text
+  - concept: locale-settings
+    where: The real sort orders lines differently under the C locale and under a UTF-8 language locale, so the challenge
+      pins LC_ALL to C.
+    explain_back:
+      prompt: The same sort command lists Zoe before adam on a build server and adam first on your laptop. Explain why, and
+        how to make the result the same everywhere.
+      rubric:
+        - id: e1
+          point: sort follows the locale, and LC_ALL overrides the other settings
+        - id: e2
+          point: Under the C locale lines are compared byte by byte, so every capital comes before every lowercase letter
+        - id: e3
+          point: A language locale uses collation rules that group a and A together, so pin the locale, for example LC_ALL=C,
+            when the order must be reproducible
+  - concept: stdin-vs-file
+    where: Your sort reads the file named on the command line, or standard input when there is none, with the same code.
+    explain_back:
+      prompt: Explain how your sort reads lines from a file or a pipe with one routine, and what it must do when the input
+        does not end with a newline.
+      rubric:
+        - id: e1
+          point: Both sources are a stream read until the end, so the source is chosen once and the rest of the code is shared
+        - id: e2
+          point: A final newline ends the last line; it does not start an empty extra line
+        - id: e3
+          point: A last line without a newline is still a line, and sort prints it followed by a newline
+  - concept: unix-pipelines
+    where: "sort and uniq are the classic pair: uniq only removes neighbouring duplicates, so it needs sorted input."
+    explain_back:
+      prompt: A colleague counts distinct visitors with uniq and then wc -l on a log, and the number is far too high.
+        Explain why, and two ways to fix it.
+      rubric:
+        - id: e1
+          point: uniq removes only duplicate lines that are next to each other
+        - id: e2
+          point: In an unsorted log the same visitor appears in many places, so each separate run is counted again
+        - id: e3
+          point: Sort first and then uniq, or use sort -u, so equal lines become neighbours before duplicates are removed
+  - concept: sorting-algorithms
+    where: The challenge lets the user choose between merge sort, quicksort, heapsort and radix sort, each with different
+      costs.
+    explain_back:
+      prompt: A service sorts records that usually arrive nearly sorted, and its home-made quicksort sometimes takes minutes
+        instead of milliseconds. Explain why, and two ways to fix it.
+      rubric:
+        - id: e1
+          point: Quicksort splits the items around a pivot and sorts each part
+        - id: e2
+          point: Choosing the first item as the pivot on sorted input splits off one item at a time, so the work grows with the
+            square of the input
+        - id: e3
+          point: A random pivot or the median of three avoids that, or an algorithm with a guaranteed n log n worst case, such
+            as merge sort, can be used
+  - concept: sort-stability
+    where: Merge sort keeps equal items in their input order and quicksort usually does not. It shows when you sort
+      records by a key.
+    explain_back:
+      prompt: A table is sorted by date and then, with a second sort, by customer. In one tool each customer's rows stay in
+        date order and in another they come out scrambled. Explain why.
+      rubric:
+        - id: e1
+          point: A stable sort keeps items whose keys compare equal in the order they arrived
+        - id: e2
+          point: With a stable second sort the earlier date order survives inside each customer
+        - id: e3
+          point: An unstable sort puts equal-key rows in any order, so the date order is lost
+  - concept: time-space-complexity
+    where: Removing duplicates, choosing a pivot and comparing algorithms are all about how time and memory grow with the
+      input.
+    explain_back:
+      prompt: You can remove duplicates before sorting with a set, while merging, or after sorting by comparing neighbours.
+        Explain what each costs in time and memory on a file with millions of lines.
+      rubric:
+        - id: e1
+          point: A set needs memory for every distinct line before sorting starts
+        - id: e2
+          point: Removing duplicates during the merge or after sorting needs no extra memory beyond the sort itself
+        - id: e3
+          point: Comparing neighbours after sorting is a single linear pass, so the sort, at n log n, dominates the time
+  - concept: unit-tests-first
+    where: One test suite that every algorithm must pass is what makes it safe to add or swap algorithms.
+    explain_back:
+      prompt: You add radix sort to a tool that already offers merge sort and quicksort. Explain how a shared, test-first
+        suite lets you trust it, and which cases the suite must contain.
+      rubric:
+        - id: e1
+          point: Every algorithm runs against the same tests, written before the code they check
+        - id: e2
+          point: The cases include empty input, one line, all lines equal, already sorted, reverse sorted and duplicates with -u
+        - id: e3
+          point: A new algorithm counts as correct only when it passes the whole suite, so swapping algorithms cannot quietly
+            change behaviour
+  - concept: hash-functions
+    where: sort -R hashes every line with a random seed and sorts by the hash, which shuffles the lines but keeps equal
+      lines together.
+    explain_back:
+      prompt: Explain why sorting lines by a seeded hash shuffles them but always keeps identical lines next to each other,
+        and why a new seed gives a new order.
+      rubric:
+        - id: e1
+          point: A hash function gives the same number for the same input, so identical lines get identical hashes
+        - id: e2
+          point: Sorting by those numbers puts lines with equal hashes, including all copies of a line, next to each other
+        - id: e3
+          point: The seed changes the whole mapping from lines to numbers, so each run with a new seed gives a different order
+  - concept: external-sorting
+    where: The optional last step sorts a file bigger than the memory you allow, the way the real sort does.
+    explain_back:
+      prompt: You must sort a 50 GB log on a machine with 8 GB of memory. Explain how to do it and how much memory the final
+        phase needs.
+      rubric:
+        - id: e1
+          point: Read as much as fits, sort it in memory, and write it out as a sorted run in a temporary file; repeat until the
+            input is used up
+        - id: e2
+          point: Merge the runs by repeatedly taking the smallest current line among them
+        - id: e3
+          point: The merge needs only one line per run in memory, and every file is read and written sequentially
+  - concept: differential-testing
+    where: You check your sort against the real sort with the locale pinned to C, on the word list and on tiny files.
+    explain_back:
+      prompt: Your sort matches your own expected outputs but differs from the real sort on one word list. Explain what such
+        a comparison catches, and what must be fixed on both sides for it to mean anything.
+      rubric:
+        - id: e1
+          point: The real sort gives the right answer for any input, including cases you did not think of
+        - id: e2
+          point: Your own expected outputs can share your own mistake about the order
+        - id: e3
+          point: Both runs must use the same locale, such as LC_ALL=C, and the same input bytes, or differences mean nothing
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Sort lines in byte order
-    summary: Read lines from a file or a pipe, compare them byte by byte, and check the result against the real sort.
-    concepts: [lexicographic-order, stdin-vs-file, differential-testing]
+    summary: Read lines from a file or a pipe, sort them in byte order, and check against the real sort.
     steps:
-      - title: First difference decides
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A file holds four lines: pear, apple, cherry and banana. After sorting, on which line of the output does
-            cherry appear? Answer with one number.
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              All four lines start with different letters, so the first letter decides: a for apple, b for banana, c
-              for cherry and p for pear. The output is apple, banana, cherry, pear, and cherry is third. Proof script
-              output: 3.
-        build:
-          prompt: >-
-            Make your tool read the file named on the command line, split it into lines and print them in sorted
-            order, one per line. Build the word list from the challenge's sample text, as the page describes, and run
-            your tool on it.
+      - title: Read and sort lines
+        minutes: 45
+        build: Read the file named on the command line, split it into lines, sort them comparing bytes, and print them. Build
+          the word list from the challenge's sample text as the page describes.
+        outcome: Your output on the word list, piped into uniq and head -5, prints A, ACTUAL, AGREE, AGREEMENT and AND, the
+          same as the real sort with LC_ALL=C.
+        concepts:
+          - lexicographic-order
         hints:
-          hint: Look only at the first letter of each word, and put the four words in alphabetical order.
-          example: >-
-            The lines owl, eel and gnu sort to eel, gnu, owl, because e, g and o are already different and decide the
-            order at once.
-
-      - title: Capitals and byte order
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A file holds banana, Cherry with a capital C, and apple. You sort it with the locale set to C, so letters
-            are compared by their byte values. On which line of the output does Cherry appear? Answer with one number.
-          key:
-            match: number_exact
-            expected: 1
-            derivation: >-
-              In ASCII every capital letter has a smaller byte value than every small letter: capital C is 67, small a
-              is 97 and small b is 98. So Cherry comes before apple and banana, and is first. A dictionary-style locale
-              such as en_US would put it last instead. Proof script output: 1.
-        build:
-          prompt: >-
-            Compare lines by their bytes. Piping your output through uniq and taking the first five lines should give
-            A, ACTUAL, AGREE, AGREEMENT and AND, which is what the real sort gives on the word list with the locale set
-            to C. If your system sort prints something else, set LC_ALL to C when you run it.
+          hint: Compare at the first position where two lines differ. Which line comes first when one is a prefix of the other?
+      - title: Byte order versus your locale
+        minutes: 30
+        build: Run the real sort on the word list under LC_ALL=C and under your usual UTF-8 locale, and compare.
+        outcome: Your notes show where the two orders differ and why, and your tool matches the C order.
+        concepts:
+          - locale-settings
+          - lexicographic-order
         hints:
-          hint: Look up the number stored for a capital C and for a small a in an ASCII table, and compare them.
-          example: >-
-            In a team list sorted by shirt number, Zed wearing 3 comes before Amy wearing 10. The stored number
-            decides the order, not where the name falls in the alphabet.
-
-      - title: Read lines from a file or a pipe
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A first version reads all of its input, splits it at every newline and sorts the pieces. The input is
-            pear, a newline, fig and a newline. How many lines does it print, counting any blank line? Answer with one
-            number.
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              Splitting at both newlines gives three pieces: pear, fig and an empty piece after the last newline. The
-              empty piece sorts first, so the output is a blank line, fig and pear, 3 lines. The real sort prints only
-              2, because a final newline ends the last line instead of starting a new one. Proof script output: 3.
-        build:
-          prompt: >-
-            Read standard input when no file name is given, using the same code for both. Do not invent an empty last
-            line when the input ends with a newline, and still print the last line, followed by a newline, when the
-            input does not end with one.
+          hint: Look at where capitals and lowercase words land in each run.
+      - title: Files and pipes
+        minutes: 30
+        build: Read standard input when no file is given, using the same code, without inventing an empty last line and
+          without losing a last line that has no newline.
+        outcome: Piping the word list into your sort gives exactly the same output as naming the file, and a file without a
+          final newline prints its last line followed by a newline.
+        concepts:
+          - stdin-vs-file
         hints:
-          hint: Count the pieces you get when you cut the text at each newline, including whatever is after the last one.
-          example: >-
-            Slicing a loaf with the last cut right at the very end still leaves a piece after that cut, one that
-            simply has no bread in it.
-
-      - title: Compare two lines
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This compare routine is meant to match the real sort with the locale set to C. It returns a negative
-            number when a goes first and a positive one when b goes first. Find the two problems.
-          snippet: |-
-            compare(a, b):
-                n = min(length(a), length(b))
-                for i from 0 to n - 1:
-                    x = lowercase(a[i])
-                    y = lowercase(b[i])
-                    if x < y: return -1
-                    if x > y: return 1
-                return 0
-          rubric:
-            - id: p1
-              point: "When one line is the start of the other, such as car and cart, it returns equal, but the shorter line should come first"
-            - id: p2
-              point: "The fix for that is to compare the lengths after the loop, so the line that ran out first sorts first"
-            - id: p3
-              point: "Lowercasing the letters is not byte order: Apple and apple become equal and capitals no longer come first, so it should compare the raw byte values"
-        build:
-          prompt: >-
-            Write a check that runs the real sort, with the locale set to C, and your tool on the word list and on a
-            few tiny files, including an empty file and a file with no final newline, and reports any difference.
+          hint: Test the empty file and the one-line file without a newline first.
+      - title: Compare with the real sort
+        minutes: 30
+        build: Write a check that runs the real sort with LC_ALL=C and your tool on the word list and on a few tiny files, and
+          reports any difference.
+        outcome: The check reports no differences, including on an empty file and a file with no final newline.
+        concepts:
+          - differential-testing
         hints:
-          hint: Try the routine on car and cart, then on Apple and apple, and see what it returns each time.
-          example: >-
-            In a dictionary, the word in comes before inside, because in runs out first while the two still agree.
-    teach_back:
-      prompt: >-
-        Explain how your sort decides which of two lines goes first, where it reads its lines from, and how you know its
-        output matches the real sort.
-      rubric:
-        - id: t1
-          concept: lexicographic-order
-          point: "Lines are compared from the left and the first differing byte decides, a line that is a prefix of another goes first, and in byte order capitals come before small letters, while a locale can order them differently"
-        - id: t2
-          concept: stdin-vs-file
-          point: "With a file name it reads that file, with none it reads standard input, and the same line-splitting code serves both"
-        - id: t3
-          concept: differential-testing
-          point: "It runs the real sort with the locale fixed to C and its own tool on the same inputs, including edge cases, and compares the outputs"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Set the locale inside the check, not in your shell.
   - title: Unique lines
-    summary: Remove duplicate lines with -u, and decide whether to do it before, during or after sorting.
-    concepts: [unix-pipelines, time-space-complexity, hash-functions]
+    summary: See why uniq needs sorted input, add -u, and decide where duplicates are removed.
     steps:
-      - title: Why uniq needs sort
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A file holds pear, fig, pear and fig, one per line. You pipe it straight into uniq without sorting first.
-            How many lines does uniq print? Answer with one number.
-          key:
-            match: number_exact
-            expected: 4
-            derivation: >-
-              uniq only drops a line that is the same as the line just before it. No two neighbours here are equal, so
-              nothing is dropped and all 4 lines come out. Sorting first gives fig, fig, pear, pear, and uniq then
-              prints 2. Proof script output: 4.
-        build:
-          prompt: >-
-            Run the real sort and uniq in a pipeline on the word list, then run uniq on its own, and count the lines of
-            each with wc -l to see the difference for yourself.
+      - title: Why uniq needs sort, and -u
+        minutes: 45
+        build: Count the lines of the word list through sort and uniq, and through uniq alone. Then add -u so duplicates are
+          printed once.
+        outcome: Your notes hold both counts and why they differ, and your -u output starts with A, ACTUAL, AGREE, AGREEMENT
+          and AND and matches the real sort -u.
+        concepts:
+          - unix-pipelines
         hints:
-          hint: uniq looks at each line and the one right before it, nothing further back.
-          example: >-
-            A bouncer who only checks whether you look like the person directly ahead of you in the queue will let in
-            twins who are standing apart.
-
-      - title: Drop duplicates with -u
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A file holds pear, fig, pear, Fig with a capital F, and fig. Your tool sorts it with -u, comparing bytes as
-            with the locale set to C. How many lines does it print? Answer with one number.
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              In byte order Fig and fig are different lines, so they are not duplicates. Sorted, the input is Fig, fig,
-              fig, pear, pear, and keeping one of each run gives Fig, fig and pear, 3 lines. Proof script output: 3.
-        build:
-          prompt: >-
-            Add the -u option so duplicate lines are printed only once. With the locale set to C, the first five
-            lines of your output on the word list should be the same five as in the first milestone: A, ACTUAL, AGREE,
-            AGREEMENT and AND.
-        hints:
-          hint: Decide first which of the five lines count as the same line when bytes are compared, then count the groups.
-          example: >-
-            A guest list that treats Sam and sam as two different names will print both of them, even after removing
-            repeats.
-
+          hint: What does uniq compare each line with?
       - title: Where to remove duplicates
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            To save work, this version removes duplicates before sorting by remembering what it has seen. It is fast,
-            but on a huge input it sometimes loses a line that was not a duplicate. Find the problem and the fix.
-          snippet: |-
-            seen = empty set
-            kept = empty list
-            for line in lines:
-                h = hash(line)
-                if h not in seen:
-                    add h to seen
-                    append line to kept
-            print_all(sort(kept))
-          rubric:
-            - id: p1
-              point: "It remembers only the hash, and two different lines can have the same hash, so the second line is dropped as if it were a duplicate"
-            - id: p2
-              point: "The fix is to store the lines themselves in the set, or to compare the full lines whenever two hashes match"
-            - id: p3
-              point: "Removing duplicates after sorting needs no set at all, because equal lines are then next to each other and one pass comparing neighbours is enough"
-        build:
-          prompt: >-
-            Pick where your tool removes duplicates: before sorting with a set, while sorting, or after sorting by
-            comparing neighbours. Write down what each choice costs in time and memory, and how easily it would carry
-            over to new options such as ignoring case.
+        minutes: 30
+        build: "Choose where your tool removes duplicates: before sorting with a set, during sorting, or after sorting by
+          comparing neighbours."
+        outcome: Your notes compare the time and memory of the three choices on a large file, and the choice you made passes
+          the -u tests.
+        concepts:
+          - time-space-complexity
         hints:
-          hint: What does a hash promise about two lines that are different, and what does it not promise?
-          example: >-
-            Sorting coats in a cloakroom by ticket colour alone works until two guests get tickets of the same colour.
-    teach_back:
-      prompt: >-
-        Explain why sort and uniq are used together, where your -u option removes duplicates, and what your choice costs
-        compared with the other ways of doing it.
-      rubric:
-        - id: t1
-          concept: unix-pipelines
-          point: "uniq only removes duplicates that are next to each other, so sort must run first to bring equal lines together, and -u builds that same pipeline into one tool"
-        - id: t2
-          concept: time-space-complexity
-          point: "Removing duplicates after sorting is one extra pass with almost no extra memory, while a set before sorting needs memory that grows with the number of distinct lines but leaves fewer lines to sort"
-        - id: t3
-          concept: hash-functions
-          point: "A hash set finds repeats without sorting, because equal lines always hash the same, but different lines can collide, so the full lines must be compared"
-
-  # ------------------------------------------------------------------------------------------
+          hint: How much memory does each choice need for a file of mostly distinct lines?
   - title: Choose the algorithm
-    summary: Let the user pick merge sort, quicksort, heapsort or radix sort, and see where each one shines or fails.
-    concepts: [sorting-algorithms, time-space-complexity, unit-tests-first]
+    summary: Offer several algorithms behind one option, all held to the same test suite.
     steps:
-      - title: Stable sorting
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A stable sort compares lines with case ignored, so A and a count as equal, and B and b count as equal. The
-            input is b, A, a, B, in that order. In which position of the output does the capital B end up? Answer with
-            one number.
-          key:
-            match: number_exact
-            expected: 4
-            derivation: >-
-              With case ignored the a group comes first and the b group second. A stable sort keeps each group in input
-              order: A came before a, and b came before B. The output is A, a, b, B, so B is fourth. The real sort
-              with -f and -s prints the same. Proof script output: 4.
-        build:
-          prompt: >-
-            Add an option that selects the sorting algorithm, and start with merge sort, which is stable. The page
-            notes that some versions of sort offer radix sort, merge sort, quicksort and heapsort, and you can add as
-            many of them as you like.
+      - title: Merge sort and a shared test suite
+        minutes: 60
+        build: Add an option that selects the sorting algorithm, starting with merge sort. Write first one test suite that
+          every algorithm must pass, plus a unit test that sorts records by a key.
+        outcome: "Merge sort passes the suite: empty input, one line, all lines equal, already sorted, reverse sorted and
+          duplicates with -u; and the key test shows records with equal keys keep their input order."
+        concepts:
+          - sorting-algorithms
+          - sort-stability
+          - unit-tests-first
         hints:
-          hint: Split the four lines into the a group and the b group, and keep each group in the order it arrived.
-          example: >-
-            A queue at a counter that serves families together still lets each family keep its own order, first come
-            first served within the family.
-
-      - title: Quicksort on sorted input
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A quicksort always picks the first line of a group as its pivot, compares every other line in the group
-            with it once, and then sorts the smaller and larger lines the same way. It is given five lines that are
-            already sorted: ant, bee, cat, dog and eel. How many comparisons with a pivot does it make in total? Answer
-            with the total.
-          key:
-            match: number_exact
-            expected: 10
-            derivation: >-
-              With sorted input the first line is always the smallest, so every split leaves nothing on one side. The
-              groups shrink from 5 to 4 to 3 to 2 lines, costing 4, 3, 2 and 1 comparisons, so 10 in total. That is
-              the square-shaped worst case; a pivot that splits evenly would do far fewer on large inputs. Proof script
-              output: 10.
-        build:
-          prompt: >-
-            Add quicksort and choose the pivot so that sorted or reverse-sorted input does not hit the worst case, for
-            example a random line or the middle of three. Time it against merge sort on the word list, and on the word
-            list after it has already been sorted.
+          hint: Write the tests so they never mention which algorithm is running.
+      - title: Quicksort and its worst case
+        minutes: 45
+        build: Add quicksort, choosing the pivot so that sorted or reverse-sorted input does not hit the worst case.
+        outcome: Quicksort passes the whole suite, and timings on the word list and on the already sorted word list stay close
+          to merge sort's; your notes say what a first-item pivot would do.
+        concepts:
+          - sorting-algorithms
+          - time-space-complexity
         hints:
-          hint: After the first split, how many lines are smaller than ant, and how many are left to sort?
-          example: >-
-            Picking the shortest person in a room as the dividing line every time means each round only removes that
-            one person from the rest.
-
-      - title: Unique lines inside a merge
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This merge step joins two sorted lists, each already free of duplicates, and is meant to drop lines that
-            appear in both. Find the two problems.
-          snippet: |-
-            merge_unique(left, right):
-                out = empty list
-                i = 0
-                j = 0
-                while i < length(left) and j < length(right):
-                    if left[i] < right[j]:
-                        append left[i] to out
-                        i = i + 1
-                    else if left[i] > right[j]:
-                        append right[j] to out
-                        j = j + 1
-                    else:
-                        append left[i] to out
-                        i = i + 1
-                return out
-          rubric:
-            - id: p1
-              point: "On equal lines it moves past the left one only, so the same line from the right list is appended next and the duplicate stays; it should move past both"
-            - id: p2
-              point: "When one list runs out the loop stops, and the lines still left in the other list are never added to the output"
-            - id: p3
-              point: "Unit tests with a line in both lists and with lists of different lengths, written before the code, would catch both problems"
-        build:
-          prompt: >-
-            Make -u work with every algorithm you offer, either inside the algorithm or as a pass afterwards. Write one
-            set of unit tests that every algorithm must pass, covering an empty input, one line, all lines equal,
-            already sorted, reverse sorted and duplicates with -u.
+          hint: Time the already sorted input with a first-item pivot once, to see the problem.
+      - title: Heapsort and radix sort
+        minutes: 45
+        build: Optionally add heapsort and radix sort and run them through the same suite.
+        outcome: Every algorithm you offer passes the suite, and your notes hold a timing table on the word list.
+        concepts:
+          - sorting-algorithms
+          - time-space-complexity
         hints:
-          hint: Trace it on left holding fig and pear and right holding fig, and write down what comes out.
-          example: >-
-            Merging two class lists by name, a student on both lists should be written once, and when one list ends
-            the rest of the other list still has to be copied over.
-
-      - title: Sorting without comparing
-        minutes: 10
-        think:
-          kind: explain
-          prompt: >-
-            Radix sort never compares two lines with each other. How can it still put lines in order, and when would
-            it beat merge sort?
-          rubric:
-            - id: p1
-              point: "It puts lines into buckets by one character position at a time, for example by first byte and then the next, so the order comes from the bucket order"
-            - id: p2
-              point: "Its work grows with the total number of characters rather than with n log n comparisons, so it wins on many short keys or keys with a small alphabet"
-            - id: p3
-              point: "It loses its edge on long lines that share long prefixes, and it needs extra memory for the buckets"
-        build:
-          prompt: >-
-            Optionally add heapsort and radix sort, run them all on the word list through the same tests, and compare
-            their running times.
-        hints:
-          hint: Think of how a post office sorts letters into pigeonholes by the first letter of the town, then the next.
-          example: >-
-            Sorting a pile of exam papers by the first letter of the surname into 26 trays never needs two papers to
-            be compared with each other.
-    teach_back:
-      prompt: >-
-        Explain how you would choose between the algorithms your tool offers for a given input, and how you make sure
-        they all give the same answers.
-      rubric:
-        - id: t1
-          concept: sorting-algorithms
-          point: "Merge sort is stable, so equal lines keep their input order, quicksort can be unstable and degrade on unlucky pivots, heapsort is not stable, and radix sort avoids comparisons"
-        - id: t2
-          concept: time-space-complexity
-          point: "Merge sort and heapsort take order n log n time in the worst case, quicksort can take order n squared, merge sort needs extra memory for the lists it merges while heapsort needs almost none"
-        - id: t3
-          concept: unit-tests-first
-          point: "One set of tests, written before the algorithms, with edge cases such as empty input, equal lines, sorted input and duplicates, is run against every algorithm"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Radix sort looks at the keys byte by byte instead of comparing whole lines.
   - title: Random order and very large files
-    summary: Shuffle lines while keeping equal ones together, test output that changes every run, and sort a file bigger than memory.
-    concepts: [hash-functions, differential-testing, external-sorting]
+    summary: Shuffle with a seeded hash, and sort a file bigger than memory.
     steps:
-      - title: Random sort keeps equal lines together
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your -R option picks a new random seed each run, hashes every line with it, and sorts by the hash. The
-            input is fig, pear, fig and kiwi. However many times you run it, how many lines end up between the two fig
-            lines? Answer with one number.
-          key:
-            match: number_exact
-            expected: 0
-            derivation: >-
-              The same line always gives the same hash for a given seed, so both figs get the same key and sort next to
-              each other. The seed moves the group around, but nothing can sit between them, so 0. The proof tries 500
-              seeds; the real sort -R kept the figs together in every run tried. Proof script output: 0.
-        build:
-          prompt: >-
-            Add the -R option: choose a random seed each run, hash every line with it, and sort by the hash, using the
-            line itself to break ties. It should work with -u too. Your output will differ from the five sample lines
-            on the page, and from one run to the next.
+      - title: Random sort with a seeded hash
+        minutes: 45
+        build: "Add -R: choose a random seed each run, hash every line with it, sort by the hash and break ties with the line.
+          Make it work with -u."
+        outcome: Two runs usually give different orders, sorting your -R output gives exactly the real sort's output, and
+          equal lines are always next to each other.
+        concepts:
+          - hash-functions
         hints:
-          hint: For one run with one seed, what do two identical lines have in common once they are hashed?
-          example: >-
-            Shuffling a deck by giving each card a random sticker, but giving every copy of the same card the same
-            sticker, keeps the copies side by side.
-
-      - title: A broken shuffle
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            Someone implements random sort by handing the sort a compare routine that answers at random. Find the
-            problems.
-          snippet: |-
-            random_compare(a, b):
-                return random_choice(-1, 1)
-
-            print_all(sort(lines, random_compare))
-          rubric:
-            - id: p1
-              point: "The answers are not consistent, the same pair can be compared twice and get opposite answers, so the sort may misbehave and some orders come out far more often than others"
-            - id: p2
-              point: "Two equal lines are not treated as equal, so they can end up far apart, which breaks the rule that equal lines stay together"
-            - id: p3
-              point: "The fix is to give each line one random key, such as a hash with a seed chosen for the run, and sort by that key"
-        build:
-          prompt: >-
-            Test -R without comparing against a fixed output: check that two runs usually differ, that sorting your -R
-            output gives exactly what the real sort gives, and that equal lines are always next to each other.
-        hints:
-          hint: Ask the same routine twice about the same two lines. Is it allowed to change its mind?
-          example: >-
-            A referee who flips a coin every time two runners are compared could rank Ann ahead of Ben, Ben ahead of
-            Cal and Cal ahead of Ann, and no finishing order fits all three.
-
+          hint: Test the properties, not a fixed output.
       - title: Sorting a file bigger than memory
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A file is too big for memory, so your tool sorts it in pieces and writes four sorted runs to temporary
-            files. It then merges the four runs into the final output, always writing the smallest line it can see
-            next. At most, how many lines does the merge need to hold in memory at once? Answer with one number.
-          key:
-            match: number_exact
-            expected: 4
-            derivation: >-
-              Each run is already sorted, so the next output line is always one of the four front lines. The merge
-              keeps the front line of each run, writes the smallest, and reads the next line from that run, so it
-              never holds more than 4 lines, however long the runs are. Proof script output: 4.
-        build:
-          prompt: >-
-            Optionally, give your tool a memory limit: read the input in chunks that fit, sort each chunk and write it
-            to a temporary file, then merge the files. Check the result against the real sort on a large generated file.
+        minutes: 60
+        build: "Optionally give your tool a memory limit: sort chunks that fit, write each to a temporary file, then merge
+          them."
+        outcome: With a limit far below the file size, your output on a large generated file is identical to the real sort's,
+          and memory stays under the limit.
+        concepts:
+          - external-sorting
         hints:
-          hint: When every run is already in order, where in each run can the next smallest line be?
-          example: >-
-            Three teachers each hold a stack of exam papers sorted by name. To build one sorted pile, the next paper
-            is always on top of one of the stacks, so you never dig further down.
-    teach_back:
-      prompt: >-
-        A colleague wants to shuffle a 50 GB log file with your tool while keeping repeated lines together. Explain how
-        the tool would cope with the size, how the shuffle works, and how you would test it.
-      rubric:
-        - id: t1
-          concept: external-sorting
-          point: "It sorts chunks that fit in memory, writes each sorted chunk to disk, then merges the chunks while holding only the front line of each"
-        - id: t2
-          concept: hash-functions
-          point: "The shuffle sorts by a hash of each line with a seed chosen for the run, so equal lines get equal keys and stay together, and a new seed gives a new order"
-        - id: t3
-          concept: differential-testing
-          point: "The output differs every run, so it is tested by properties against the real sort: the same lines come out, sorting them gives the real sort's output, and equal lines are adjacent"
+          hint: During the merge, how many lines do you need in memory at once?

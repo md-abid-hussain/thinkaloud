@@ -1,21 +1,19 @@
-# Coding Challenges, Build your own code comment remover.
-# Source: https://codingchallenges.fyi/challenges/challenge-code-comment-remover
-# Written in our own words. The page has no level tag, so level is left empty.
-# Every predict and trace key is proven by content/proofs/challenge-code-comment-remover.mjs.
+# Coding Challenges, Build your own code comment remover. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-code-comment-remover . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-code-comment-remover
   title: Build your own code comment remover
   source_url: https://codingchallenges.fyi/challenges/challenge-code-comment-remover
-  level:
+  level: null
   status: generated
   figure:
     kind: states
-  summary: >-
-    A command-line tool that reads a source file in Python, JavaScript, C, C++ or Go and writes it back with the
+  summary: A command-line tool that reads a source file in Python, JavaScript, C, C++ or Go and writes it back with the
     comments removed and the code unchanged, while keeping the comments that tools rely on, such as Go doc comments
     and linter or build directives.
   requirements:
@@ -25,397 +23,293 @@ project:
     - Keep Go doc comments that sit directly above a top-level declaration, and remove the other Go comments
     - Keep tool and linter directives, such as noqa in Python and go:generate or go:build in Go
     - The cleaned program must behave exactly like the original
-  restate_rubric:
-    - id: r1
-      point: "The tool reads source code and writes it back with the comments removed and the code unchanged"
-    - id: r2
-      point: "It handles Python hash comments and the line and block comments of JavaScript, C, C++ and Go"
-    - id: r3
-      point: "It keeps comments that tools read, such as Go doc comments and linter or build directives"
-  reflection_prompt: >-
-    In your own words, how does your tool tell a comment from the same characters inside a string, and what would
-    you change to support another language?
   primer:
-    what: >-
-      A comment is a note for people inside a program's source code, and the computer skips it. In Python a comment
+    what: A comment is a note for people inside a program's source code, and the computer skips it. In Python a comment
       starts with a hash and runs to the end of the line. JavaScript, C, C++ and Go use two slashes for a comment to
       the end of the line, and a slash followed by a star to open a block comment that a star followed by a slash
       closes, possibly many lines later. You will build a command-line tool that reads a source file and writes it
       back with the comments taken out and the code untouched.
-    why: >-
-      Stripping comments is the smallest useful job of a lexer, the same first step that compilers, minifiers and
-      code formatters take. It also shows that the same character can mean different things depending on where it
-      appears.
-    example: >-
-      Take a JavaScript line that sets a total to zero and then has two slashes and the words start empty. The tool
-      keeps everything before the slashes, drops the slashes and the note, and trims the spaces left at the end of
-      the line, so only the code that sets the total remains. A line that held nothing but a comment disappears.
+    why: Stripping comments is the smallest useful job of a lexer, the same first step that compilers, minifiers and code
+      formatters take. It also shows that the same character can mean different things depending on where it appears.
+    example: Take a JavaScript line that sets a total to zero and then has two slashes and the words start empty. The tool
+      keeps everything before the slashes, drops the slashes and the note, and trims the spaces left at the end of the
+      line, so only the code that sets the total remains. A line that held nothing but a comment disappears.
     words:
       - term: comment
         meaning: A note inside source code that the language ignores when it runs or compiles the program.
       - term: line comment
-        meaning: A comment that starts with a marker, a hash in Python or two slashes in C-style languages, and ends at the end of the line.
+        meaning: A comment that starts with a marker, a hash in Python or two slashes in C-style languages, and ends at the
+          end of the line.
       - term: block comment
         meaning: A comment that opens with slash star and closes with star slash, and can cover part of a line or many lines.
       - term: string literal
         meaning: Text written between quote marks inside code, such as a message the program prints.
       - term: lexer
-        meaning: A program that reads source code character by character and splits it into pieces such as code, strings and comments.
+        meaning: A program that reads source code character by character and splits it into pieces such as code, strings and
+          comments.
       - term: directive
         meaning: A comment that a tool reads as an instruction, for example telling a linter to skip a line.
-
+  restate_rubric:
+    - id: r1
+      point: The tool reads source code and writes it back with the comments removed and the code unchanged
+    - id: r2
+      point: It handles Python hash comments and the line and block comments of JavaScript, C, C++ and Go
+    - id: r3
+      point: It keeps comments that tools read, such as Go doc comments and linter or build directives
+  reflection_prompt: In your own words, how does your tool tell a comment from the same characters inside a string, and
+    what would you change to support another language?
+  reference_tool: "The original program itself: build or run it next to the cleaned copy and compare. Each language's
+    own compiler or interpreter, and its linter, do the checking."
+  done_when: Comments are removed from the challenge's Python, JavaScript, C, C++ and Go examples and your own samples;
+    strings, character literals and escapes are never touched; Go doc comments and tool directives survive; and every
+    cleaned sample builds and behaves exactly like the original. Your notes explain the scanner's states and why a
+    single pattern is not enough.
+  open_checks:
+    - Whether your JavaScript samples contain regular-expression literals, which can include slashes, and how your
+      scanner should treat them.
+    - Whether your C samples use line continuations with a trailing backslash, which can extend a line comment onto
+      the next line.
+    - Exactly which Go comments count as doc comments inside a grouped declaration block.
+    - What to do with a line that becomes empty after its comment is removed.
+learning_map:
+  - concept: lexer-states
+    where: Your scanner walks the source once and keeps a state, such as in code, in a string, in a line comment or in a
+      block comment, so a comment marker counts only in the right state.
+    explain_back:
+      prompt: A teammate strips comments with a find-and-replace on two slashes, and a line holding a web address inside a
+        string gets cut in half. Explain why, and how a scanner with states avoids it.
+      rubric:
+        - id: e1
+          point: Comment markers such as two slashes or a hash can appear inside strings, so a plain search cannot tell a
+            comment from string content
+        - id: e2
+          point: A scanner keeps a state, such as code, string, line comment or block comment, and changes state only on the
+            characters that matter in the current state
+        - id: e3
+          point: In the string state comment markers are ordinary characters, and the string ends only at its own closing quote
+        - id: e4
+          point: The scanner reads the file once from start to end, so what came before always decides what a character means
+  - concept: string-escapes
+    where: A backslash before a quote keeps a string open, and Python's triple-quoted strings can span lines, so the
+      scanner must understand escapes to know where a string really ends.
+    explain_back:
+      prompt: One line of code has a string that contains an escaped quote, followed by a real comment after the string.
+        Explain how a scanner that ignores escapes gets this line wrong, and what rule it needs.
+      rubric:
+        - id: e1
+          point: Without the escape rule the escaped quote looks like the end of the string, so the scanner treats the rest of
+            the string as code and the real comment as part of a new string
+        - id: e2
+          point: Inside a string, a backslash means the next character belongs to the string, so the scanner skips over it
+        - id: e3
+          point: Two backslashes in a row are one literal backslash, so a quote right after them does close the string
+        - id: e4
+          point: Triple-quoted strings end only at three matching quotes, and may contain line breaks and comment markers
+  - concept: lexical-analysis
+    where: "Each language defines its own tokens: Python has hash comments and triple quotes, C has character literals in
+      single quotes and preprocessor lines, JavaScript has template strings, and Go has raw strings."
+    explain_back:
+      prompt: Your Python comment remover works perfectly, and a colleague runs it on a C file. Explain why it damages the
+        file, and what has to change for each language.
+      rubric:
+        - id: e1
+          point: In C a hash starts a preprocessor line, such as an include, so treating it as a comment deletes real code
+        - id: e2
+          point: C comments use two slashes and slash-star pairs, which the Python rules do not know
+        - id: e3
+          point: Single quotes mean a character literal in C but a string in Python, so the rules for quotes differ too
+        - id: e4
+          point: Each language needs its own rules for strings and comments, chosen from the file extension or an option
+  - concept: regex-matching
+    where: A regular expression is tempting for stripping comments, but it cannot follow strings and escapes reliably. It
+      is the right tool later, on comment text the scanner has already found, to spot directives.
+    explain_back:
+      prompt: Explain why a single regular expression cannot reliably remove comments from source code, and give one place
+        in this tool where a regular expression is the right choice.
+      rubric:
+        - id: e1
+          point: "Whether a marker starts a comment depends on everything before it: open strings, escapes and open block
+            comments"
+        - id: e2
+          point: A pattern applied line by line cannot remember that state, so it ends up matching inside strings or across the
+            end of one string and the start of another
+        - id: e3
+          point: Patterns are fine for small, regular jobs, such as recognising a directive like noqa or go:build in the text of
+            a comment the scanner has already identified
+  - concept: meaningful-comments
+    where: "Some comments are read by tools, not people: Go doc comments above declarations, build constraints, generate
+      directives and linter suppressions. Removing them changes how the program is built or checked."
+    explain_back:
+      prompt: After running your tool, a Go project fails to build on one operating system, and the linter suddenly reports
+        many warnings. Explain which comments your tool should have kept and how it can recognise them.
+      rubric:
+        - id: e1
+          point: Build constraints such as go:build decide which files are compiled on which platform, so removing them breaks
+            builds
+        - id: e2
+          point: Linter directives such as noqa or nolint switch off specific warnings, so removing them brings the warnings
+            back
+        - id: e3
+          point: Doc comments directly above a top-level declaration feed documentation tools
+        - id: e4
+          point: They are recognised by position, directly above a declaration with no blank line between, and by an exact
+            directive pattern at the start of the comment
+  - concept: differential-testing
+    where: The cleaned program must behave exactly like the original, so you compile or run both and compare their output.
+    explain_back:
+      prompt: Explain how you can check, without reading every file by hand, that removing comments never changed what a
+        program does, and what kinds of mistakes this catches.
+      rubric:
+        - id: e1
+          point: Run or compile the original and the cleaned copy on the same inputs and compare their output and exit status
+        - id: e2
+          point: It catches code glued together when a comment between two words is removed without leaving a space
+        - id: e3
+          point: It catches string content that was deleted by mistake, and removed directives that change how the program
+            builds
+        - id: e4
+          point: It checks cases you never wrote a test for, because the original program is the reference
+  - concept: unit-tests-first
+    where: "The rules for Go doc comments are subtle, so you write one test per rule before the code: a one-line doc
+      comment, a three-line one, one separated by a blank line, and a directive."
+    explain_back:
+      prompt: The rules for which Go comments to keep have several edge cases. Explain why writing a test for each rule
+        before the code helps here, and list the cases you would start with.
+      rubric:
+        - id: e1
+          point: A test per rule pins down the intended behaviour before any code exists, fails until it is implemented, and
+            guards it from later changes
+        - id: e2
+          point: "Cases to keep: a one-line comment directly above a function, a group of comment lines above a type kept as a
+            whole, and a directive anywhere"
+        - id: e3
+          point: "Cases to remove: a comment group separated from its declaration by a blank line, and a comment inside a
+            function body"
+  - concept: stdin-vs-file
+    where: The tool reads a file named on the command line, or standard input when no name is given, and writes the
+      cleaned code to standard output, so it can sit in a pipeline.
+    explain_back:
+      prompt: Explain why a comment remover that reads standard input and writes standard output is easier to use in scripts
+        than one that edits files in place, and how a user still gets a cleaned copy of a file.
+      rubric:
+        - id: e1
+          point: Standard streams let it combine with other tools in a pipeline, such as feeding a formatter or a diff
+        - id: e2
+          point: Nothing is overwritten by accident, because the original file is never touched
+        - id: e3
+          point: The user redirects the output to a new file to keep a cleaned copy
+        - id: e4
+          point: Reading standard input means there is no file extension, so the language has to come from an option
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Python hash comments
-    summary: Remove Python comments, first with a pattern, then with a scanner that knows when it is inside a string.
-    concepts: [lexical-analysis, regex-matching, lexer-states]
+    summary: Strip Python comments, then replace pattern matching with a scanner that understands strings, escapes and
+      triple quotes.
     steps:
       - title: Strip a small Python file
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A Python file has three lines. The first holds only a comment. The second holds code followed by a
-            comment. The third holds code and no comment. Your tool removes every comment, trims the spaces left at
-            the end of a line, and drops a line completely when nothing is left on it. How many lines does the
-            cleaned file have? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The first line is only a comment, so nothing is left and it is dropped. The second line keeps its code
-              and loses the comment. The third line is unchanged. That leaves 2 lines. Python's tokenize module finds
-              the same 2 comments on the same input. Proof script output: 2.
-        build:
-          prompt: >-
-            Make your tool read a Python file named on the command line, or standard input when no name is given,
-            and write the code to standard output with every hash comment removed. Try it on the page's Python
-            example, a list built from a range with comments around it: only the line that builds the list should
-            remain. Then run it over Python files from the Coding Challenges shared solutions repository and check
-            that the cleaned files still run.
+        minutes: 30
+        build: Read a Python file named on the command line, or standard input when no name is given, and write the code to
+          standard output with every hash comment removed. Try it on the challenge's Python example.
+        outcome: The challenge's Python example comes out with its comments gone and its code unchanged, both from a file and
+          from standard input.
+        concepts:
+          - stdin-vs-file
+          - regex-matching
         hints:
-          hint: Go line by line and ask what is left on each one once the comment has gone.
-          example: >-
-            Crossing out the margin notes in a recipe leaves the steps in place, and a line that held only a note is
-            left blank, so you can remove it.
-
-      - title: Why one pattern is not enough
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This first version removes Python comments with one pattern per line. It works on most files but breaks
-            some programs. What goes wrong, and what is the fix?
-          snippet: |-
-            for line in read_lines(source):
-                cleaned = replace_pattern(line, "#.*", "")
-                write_line(trim_end(cleaned))
-          rubric:
-            - id: p1
-              point: "A hash inside a quoted string, such as a colour code or part of a web address, is not a comment, but the pattern cuts the line there and breaks the string"
-            - id: p2
-              point: "The fix is to walk the line character by character, remember whether it is inside a string, and only treat a hash found outside a string as the start of a comment"
-        build:
-          prompt: >-
-            Replace the pattern with a scanner that walks the source, tracks whether it is inside a single-quoted or
-            double-quoted string, and only removes from a hash that it finds outside a string. Test it on a line that
-            prints a colour code written with a hash.
+          hint: Start simple, then try a line where a hash sits inside a string and see what breaks.
+      - title: Scan instead of matching
+        minutes: 45
+        build: Replace the pattern with a scanner that walks the source, tracks whether it is inside a single-quoted or
+          double-quoted string, and removes text only from a hash found outside a string.
+        outcome: A line that prints a colour code containing a hash keeps its string intact, while a real comment after the
+          string is removed.
+        concepts:
+          - lexer-states
+          - regex-matching
         hints:
-          hint: Think of a line of Python where a hash appears but no comment does.
-          example: >-
-            In an email address the at sign is part of the address, while on a price board the same sign means each.
-            The surroundings decide what a symbol means.
-
-      - title: Track both kinds of quote
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A Python line assigns to msg a double-quoted string holding the words it's, a space, a hash and the word
-            fine. Then comes a plus sign and a single-quoted string holding just a hash. The line ends with two
-            spaces, a hash and the word note. Your scanner tracks single and double quotes correctly. How many hash
-            characters are left on the line after it removes the comment? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The apostrophe in it's sits inside a double-quoted string, so it does not open a new string, and the
-              hash after it is text. The single-quoted string holds the second hash, also text. Only the third hash is
-              in code, and it starts the comment. So 2 hash characters remain. Python's tokenize module agrees.
-              Proof script output: 2.
-        build:
-          prompt: >-
-            Handle a backslash before a quote mark, which keeps the string open, and triple-quoted strings, which can
-            run over several lines and may contain hash characters. Docstrings are strings, not comments, so leave
-            them in.
+          hint: List your states first, and for each state, which characters change it.
+          example: A proofreader reading aloud stops treating punctuation as instructions while reading a quotation, and picks
+            up again at the closing quote mark.
+      - title: Escapes and triple quotes
+        minutes: 45
+        build: Handle a backslash before a quote, which keeps a string open, and triple-quoted strings, which can run over
+          several lines and contain hash characters. Leave docstrings in, because they are strings.
+        outcome: Strings with escaped quotes, strings ending in two backslashes, and triple-quoted strings with hash
+          characters over several lines all come through unchanged.
+        concepts:
+          - string-escapes
+          - lexer-states
         hints:
-          hint: Inside a double-quoted string, which quote mark is the only one that can end it?
-          example: >-
-            A remark in round brackets is not closed by a square bracket that appears inside it. Only the matching
-            kind of bracket ends it.
-    teach_back:
-      prompt: >-
-        Explain why searching each line for a hash removes too much, and how your tool decides which hash characters
-        start a comment.
-      rubric:
-        - id: t1
-          concept: regex-matching
-          point: "A pattern such as a hash followed by anything matches wherever a hash appears, so it cannot tell a comment from a hash inside a string"
-        - id: t2
-          concept: lexer-states
-          point: "The tool remembers whether it is in code or inside a string, and only a hash met while in code starts a comment, which then runs to the end of the line"
-        - id: t3
-          concept: lexical-analysis
-          point: "The tool reads the source as a series of pieces, code, strings and comments, and writes every piece back unchanged except the comments"
-
-  # ------------------------------------------------------------------------------------------
+          hint: What should the scanner do with the character right after a backslash?
   - title: Slash comments in JavaScript, C and C++
-    summary: Remove line and block comments, carry the scanner's state across lines, and check the cleaned program still behaves the same.
-    concepts: [lexer-states, word-state-machine, differential-testing]
+    summary: Add line and block comments, character literals, and make sure removing a comment never glues code together.
     steps:
       - title: Line and block comments
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A JavaScript file has four lines. Line one is a block comment that opens and closes on that line. Line
-            two stores the web address https colon slash slash example dot com in a double-quoted string, then has
-            two slashes and the words home page. Line three stores a file pattern, src slash star dot js, in a
-            double-quoted string. Line four sets a counter to zero, then has two slashes and the word counter. How
-            many comments does the file contain? Answer with one number.
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              Line one is a block comment. The two slashes in the web address and the slash star in the file pattern
-              are inside strings, so they are text. The two slashes after the address and after the counter start
-              real line comments. That is 1 + 1 + 1 = 3. A tool that ignored strings would also cut the address and
-              would open a block comment at the file pattern that swallows the rest of the file. Proof script output: 3.
-        build:
-          prompt: >-
-            Add JavaScript: remove line comments that start with two slashes and block comments from slash star to
-            star slash, and leave strings in single quotes, double quotes and backticks alone. Run it on the page's
-            JavaScript example, a factorial function with a block comment above it and line comments inside it: the
-            function should come out with its code unchanged and no comments left.
+        minutes: 45
+        build: "Add JavaScript: remove line comments that start with two slashes and block comments from slash-star to
+          star-slash, leaving strings in single quotes, double quotes and template quotes alone."
+        outcome: The challenge's JavaScript example comes out without comments, and strings in all three quote styles that
+          contain comment markers are untouched.
+        concepts:
+          - lexical-analysis
+          - lexer-states
         hints:
-          hint: Mark every pair of slashes and every slash star, then cross out the ones that sit between quote marks.
-          example: >-
-            A news story that quotes someone saying stop here does not tell the reader to stop. Quoted words are part
-            of the text.
-
+          hint: Which characters can end each kind of comment, and which states can a comment start from?
       - title: Block comments across lines
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            A C file has five lines. Line one declares x. Line two declares y, then opens a block comment with slash
-            star and the words the next value. Line three holds only the words is set below. Line four starts with
-            the words in one step, closes the comment with star slash, and then declares z. Line five returns the
-            sum. A buggy tool scans each line on its own and starts every line in the code state. How many lines of
-            its output still contain words from the comment? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              On line two the comment opens and the buggy tool removes the rest of that line, which is correct by
-              luck. Line three starts in the code state, so is set below is kept as if it were code. Line four also
-              starts in the code state, so in one step and the star slash are kept. Lines three and four leak comment
-              text, so 2. Proof script output: 2.
-        build:
-          prompt: >-
-            Carry the scanner's state from one line to the next, or scan the whole file as one stream, so a block
-            comment can open on one line and close several lines later. Decide what to do with lines that a block
-            comment leaves empty, and check that the code after the comment still starts where it should.
+        minutes: 30
+        build: Carry the scanner's state from one line to the next, or scan the whole file as one stream, so a block comment
+          can open on one line and close several lines later. Decide what to do with lines a comment leaves empty.
+        outcome: A block comment that opens on one line and closes three lines later is removed completely, and your notes
+          state your rule for empty lines.
+        concepts:
+          - lexer-states
         hints:
-          hint: Write down the state the tool is in at the start of line three, and the state it should be in.
-          example: >-
-            Someone reading a long quotation that runs over a page break has to remember on the new page that they
-            are still inside the quotation.
-
+          hint: Does your state survive the end of a line?
       - title: Character literals in C
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            In C a single character is written between single quotes, and that character can be a double quote. A C
-            file has two lines. Line one stores a double quote character between single quotes, then has two slashes
-            and the words a double quote. Line two sets n to zero, then has two slashes and the words a counter. A
-            scanner knows double-quoted strings, treats single quotes as ordinary characters, and ends any open
-            string at the end of a line. How many comments does it remove? Answer with one number.
-          key:
-            match: number_exact
-            expected: 1
-            derivation: >-
-              On line one the scanner skips the single quote as ordinary, then sees the double quote and thinks a
-              string has started. Everything after it on the line, including the two slashes, is treated as string
-              text, until the end of the line closes it. Line two is read correctly and its comment is removed. So 1
-              comment is removed instead of 2. Proof script output: 1.
-        build:
-          prompt: >-
-            Add C and C++: the same two comment styles, plus character literals in single quotes, which can hold a
-            quote mark or a backslash escape. Run it on the page's C example, a factorial function with an assert
-            and comments about checking validity, the base case and the other cases: the assert and every line of
-            code must survive. Compile the original and the cleaned file and check that both give the same results.
+        minutes: 45
+        build: "Add C and C++: the same two comment styles, plus character literals in single quotes, which can hold a quote
+          mark or a backslash escape. Leave preprocessor lines alone."
+        outcome: The challenge's C example comes out without comments, character literals holding a quote or a backslash are
+          untouched, and include lines survive.
+        concepts:
+          - lexical-analysis
+          - string-escapes
         hints:
-          hint: Follow the scanner from the left of line one and note the moment it believes a string has started.
-          example: >-
-            A proofreader who thinks every apostrophe opens a quotation loses track in a sentence about the dog's
-            bone and the cat's bowl.
-
+          hint: Why must a single quote mean something different in C than in Python?
       - title: Do not glue code together
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This routine removes block comments from C and JavaScript. Strings are handled elsewhere. Running the
-            original and the cleaned program shows different behaviour on some files. Find the two problems and say
-            how to fix each.
-          snippet: |-
-            out = ""
-            while not at_end(src):
-                if peek(src, 2) == "/*":
-                    skip_past(src, "*/")
-                else:
-                    out = out + next_char(src)
-            return out
-          rubric:
-            - id: p1
-              point: "Deleting a comment that sits between two words with no spaces, such as a type name and a variable name, glues them into one word. Replacing the comment with a single space keeps them apart"
-            - id: p2
-              point: "A block comment that spans lines is removed together with its line breaks, so code from two lines ends up on one. That shifts line numbers in error messages, and in JavaScript a line break can change meaning, for example right after return, so the line breaks should be kept"
-        build:
-          prompt: >-
-            Replace each removed block comment with a single space, or with the line breaks it contained, and add
-            tests where a comment sits between two words with no spaces and where one spans lines. Compile or run
-            the original and the cleaned versions on the same inputs and compare their outputs.
+        minutes: 45
+        build: Replace each removed block comment with a single space, or with the line breaks it contained, and compile or
+          run the original and the cleaned version of every sample.
+        outcome: For every sample, including a block comment between two words with no spaces, the original and cleaned
+          versions build and give identical output.
+        concepts:
+          - lexical-analysis
+          - differential-testing
         hints:
-          hint: Try it on a declaration where the comment is the only thing between the type and the name.
-          example: >-
-            Cutting a sticker off a page that was the only thing between two words makes the words run into each
-            other. Leaving a gap the size of a space keeps them readable.
-    teach_back:
-      prompt: >-
-        Explain how your tool finds comments in JavaScript and C when comment markers can also appear inside strings
-        and block comments can run over many lines, and how you would show that the cleaned program still behaves
-        the same.
-      rubric:
-        - id: t1
-          concept: lexer-states
-          point: "The scanner is always in one context, such as code, string, character literal, line comment or block comment, and two slashes or slash star only start a comment when it is in code"
-        - id: t2
-          concept: word-state-machine
-          point: "The context is remembered from one line to the next, so a block comment stays open until its star slash, the way a word counter keeps its inside-a-word state across chunks"
-        - id: t3
-          concept: differential-testing
-          point: "Compile or run the original and the cleaned program on the same inputs and compare the outputs, with the original acting as the reference"
-
-  # ------------------------------------------------------------------------------------------
+          hint: What does the compiler see if a comment between two names simply disappears?
   - title: Comments that must stay
-    summary: Support Go, keep its doc comments, and keep the directives that linters and build tools read.
-    concepts: [meaningful-comments, regex-matching, unit-tests-first]
+    summary: "Keep the comments tools rely on: Go doc comments and build, generate and linter directives."
     steps:
       - title: Go doc comments
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A Go file holds five comments. One sits directly above the package line. One is followed by a blank line
-            and then a type declaration. One sits directly above a top-level function. One is inside that function's
-            body, directly above an indented var declaration. One is at the end of the line that returns the result.
-            Using the page's rule for doc comments, how many of the five does your tool keep? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              A doc comment sits directly above a top-level package, const, func, type or var declaration with no
-              blank line between. The comment above the package line and the one above the top-level function
-              qualify. The one before the type has a blank line in between, the var inside the function body is not
-              at the top level, and the one at the end of the return line is not above any declaration. So 2. Proof
-              script output: 2.
-        build:
-          prompt: >-
-            Add Go, which uses the same comment markers as C plus raw strings in backticks. Keep doc comments, the
-            comments directly above a top-level package, const, func, type or var declaration with no blank line in
-            between, and remove every other comment. Check by running go doc on the package before and after
-            cleaning: the output should be identical.
+        minutes: 60
+        build: Add Go, which uses C's comment markers plus raw strings. Write a test for each rule first, then keep doc
+          comments, the comment lines directly above a top-level declaration with no blank line between, as a whole
+          group, and remove every other comment.
+        outcome: Your tests for a one-line doc comment, a three-line one, one separated by a blank line and one inside a
+          function body all pass.
+        concepts:
+          - meaningful-comments
+          - unit-tests-first
         hints:
-          hint: For each comment, ask whether the very next line is a declaration at the top level of the file.
-          example: >-
-            A label names the jar it is stuck to. A label lying on the shelf next to a gap, or one stuck on something
-            inside the jar, does not name the jar.
-
-      - title: Find the whole doc comment
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This code decides which Go comment lines are doc comments. It drops parts of some doc comments and keeps
-            some comments it should remove. Find the two problems and say how to fix each.
-          snippet: |-
-            for i in range(len(lines)):
-                if is_comment(lines[i]):
-                    next = trim(line_after(lines, i))
-                    if starts_with_any(next, ["package", "const", "func", "type", "var"]):
-                        keep(lines[i])
-                    else:
-                        drop(lines[i])
-          rubric:
-            - id: p1
-              point: "A doc comment can be several comment lines in a row, and only the last one is directly above the declaration, so the earlier lines are dropped. The whole run of comment lines should be kept or removed together"
-            - id: p2
-              point: "Trimming the next line makes an indented declaration inside a function look like a top-level one, so a comment inside a function body is kept. The declaration should have to start at the beginning of the line"
-        build:
-          prompt: >-
-            Treat a run of comment lines with nothing between them as one group, and keep or remove the whole group.
-            Write a test for each rule before the code: a one-line doc comment, a three-line one, one separated from
-            its declaration by a blank line, and one inside a function body.
-        hints:
-          hint: Try it on a doc comment that is three lines long, and on a comment inside a function body.
-          example: >-
-            A caption that runs over three lines belongs to the photo below it, all three lines, not only the line
-            touching the photo.
-
+          hint: Treat a run of comment lines with nothing between them as one group, and decide for the whole group.
       - title: Keep tool directives
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Across two files there are five comments, and none of them sits directly above a declaration. In Python,
-            a noqa comment naming one rule sits at the end of a line that assigns a lambda, and a full-line comment
-            says tidy this later. In Go, one comment is two slashes followed directly by go:build ignore, one is two
-            slashes followed directly by go:generate and a command, and one is two slashes, a space, and then
-            go:generate. In Go a directive has no space between the slashes and the tool name. How many of the five
-            comments does your tool keep? Answer with one number.
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              The noqa comment tells the flake8 linter to skip a rule on that line, so it stays. The go:build and
-              go:generate comments are directives that the Go tools read, so they stay. The tidy note is for people,
-              and the comment with a space before go:generate is not a directive, because Go only recognises a
-              directive written with no space, so both are removed. That keeps 3. Proof script output: 3.
-        build:
-          prompt: >-
-            Keep linter and build directives: in Python, noqa comments, as in the page's lambda example, and in Go,
-            directives such as go:generate and go:build ignore. Recognise them with a precise pattern applied only to
-            comment text your scanner has already found, never to the raw line. Run your earlier Python, JavaScript
-            and C tests again to check nothing else changed.
+        minutes: 45
+        build: Keep linter and build directives, such as noqa in Python and go:generate and go:build in Go. Recognise them
+          with a precise pattern applied only to comment text your scanner has already found.
+        outcome: Directives survive in every sample, a cleaned Go sample still builds for the same platforms, and the linter
+          reports the same warnings before and after cleaning.
+        concepts:
+          - meaningful-comments
+          - regex-matching
+          - differential-testing
         hints:
-          hint: Sort the five into notes meant for people and instructions meant for tools.
-          example: >-
-            A sticker on a parcel saying fragile is an instruction to the courier, while one saying happy birthday is
-            for the person. Peeling off every sticker loses the instruction.
-    teach_back:
-      prompt: >-
-        Explain which comments your tool keeps and why removing them would change things, how it recognises them,
-        and how you make sure that adding these rules did not break the earlier languages.
-      rubric:
-        - id: t1
-          concept: meaningful-comments
-          point: "Go doc comments become the package documentation, and directives such as noqa, go:generate and go:build change what a linter checks or what gets built, so removing them changes more than the look of the file"
-        - id: t2
-          concept: regex-matching
-          point: "Directives are recognised with a precise pattern, such as two slashes directly followed by a lowercase tool name and a colon, applied only to comments the scanner has already found"
-        - id: t3
-          concept: unit-tests-first
-          point: "Each new rule gets a small failing test written first, and the tests for earlier languages stay and run again, so a new rule cannot silently break them"
+          hint: Apply the pattern to the comment's text, never to the whole line.

@@ -1,13 +1,9 @@
-# Coding Challenges, Build your own grep.
-# Source: https://codingchallenges.fyi/challenges/challenge-grep
-# Written in our own words. The source page is linked, not copied.
-# The page offers an easy route, using the language's regular expression library, and a hard route, writing your
-# own matching engine. Every step works for both: the think tasks test the idea, and no step requires an engine.
-# Every predict and trace key is proven by content/proofs/challenge-grep.mjs and was cross-checked with GNU grep 3.0
-# and wc in Git Bash on the same tiny inputs.
+# Coding Challenges, Build your own grep. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-grep . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-grep
@@ -17,10 +13,9 @@ project:
   status: generated
   figure:
     kind: match
-  summary: >-
-    A command-line tool that prints the lines of files or piped text that match a pattern, with digit and word
-    classes, start and end anchors, recursive search, inverted and case-insensitive matching, and the same exit
-    status as grep. Use your language's regex library, or write your own matching engine.
+  summary: A command-line tool that prints the lines of files or piped text that match a pattern, with digit and word
+    classes, start and end anchors, recursive search, inverted and case-insensitive matching, and the same exit status
+    as grep. Use your language's regex library, or write your own matching engine.
   requirements:
     - Print every line of the input that matches the pattern, where an empty pattern matches every line
     - Exit with status 0 when a line was printed, 1 when none was, and 2 on an error such as a missing file
@@ -28,29 +23,16 @@ project:
     - Print the lines that do not match with -v, and ignore case with -i
     - Support a digit class, a word class, and anchors for the start and end of a line
     - Read standard input when no file name is given, so the tool works after a pipe
-  restate_rubric:
-    - id: r1
-      point: "The tool prints the lines that match a pattern, from files, a folder tree or a pipe"
-    - id: r2
-      point: "It supports classes such as any digit, anchors for the start and end of a line, -v to invert and -i to ignore case"
-    - id: r3
-      point: "Its exit status says whether anything matched or an error happened, so scripts can act on it"
-  reflection_prompt: >-
-    In your own words, how does your grep decide that a line matches, and what would change if you swapped the
-    regex library for an engine you wrote yourself, or the other way round?
   primer:
-    what: >-
-      grep reads text one line at a time and prints the lines that contain a match for a pattern. The pattern is a
+    what: "grep reads text one line at a time and prints the lines that contain a match for a pattern. The pattern is a
       regular expression: plain letters match themselves, and a few special signs stand for a whole class of
       characters or for a position such as the start of a line. You will build a version that can search a folder
-      tree, invert the search, ignore case, and tell a script through its exit status whether anything matched.
-    why: >-
-      Searching logs, code and data for lines of a certain shape is an everyday programming job, and grep's exit
-      status lets scripts decide what to do next. Writing one also shows how pattern matching works underneath.
-    example: >-
-      A file holds three lines: Rome, Paris and Oslo. Searching it for the letter s prints Paris and Oslo, because a
-      line is printed when the pattern appears anywhere in it, at the start, the middle or the end. Rome has no s, so
-      it is left out.
+      tree, invert the search, ignore case, and tell a script through its exit status whether anything matched."
+    why: Searching logs, code and data for lines of a certain shape is an everyday programming job, and grep's exit status
+      lets scripts decide what to do next. Writing one also shows how pattern matching works underneath.
+    example: "Picture three lines of text: Rome, Paris and Oslo. Searching it for the letter s prints Paris and Oslo,
+      because a line is printed when the pattern appears anywhere in it, at the start, the middle or the end. Rome has
+      no s, so it is left out."
     words:
       - term: pattern
         meaning: The regular expression grep looks for in each line.
@@ -64,326 +46,272 @@ project:
         meaning: A small number a program hands back when it ends, which scripts read to learn how it went.
       - term: recursive search
         meaning: Searching every file in a folder, then every file in each folder inside it, all the way down.
-
+  restate_rubric:
+    - id: r1
+      point: The tool prints the lines that match a pattern, from files, a folder tree or a pipe
+    - id: r2
+      point: It supports classes such as any digit, anchors for the start and end of a line, -v to invert and -i to ignore
+        case
+    - id: r3
+      point: Its exit status says whether anything matched or an error happened, so scripts can act on it
+  reflection_prompt: In your own words, how does your grep decide that a line matches, and what would change if you
+    swapped the regex library for an engine you wrote yourself, or the other way round?
+  reference_tool: GNU grep, with the locale fixed (for example LC_ALL=C.UTF-8). For backslash classes use a grep that
+    understands them, such as GNU grep with its Perl-style option.
+  done_when: Matching, the empty pattern, exit statuses, -r, -v, -i, both classes, both anchors and piped input match
+    the reference on the challenge's files; the comparison check reports no differences; and your notes explain, in
+    your own words, why some regex engines can take exponential time and yours does or does not.
+  open_checks:
+    - Which regex dialect your reference grep uses by default, and how it treats a backslash d and a backslash w.
+    - Whether the reference follows symbolic links with -r, and what it prints for an unreadable folder.
+    - What the reference prints as the file name for piped input when several sources are searched.
+    - How the reference treats binary files during -r.
+learning_map:
+  - concept: regex-matching
+    where: grep prints every line in which the pattern matches somewhere. On the hard route you build the matcher
+      yourself, as a small state machine over the line.
+    explain_back:
+      prompt: A log search tool scans gigabytes of logs for a pattern in seconds. Explain how a regular expression can be
+        turned into something that checks a line by reading each character once.
+      rubric:
+        - id: e1
+          point: "A regular expression can be turned into a finite automaton: states joined by transitions labelled with
+            characters"
+        - id: e2
+          point: Matching reads the line one character at a time while keeping the set of states the automaton could be in
+        - id: e3
+          point: That set is never bigger than the number of states, so the work grows only with the length of the text times
+            the size of the pattern
+  - concept: regex-backtracking
+    where: How your matcher tries alternatives decides whether some patterns finish instantly or never. Comparing your
+      grep with the real one on a nasty pattern shows the difference.
+    explain_back:
+      prompt: A firewall rule containing a pattern with two wildcard repetitions next to each other pinned every processor
+        of a large company's servers for half an hour. Explain how a regex can do that, and what kind of engine is
+        immune.
+      rubric:
+        - id: e1
+          point: A backtracking engine tries one way to match, and on failure backs up and tries the next way
+        - id: e2
+          point: Nested or adjacent repetition gives it exponentially many ways to split a line that almost matches, and it
+            tries them all before failing
+        - id: e3
+          point: An automaton-based engine tracks all possible states at once and reads each character once, so its time stays
+            linear in the input
+  - concept: line-endings
+    where: grep works line by line, so it must agree with the real grep on a last line without a newline and on Windows
+      line endings.
+    explain_back:
+      prompt: A pattern anchored with a dollar sign at the end of a line matches on Linux but finds nothing in a file that
+        came from Windows. Explain why.
+      rubric:
+        - id: e1
+          point: Windows files end each line with a carriage return before the newline
+        - id: e2
+          point: A line-oriented tool removes only the newline, so the carriage return is still the last character of the line
+        - id: e3
+          point: The end anchor sits after the carriage return, so a pattern expecting the last letter there does not match
+  - concept: cli-subcommands
+    where: "grep reports through its exit status: 0 when a line was printed, 1 when none was, and 2 on an error such as a
+      missing file."
+    explain_back:
+      prompt: A deployment script runs grep for the word ERROR in a log and aborts when grep succeeds. One day the log file
+        is missing and the deploy goes ahead anyway. Explain what grep should have returned in each case and how the
+        script should test it.
+      rubric:
+        - id: e1
+          point: Status 0 means a line matched, 1 means no line matched, and 2 means something went wrong, such as a missing
+            file
+        - id: e2
+          point: Treating every non-zero status as no errors found mixes up a clean log with an unreadable one
+        - id: e3
+          point: The script should check for status 2 separately, and grep prints the reason on standard error
+  - concept: recursive-file-walk
+    where: With -r your grep walks a folder tree and prints the path of each file before its matching lines.
+    explain_back:
+      prompt: Your recursive search over a home folder never finishes, and on another machine it stops halfway with a
+        permission error. Explain both, and how a tree walker should behave.
+      rubric:
+        - id: e1
+          point: A symbolic link that points back up the tree makes the walk loop for ever unless links are skipped or visited
+            folders are remembered
+        - id: e2
+          point: An unreadable folder should give a message on standard error, and the walk should carry on with the rest
+        - id: e3
+          point: The order in which entries are listed is not guaranteed, so output that must be stable has to be sorted
+  - concept: stdin-vs-file
+    where: With no file name, grep reads standard input, so the second grep in a pipeline works on the first one's output.
+    explain_back:
+      prompt: Explain how one line loop serves both files and piped input, and why grep prints a file name before each line
+        only in some cases.
+      rubric:
+        - id: e1
+          point: Files and standard input are both streams of lines read until the end, so the same matching loop serves both
+        - id: e2
+          point: With one source the file name adds nothing, so it is printed only when several files are searched or -r is used
+        - id: e3
+          point: Piped input has no name, so it is reported as standard input when a name is needed
+  - concept: unix-pipelines
+    where: "grep -r piped into grep -v shows tools composing: each one only filters the lines it receives."
+    explain_back:
+      prompt: grep -r Nirvana piped into grep -v Madonna leaves one line. Explain what each stage sees, and what the exit
+        status of the whole pipeline tells a script.
+      rubric:
+        - id: e1
+          point: The first grep prints matching lines with their paths, and the second sees only those lines as its input
+        - id: e2
+          point: grep -v prints the lines that do not match, so it removes the ones that also mention Madonna
+        - id: e3
+          point: A pipeline's exit status is normally the last command's, so a script that cares about an earlier stage must
+            check it separately
+  - concept: case-folding
+    where: -i makes grep ignore case. Beyond English letters the rules get subtle, and your grep has to agree with the
+      reference.
+    explain_back:
+      prompt: A case-insensitive search for straße finds STRASSE in one tool and not in another, and an application
+        lowercasing user names with a Turkish locale breaks a login. Explain both.
+      rubric:
+        - id: e1
+          point: Simple case folding maps one character to one character, but full folding turns ß into ss, so only full folding
+            matches STRASSE
+        - id: e2
+          point: In Turkish the capital of i is a dotted İ and the lowercase of I is a dotless ı, so case mapping depends on the
+            language
+        - id: e3
+          point: Case-insensitive matching is therefore a choice of rules, and a tool should say which one it uses
+  - concept: streaming-constant-memory
+    where: grep reads, tests and prints one line at a time, so it can search files far larger than memory.
+    explain_back:
+      prompt: Explain why grep can search a 50 GB log on a laptop, and what kind of input would still make its memory grow.
+      rubric:
+        - id: e1
+          point: It keeps only the current line and the compiled pattern, and discards each line after testing it
+        - id: e2
+          point: Nothing from earlier lines is needed, so memory does not grow with the size of the file
+        - id: e3
+          point: A file with one enormous line, such as a minified data dump, makes the current line itself huge
+  - concept: differential-testing
+    where: The last step compares your grep with a pinned reference on the same patterns and files, including exit statuses.
+    explain_back:
+      prompt: Your own tests for classes and anchors pass, but a comparison with the real grep finds differences. Explain
+        what such a comparison catches, and why the comparison must pin the regex dialect and locale.
+      rubric:
+        - id: e1
+          point: The reference gives the right answer for inputs you did not think to write tests for
+        - id: e2
+          point: Different greps read backslash classes differently, for example Git Bash's grep treats a backslash d as a plain
+            d unless its Perl-style option is used
+        - id: e3
+          point: The locale changes what counts as a letter or a digit and how case is folded, so both runs must use the same
+            one
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Matching lines
-    summary: Print the lines that match a plain pattern or an empty one, and report the result through the exit status.
-    concepts: [regex-matching, line-endings, cli-subcommands]
+    summary: Print matching lines one at a time, handle the empty pattern, and report results through the exit status.
     steps:
       - title: Find a letter
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A file holds three lines: cat, cow and dog. How many lines does grep print when the pattern is the
-            letter o?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              A line is printed when the pattern appears anywhere in it. cow and dog each contain an o, cat does not,
-              so 2 lines are printed. GNU grep piped into wc -l gives 2. Proof script output: 2.
-        build:
-          prompt: >-
-            Make your grep take a pattern and a file name and print every line that contains the pattern. With the
-            pattern J, rockbands.txt should give Judas Priest, Bon Jovi and Junkyard. On the easy route, hand the
-            pattern to your language's regex library. On the hard route, start an engine that matches plain letters.
+        minutes: 45
+        build: Make your grep take a pattern and a file and print every line that contains it, reading one line at a time. On
+          the easy route, use your language's regex library; on the hard route, start an engine that matches plain
+          letters.
+        outcome: grep J rockbands.txt prints Judas Priest, Bon Jovi and Junkyard, the same as the real grep.
+        concepts:
+          - regex-matching
+          - streaming-constant-memory
         hints:
-          hint: Look at each line on its own and ask whether the letter is anywhere in it.
-          example: >-
-            Searching a guest list for the letter z picks out every name with a z in it, wherever the z sits.
-
-      - title: The empty pattern
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A file holds the letter a, a newline, and the letter b, with no newline after the b, so wc -l on the file
-            reports 1. You run grep with an empty pattern on the file and pipe its output into wc -l. What does wc
-            report?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              An empty pattern fits at the start of any line, so both a and b are printed. grep writes a newline after
-              every line it prints, including the last one that had none in the file, so the output holds 2 newlines
-              and wc -l reports 2. GNU grep piped into wc -l gives 2. Proof script output: 2.
-        build:
-          prompt: >-
-            Make an empty pattern match every line. Running grep with an empty pattern on test.txt and comparing the
-            output with test.txt using diff should print nothing at all. Then try a file with no final newline on
-            your grep and the real one, and make them agree.
+          hint: Test the pattern anywhere in the line, not only at the start.
+      - title: The empty pattern and line endings
+        minutes: 30
+        build: Make an empty pattern match every line, and check a file with no final newline and a file with Windows line
+          endings.
+        outcome: grep with an empty pattern on test.txt, compared with test.txt using diff, prints nothing, and your grep
+          agrees with the real grep on both special files.
+        concepts:
+          - regex-matching
+          - line-endings
         hints:
-          hint: Does a pattern with nothing in it fit inside the line b? Then look at what grep writes after each line it prints.
-          example: >-
-            A sieve with no mesh lets everything through. Asking whether nothing appears in a word is always
-            answered yes.
-
+          hint: Does every line contain the empty string? What exactly is a line in each file?
       - title: Exit status
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            rockbands.txt has no line containing zebra, and missing.txt does not exist. What exit status does grep
-            return for a search for zebra in rockbands.txt, and what for the same search in missing.txt?
-          key:
-            match: numbers_all
-            expected: [1, 2]
-            derivation: >-
-              grep returns 0 when it printed at least one line, 1 when it read everything and found no match, and 2
-              when something went wrong, such as a file that cannot be opened. The first search finds nothing, so 1.
-              The second cannot open the file, so 2, with a message on the error stream. GNU grep returns 1 and 2.
-              Proof script output: [1, 2].
-        build:
-          prompt: >-
-            Return exit status 0 when a line matched, 1 when none did, and 2 on an error, with the error message on
-            the error stream. Check each case by printing the exit status straight after running your grep, for
-            example after the search for J in rockbands.txt, which should report 0.
+        minutes: 30
+        build: Return 0 when a line matched, 1 when none did, and 2 on an error, with the message on standard error.
+        outcome: Printing the exit status after each run shows 0 for J in rockbands.txt, 1 for a pattern that is not there,
+          and 2 for a missing file, matching the real grep.
+        concepts:
+          - cli-subcommands
         hints:
-          hint: There are three outcomes, not two. Which of them is each search?
-          example: >-
-            A librarian asked for a book can say here it is, we do not have it, or the catalogue is broken. Not
-            having the book is not the same as being unable to look.
-    teach_back:
-      prompt: >-
-        Explain how your grep decides which lines to print for a plain pattern and for an empty one, how it treats
-        the ends of lines, and how a script calling it can tell what happened.
-      rubric:
-        - id: t1
-          concept: regex-matching
-          point: "A line is printed when the pattern fits starting at some position in it, so a plain letter can match anywhere and an empty pattern matches every line"
-        - id: t2
-          concept: line-endings
-          point: "It splits the input into lines at newlines, matches each line without its newline, and writes a newline after every printed line, even a last line that had none"
-        - id: t3
-          concept: cli-subcommands
-          point: "Exit status 0 means a line matched, 1 means none did, and 2 means an error such as a missing file, reported on the error stream"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Run the real grep in each case first and write down the three statuses.
   - title: Files, folders and pipes
-    summary: Search a folder tree with file name prefixes, invert the match, and read from a pipe.
-    concepts: [recursive-file-walk, stdin-vs-file, unix-pipelines]
+    summary: Walk a folder tree, invert the match, and read from a pipe.
     steps:
       - title: Search a folder tree
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            Your current folder holds a folder called sub. sub holds b.txt and a folder called deeper, and deeper holds
-            c.txt. Each file has one line containing x. You run grep -r x sub. Using forward slashes, what text comes
-            before the colon on the line printed from c.txt?
-          key:
-            match: text_ci
-            expected: sub/deeper/c.txt
-            derivation: >-
-              grep -r starts at the folder it was given and joins each name it walks through onto that path, so the
-              file is reached as sub, then deeper, then c.txt, and printed as sub/deeper/c.txt followed by a colon
-              and the line. GNU grep prints sub/deeper/c.txt:x. Proof script output: sub/deeper/c.txt.
-        build:
-          prompt: >-
-            Add -r. List a folder's entries, search each file, and walk into each subfolder the same way, printing the
-            path, a colon and the line for each match. From the test folder, grep -r Nirvana with a star for the file
-            names should print rockbands.txt:Nirvana and five lines from test-subdir/BFS1985.txt, each starting with
-            that path. Decide what to do with a folder you cannot read and with a link that leads back up the tree.
+        minutes: 60
+        build: "Add -r: list a folder's entries, search each file, and walk into each subfolder the same way, printing the
+          path, a colon and the line. Decide what to do with unreadable folders and links."
+        outcome: From the test folder, grep -r Nirvana with a star for the files prints rockbands.txt:Nirvana and the five
+          lines from test-subdir/BFS1985.txt, each starting with its path, as the real grep does apart from order.
+        concepts:
+          - recursive-file-walk
         hints:
-          hint: Follow the path grep builds as it walks down, starting from the name you gave it.
-          example: >-
-            Directions to a room in a building start from the entrance you named: east wing, second floor, room 12.
-            The room number alone does not say where it is.
-
+          hint: What stops your walker if a link points back to a folder it is already inside?
       - title: Invert the match
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A file holds five lines: apple, berry, an empty line, banana and cherry. How many lines does grep -v with
-            the pattern a print?
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              -v prints the lines where the pattern does not fit. apple and banana contain an a, so they are dropped.
-              berry, cherry and the empty line contain no a, and the empty line is still a line, so 3 are printed.
-              GNU grep piped into wc -l gives 3. Proof script output: 3.
-        build:
-          prompt: >-
-            Add -v to print the lines that do not match. Piping grep -r Nirvana with a star into grep -v Madonna
-            should leave only rockbands.txt:Nirvana, because every matching line from BFS1985.txt also mentions
-            Madonna. Make sure the exit status follows the lines printed, not the lines matched.
+        minutes: 30
+        build: Add -v to print the lines that do not match, with the exit status following the lines printed.
+        outcome: grep -r Nirvana with a star piped into grep -v Madonna leaves only rockbands.txt:Nirvana.
+        concepts:
+          - unix-pipelines
         hints:
-          hint: Go through the lines one by one, and do not skip the one that looks like nothing.
-          example: >-
-            A bouncer told to keep out everyone in red lets in the person in blue, the person in green, and the person
-            with no coat at all.
-
+          hint: Which lines does the second grep receive, and which does it print?
       - title: Read from a pipe
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This grep works when given one file, but goes wrong after a pipe and prints oddly for a single file. Find
-            the two problems and say how to fix them.
-          snippet: |-
-            pattern, names = parse_options(args)
-            status = 1
-            for name in names:
-                for line in read_lines(open_file(name)):
-                    if matches(pattern, line):
-                        print(name + ":" + line)
-                        status = 0
-            exit(status)
-          rubric:
-            - id: p1
-              point: "With no file names the loop never runs, so after a pipe it reads nothing, but it should read standard input"
-            - id: p2
-              point: "The fix is to use standard input as the source when no file is named and pass it to the same line loop"
-            - id: p3
-              point: "It puts the file name before every line even for a single file, but the prefix belongs only to searches over several files or with -r"
-        build:
-          prompt: >-
-            When no file name is given, read standard input with the same line loop, so the second grep in the
-            Nirvana and Madonna pipeline works. Print the file name prefix only when more than one file is searched
-            or -r is used.
+        minutes: 30
+        build: With no file name, read standard input through the same line loop, and print the file name prefix only when it
+          helps.
+        outcome: The Nirvana and Madonna pipeline gives the same output as the real grep, and a single searched file prints no
+          prefix.
+        concepts:
+          - stdin-vs-file
+          - unix-pipelines
         hints:
-          hint: In a pipeline, what does the second grep receive as its list of file names?
-          example: >-
-            A translator who only works from printed letters is no help on a phone call, even though the words are
-            the same.
-    teach_back:
-      prompt: >-
-        In grep -r Nirvana with a star, piped into grep -v Madonna, explain how the first grep finds its files, what
-        each grep reads, and what the second one sees.
-      rubric:
-        - id: t1
-          concept: recursive-file-walk
-          point: "The first grep lists each folder's entries, searches the files and walks into each subfolder the same way, putting the path before each printed line"
-        - id: t2
-          concept: stdin-vs-file
-          point: "The second grep is given no file names, so it reads standard input with the same line loop it uses for files"
-        - id: t3
-          concept: unix-pipelines
-          point: "The second grep only sees the first one's output lines, with their path prefix, and drops every line that contains Madonna"
-
-  # ------------------------------------------------------------------------------------------
+          hint: When is a file name useful in the output, and when is it noise?
   - title: Classes, anchors and case
-    summary: Match digit and word classes, anchor to the start or end of a line, ignore case, and compare against a reference.
-    concepts: [regex-matching, case-folding, differential-testing]
+    summary: Support digit and word classes, anchors and -i, then compare with a pinned reference, including a pattern
+      that explodes.
     steps:
       - title: Digit and word classes
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A file holds five lines: a plus sign, the word ok, two dashes, a single underscore, and a question mark.
-            How many lines does grep print for the word-character class, written as a backslash and a w?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The word class matches one letter, digit or underscore. ok is made of letters, and the underscore line
-              is itself a word character, so both are printed. The plus sign, the dashes and the question mark
-              are not word characters, so 2 lines. GNU grep piped into wc -l gives 2. Proof script output: 2.
-        build:
-          prompt: >-
-            Support the digit class, a backslash and a d, and the word class, a backslash and a w. On BFS1985.txt the
-            digit class should print five lines, each with a digit in it, and on symbols.txt the word class should
-            print the lines pound and dollar. The grep in Git Bash reads a backslash d as a plain d, so compare with
-            its Perl-style option instead. On the hard route, a class is a test on one character against a set.
+        minutes: 45
+        build: Support the digit class, a backslash and a d, and the word class, a backslash and a w. On the hard route, a
+          class is a test on one character against a set.
+        outcome: The digit class on BFS1985.txt prints five lines, and the word class on symbols.txt prints the lines pound
+          and dollar, matching a reference that understands these classes.
+        concepts:
+          - regex-matching
         hints:
-          hint: Check exactly which characters the word class includes. It is more than letters.
-          example: >-
-            A form that says letters only may still quietly accept one or two other symbols. Read the full list for
-            the word class rather than guessing from its name.
-
+          hint: "Check which reference you compare with: some greps need a Perl-style option for these classes."
       - title: Start and end anchors
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            A file holds four lines: Banana, nachos, Ana and banana split. How many lines does grep print for the
-            pattern n, a, then a dollar sign?
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The dollar sign pins the match to the end of the line, so the line must end in na. Banana and Ana do.
-              nachos only starts with na, and banana split has na in the middle but ends in split. That is 2 lines.
-              GNU grep piped into wc -l gives 2. Proof script output: 2.
-        build:
-          prompt: >-
-            Support a caret for the start of a line and a dollar sign for the end. On rockbands.txt, caret A should
-            print AC/DC, Aerosmith, Accept, April Wine and Autograph, and n, a, dollar should print Nirvana. On the
-            hard route, a pattern without a caret is tried at every start position in the line, and one with a caret
-            only at the first.
+        minutes: 45
+        build: Support a caret for the start of a line and a dollar sign for the end.
+        outcome: On rockbands.txt, caret A prints AC/DC, Aerosmith, Accept, April Wine and Autograph, and n, a, dollar prints
+          Nirvana.
+        concepts:
+          - regex-matching
         hints:
-          hint: Ask how each line ends, not whether na appears in it somewhere.
-          example: >-
-            A list of words that end in ing keeps singing and ring, but not ingot, even though ingot contains ing.
-
+          hint: An anchored pattern is tried at one position; an unanchored one at every position.
       - title: Ignore case
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A file holds ABBA, abba, Toto and a-ha, one per line. How many lines does grep print for the pattern A,
-            and how many when -i is added?
-          key:
-            match: numbers_all
-            expected: [1, 3]
-            derivation: >-
-              Without -i, A only matches a capital A, which only ABBA has, so 1 line. With -i, A and a count as the
-              same letter, so ABBA, abba and a-ha are printed, and Toto still has no a: 3 lines. GNU grep piped into
-              wc -l gives 1 and 3. Proof script output: [1, 3].
-        build:
-          prompt: >-
-            Add -i. grep A on rockbands.txt piped into wc -l should print 8, and with -i it should print 58. On the
-            hard route, compare characters in one common case, and make sure classes and anchors behave the same with
-            and without -i.
+        minutes: 30
+        build: Add -i, so that letters, classes and anchors behave the same with and without case.
+        outcome: grep A rockbands.txt piped into wc -l prints 8, and grep -i A prints 58, and your notes record what your -i
+          does with ß.
+        concepts:
+          - case-folding
         hints:
-          hint: Without -i, a capital letter and a small one are different characters. Check each line twice.
-          example: >-
-            A search for the name Smith that ignores case also finds SMITH and smith, but never Smyth.
-
+          hint: Compare in one common form of the letters, and decide which form.
       - title: Compare with the real grep
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            On the same file, your grep prints the lines with digits for a backslash d, but the grep in Git Bash
-            prints the lines containing the letter d. What does this tell you about checking your tool against a
-            reference, and how would you set up a comparison you can trust?
-          rubric:
-            - id: p1
-              point: "The tools read the pattern in different dialects, so a difference can come from the reference's version or mode rather than a bug in your code"
-            - id: p2
-              point: "Fix the reference and its mode, such as grep's Perl-style option or one regex library, so both read patterns the same way"
-            - id: p3
-              point: "Compare many small cases, including an empty pattern, an empty line and mixed case, checking both the printed lines and the exit status"
-        build:
-          prompt: >-
-            Write a check that runs your grep and a pinned reference on the same patterns and files, including the
-            empty pattern, anchors, both classes, -v and -i, and reports any difference in output or exit status. On
-            the hard route, run your engine against your language's regex library on many short patterns and lines.
+        minutes: 45
+        build: Write a check that runs your grep and a pinned reference on the same patterns and files, with the locale fixed,
+          comparing output and exit status. Include a pattern with nested repetition on a long line that almost
+          matches.
+        outcome: The check reports no differences on the normal patterns, and your notes record how long each grep takes on
+          the nested-repetition pattern.
+        concepts:
+          - differential-testing
+          - regex-backtracking
         hints:
-          hint: Before deciding which tool is wrong, ask whether both understood the pattern the same way.
-          example: >-
-            Two people reading the date 03/04 can both be right, one meaning March and the other April. Agree on the
-            format first, then compare the answers.
-    teach_back:
-      prompt: >-
-        Take the pattern caret, backslash w, backslash d, with -i. Explain how your grep decides whether a line such
-        as X7 matches, and how you would show that your matcher agrees with grep.
-      rubric:
-        - id: t1
-          concept: regex-matching
-          point: "The caret pins the match to the start of the line, so only the first position is tried, while a pattern without it is tried at every position"
-        - id: t2
-          concept: regex-matching
-          point: "Each class matches exactly one character from its set, so the line needs a word character followed by a digit, as X then 7"
-        - id: t3
-          concept: case-folding
-          point: "With -i the pattern and the line are compared in one common case, so capital and small letters count as the same, while digits and symbols are unchanged"
-        - id: t4
-          concept: differential-testing
-          point: "Run the same patterns and lines through a pinned reference, the real grep in a matching mode or a regex library, and compare outputs and exit statuses"
+          hint: Time both tools on a line of thirty letters a followed by one character that breaks the match.

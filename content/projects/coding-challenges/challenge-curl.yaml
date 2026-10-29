@@ -1,24 +1,19 @@
-# Coding Challenges, Build your own curl.
-# Source: https://codingchallenges.fyi/challenges/challenge-curl
-# Written in our own words. The source page is linked, not copied.
-# The page has no level tag, so level is left empty.
-# The page's verbose example does not show the Connection: close header that its previous step asks the tool to
-# send. No key depends on that.
-# Every predict and trace key is proven by content/proofs/challenge-curl.mjs.
+# Coding Challenges, Build your own curl. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-curl . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-curl
   title: Build your own curl
   source_url: https://codingchallenges.fyi/challenges/challenge-curl
-  level:
+  level: null
   status: generated
   figure:
     kind: net
-  summary: >-
-    A small curl that takes a URL on the command line, writes an HTTP/1.1 request by hand over a TCP socket, and
+  summary: A small curl that takes a URL on the command line, writes an HTTP/1.1 request by hand over a TCP socket, and
     prints the reply. It supports GET, DELETE, POST and PUT, request bodies and extra headers, and a verbose mode that
     shows what was sent and received.
   requirements:
@@ -28,347 +23,316 @@ project:
     - Print only the body by default, and the sent and received headers too with -v
     - Choose the method with -X, send a body with -d and add headers with -H
     - Send a Content-Length header with every body
-  restate_rubric:
-    - id: r1
-      point: "It is a command-line HTTP client that sends a request to the host named in a URL and prints the reply"
-    - id: r2
-      point: "It writes the HTTP text itself over a TCP connection instead of using an HTTP library"
-    - id: r3
-      point: "It supports GET, DELETE, POST and PUT, with a body, extra headers and a verbose mode chosen by options"
-  reflection_prompt: >-
-    In your own words, how does your tool turn a URL and a few options into bytes on a socket, and how does it know
-    the reply has ended? What would change if it had to keep the connection open for a second request?
   primer:
-    what: >-
-      curl is a command-line tool that sends a request to a web server and prints what comes back. HTTP/1.1 is plain
+    what: "curl is a command-line tool that sends a request to a web server and prints what comes back. HTTP/1.1 is plain
       text sent over a TCP connection: the client connects to a host and port, writes a request line, some header
       lines and an empty line, and the server writes back a reply of the same shape. You will build cccurl, which does
-      this by hand for the GET, DELETE, POST and PUT methods against a public test site.
-    why: >-
-      Every API call from a browser, an app or a script works this way underneath. Writing the request yourself shows
+      this by hand for the GET, DELETE, POST and PUT methods against a public test site."
+    why: "Every API call from a browser, an app or a script works this way underneath. Writing the request yourself shows
       what HTTP libraries hide: how a URL becomes a connection, how lines and an empty line shape a message, and how a
-      client knows a reply is complete.
-    example: >-
-      Given http://localhost:8080/status, cccurl reads the scheme http, the host localhost, the port 8080 and the path
-      /status. It connects to port 8080 on localhost and sends the request line GET /status HTTP/1.1, then a Host
-      header naming localhost and its port, then an Accept header, then an empty line. The server answers with a status
-      line such as HTTP/1.1 200 OK, its own headers, an empty line and the body.
+      client knows a reply is complete."
+    example: Given http://localhost:8080/status, cccurl reads the scheme http, the host localhost, the port 8080 and the
+      path /status. It connects to port 8080 on localhost and sends the request line GET /status HTTP/1.1, then a Host
+      header naming localhost and its port, then an Accept header, then an empty line. The server answers with a
+      status line such as HTTP/1.1 200 OK, its own headers, an empty line and the body.
     words:
       - term: URL
         meaning: An address made of a scheme such as http, a host name, an optional port and a path.
       - term: port
-        meaning: A number that picks which program on the host receives the connection. When a URL leaves it out, the scheme's usual port is used, which is 80 for http.
+        meaning: A number that picks which program on the host receives the connection. When a URL leaves it out, the scheme's
+          usual port is used, which is 80 for http.
       - term: request line
         meaning: The first line of a request, holding the method, the path and the HTTP version, separated by single spaces.
       - term: header
-        meaning: A line made of a name, a colon and a value, such as Host followed by the host name, that adds a detail to a message.
+        meaning: A line made of a name, a colon and a value, such as Host followed by the host name, that adds a detail to a
+          message.
       - term: method
-        meaning: The verb at the start of the request line, such as GET to read or DELETE to remove, saying what to do with the path.
+        meaning: The verb at the start of the request line, such as GET to read or DELETE to remove, saying what to do with
+          the path.
       - term: body
         meaning: The optional data that follows the empty line, such as the JSON a POST sends.
-
+  restate_rubric:
+    - id: r1
+      point: It is a command-line HTTP client that sends a request to the host named in a URL and prints the reply
+    - id: r2
+      point: It writes the HTTP text itself over a TCP connection instead of using an HTTP library
+    - id: r3
+      point: It supports GET, DELETE, POST and PUT, with a body, extra headers and a verbose mode chosen by options
+  reflection_prompt: In your own words, how does your tool turn a URL and a few options into bytes on a socket, and how
+    does it know the reply has ended? What would change if it had to keep the connection open for a second request?
+  reference_tool: The real curl, with -v to compare what is sent and received, against eu.httpbin.org.
+  done_when: cccurl sends correct GET, DELETE, POST and PUT requests by hand over a TCP socket, prints only the body by
+    default and the exchange with -v, reads replies framed by Content-Length, by chunks or by the connection closing,
+    rejects https with a clear message, and gives a non-zero exit status on failure; and your notes explain, in your
+    own words, what happens between typing a URL and seeing the reply.
+  open_checks:
+    - Whether eu.httpbin.org still answers plain HTTP on port 80, and which endpoints reply chunked.
+    - In which order your system's resolver returns IPv6 and IPv4 addresses for the same host.
+    - "Whether the server really closes the connection after the reply when you send Connection: close."
+    - Which output stream the real curl uses for its verbose lines.
+learning_map:
+  - concept: url-parsing
+    where: cccurl splits the URL from the command line into scheme, host, port and path, fills in port 80 and the path /
+      when they are missing, and refuses schemes it cannot speak.
+    explain_back:
+      prompt: Your tool is given http://example.com:8080/a b?x=1#top and, another time,
+        http://trusted.com@evil.example/login. Explain how each URL breaks into parts, which part is never sent to the
+        server, and why the second is a classic trick.
+      rubric:
+        - id: e1
+          point: The first has the scheme http, the host example.com, the port 8080, the path /a b, the query x=1 and the
+            fragment top
+        - id: e2
+          point: The space must be percent-encoded as %20 before it goes into the request line
+        - id: e3
+          point: The fragment after the hash stays in the client and is never sent
+        - id: e4
+          point: In the second, trusted.com is only user information before the at sign; the real host is evil.example
+  - concept: name-resolution
+    where: Before connecting, cccurl turns the host name into one or more IP addresses through the system resolver.
+    explain_back:
+      prompt: Your tool connects instantly on your laptop, but on a server it hangs for about 20 seconds before the reply
+        arrives. Explain what happens between having a host name and opening a socket, and a likely cause of the
+        delay.
+      rubric:
+        - id: e1
+          point: The name is turned into addresses by the system resolver, from the hosts file, a cache or a DNS query to a
+            recursive resolver
+        - id: e2
+          point: A name can have several addresses, both IPv6 and IPv4, and a client tries them one after another
+        - id: e3
+          point: If the first address is unreachable, for example IPv6 with no working route, the client waits for a connect
+            timeout before trying the next
+        - id: e4
+          point: Trying addresses in parallel or with short timeouts avoids the delay
+  - concept: tcp-sockets
+    where: cccurl opens a TCP connection to the host and port, writes the request bytes and reads the reply as a stream.
+    explain_back:
+      prompt: Explain what your tool does from the moment it has an IP address until the first byte of the reply arrives,
+        and what "connection refused" and a connect timeout each tell you.
+      rubric:
+        - id: e1
+          point: It opens a client socket and connects, which runs the TCP handshake and creates a two-way byte stream
+        - id: e2
+          point: It then writes the request bytes and reads whatever the server sends back
+        - id: e3
+          point: Connection refused means the host answered but nothing is listening on that port
+        - id: e4
+          point: A timeout means no answer came at all, for example a host that is down, a wrong address or a firewall that
+            drops the packets
+  - concept: http-message-format
+    where: You write the request line, the Host and Accept headers and the empty line by hand, with every line ending in a
+      carriage return and line feed, and read the status line and headers back.
+    explain_back:
+      prompt: Your hand-written request works with one server but gets 400 Bad Request from another. Explain the exact shape
+        of an HTTP/1.1 request, and two small mistakes that make strict servers reject it.
+      rubric:
+        - id: e1
+          point: A request line with the method, the path and the version separated by single spaces, then header lines, then an
+            empty line, then an optional body
+        - id: e2
+          point: Every line ends with a carriage return and a line feed, and HTTP/1.1 requires a Host header
+        - id: e3
+          point: Typical mistakes are bare line feeds, a missing empty line after the headers, a missing Host header or an
+            unencoded space in the path
+        - id: e4
+          point: Lenient servers accept these mistakes, so testing against one server is not enough
+  - concept: message-framing
+    where: "cccurl must know where the reply body ends: when the server closes the connection, after Content-Length bytes,
+      or at the last chunk."
+    explain_back:
+      prompt: "Without the Connection: close header, your tool prints the whole reply and then hangs. Explain why, and the
+        three ways an HTTP/1.1 client can tell that a body is complete."
+      rubric:
+        - id: e1
+          point: HTTP/1.1 keeps connections open by default, so a client that waits for the server to close waits until a
+            timeout
+        - id: e2
+          point: Content-Length gives the exact number of body bytes to read
+        - id: e3
+          point: A chunked body ends with a chunk of size zero
+        - id: e4
+          point: "Otherwise the body ends when the server closes the connection, which is what Connection: close asks for"
+  - concept: chunked-transfer-encoding
+    where: Some replies arrive as chunks of unknown total size, each preceded by its length in hexadecimal, which your
+      tool must strip before printing.
+    explain_back:
+      prompt: Your tool prints stray lines such as 1f8 and 0 around the JSON from one endpoint. Explain what they are, how a
+        client should read such a body, and why a server would send it that way.
+      rubric:
+        - id: e1
+          point: The reply uses chunked transfer encoding, and those lines are chunk sizes written in hexadecimal
+        - id: e2
+          point: A client reads a size line, then exactly that many bytes, then the line ending, and repeats until a chunk of
+            size zero
+        - id: e3
+          point: The size lines are framing, not content, so they must not be printed
+        - id: e4
+          point: Servers use it when they do not know the length in advance, for example when they stream or generate the output
+  - concept: idempotency
+    where: The -X flag chooses GET, DELETE, POST or PUT, and what each method means decides whether a request can safely
+      be sent twice.
+    explain_back:
+      prompt: A request from your tool times out and you consider adding an automatic retry. Explain for which of GET, PUT,
+        DELETE and POST a retry is safe, and why.
+      rubric:
+        - id: e1
+          point: A request is idempotent when doing it twice has the same effect as doing it once
+        - id: e2
+          point: GET, PUT and DELETE are idempotent, and GET also changes nothing, so retrying them is safe
+        - id: e3
+          point: POST is not idempotent, so a retry can create a second order or charge
+        - id: e4
+          point: For POST a client needs an idempotency key or a way to check whether the first attempt worked
+  - concept: http-redirects
+    where: A server can answer with a 3xx status and a Location header instead of the content, and your verbose mode shows
+      it.
+    explain_back:
+      prompt: Your tool fetches a URL and prints an empty body, while a browser shows the page. Explain what the server
+        probably sent, what a client must do to follow it, and two risks of following redirects automatically.
+      rubric:
+        - id: e1
+          point: A 3xx status such as 301 or 302 with a Location header pointing at the real address
+        - id: e2
+          point: The client reads Location, resolves it against the original URL if it is relative, and sends a new request
+            there
+        - id: e3
+          point: Redirects can loop, so a client limits the number it follows
+        - id: e4
+          point: A redirect can lead to another host or from https to http, so credentials must not be forwarded blindly
+  - concept: tls-basics
+    where: cccurl speaks plain HTTP on port 80; an https URL needs TLS between TCP and HTTP, which is why your tool
+      rejects it.
+    explain_back:
+      prompt: A user tries https://example.com with your tool and it fails. Explain what TLS adds between the TCP connection
+        and the HTTP request, and what the client checks before sending any data.
+      rubric:
+        - id: e1
+          point: TLS wraps the TCP byte stream so that every byte is encrypted and protected against tampering
+        - id: e2
+          point: A handshake on port 443 agrees on keys before any HTTP is sent
+        - id: e3
+          point: The server presents a certificate, and the client checks that it is signed by a trusted authority and matches
+            the host name
+        - id: e4
+          point: Without TLS, anyone on the network path can read or change the request and the reply
+  - concept: cli-subcommands
+    where: -v, -X, -d and -H change what is sent and printed, the body goes to standard output, and failures give a
+      non-zero exit status.
+    explain_back:
+      prompt: A script pipes your tool's output into a JSON parser, and with -v the parser breaks. Explain how a
+        well-behaved tool separates the body, diagnostics and errors, and how the script learns that a request failed.
+      rubric:
+        - id: e1
+          point: The body goes to standard output so it can be piped
+        - id: e2
+          point: Verbose lines and error messages go to standard error, as the real curl does
+        - id: e3
+          point: A failed request, such as a host that cannot be reached, gives a non-zero exit status
+        - id: e4
+          point: Scripts parse standard output and check the exit status
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: From a URL to a request
-    summary: Read a URL from the command line, split it into its parts, and write the exact text of a GET request.
-    concepts: [url-parsing, http-message-format, cli-subcommands]
+    summary: Split the URL and write the request by hand, without sending anything yet.
     steps:
       - title: Split the URL
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            cccurl is given http://eu.httpbin.org/ip, which has no port written in it. Which port does it connect to?
-            Answer with one number.
-          key:
-            match: number_exact
-            expected: 80
-            derivation: >-
-              The URL names no port, so the usual port of its scheme is used. The scheme is http, whose usual port is
-              80. Proof script output: 80.
-        build:
-          prompt: >-
-            Read a URL from the command line and split it into the scheme, host, port and path. Print a line saying
-            which host you are connecting to, then the request you would send, without sending anything yet. Both
-            http://eu.httpbin.org/get and http://eu.httpbin.org:80/get should print the same three lines: GET /get
-            HTTP/1.1, a Host header of eu.httpbin.org and an Accept header of */*.
+        minutes: 45
+        build: Read a URL from the command line and split it into scheme, host, port and path. Print the host and port you
+          would connect to and the path you would ask for, without sending anything.
+        outcome: For http://eu.httpbin.org/get your tool prints the host eu.httpbin.org, port 80 and path /get, and for a URL
+          with an explicit port and no path it prints that port and the path /.
+        concepts:
+          - url-parsing
+          - cli-subcommands
         hints:
-          hint: The scheme at the front of the URL decides which port is used when the URL does not name one.
-          example: >-
-            A phone number dialled without an area code goes to your own area. Leaving a part out does not mean
-            there is none; a usual value fills the gap.
-
-      - title: Write the request line
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            The user types http://eu.httpbin.org, with nothing at all after the host name. What request line does
-            cccurl send? Answer with the request line only.
-          key:
-            match: text_ci
-            expected: GET / HTTP/1.1
-            derivation: >-
-              A request line always holds a method, a path and a version. The method is GET, the version is HTTP/1.1,
-              and a URL with no path asks for the root of the site, which is the single slash. So the line is GET, a
-              space, a slash, a space and HTTP/1.1. Proof script output: GET / HTTP/1.1.
-        build:
-          prompt: >-
-            Build the request as text: the request line, a Host header and an Accept header, each line ending in a
-            carriage return and a line feed, then an empty line. Check a URL with no path, and reject a URL whose
-            scheme is not http, such as https or ftp, with a message on the error stream and a non-zero exit status.
+          hint: Find the end of the scheme first, then the end of the host, then decide whether a port follows.
+      - title: Write the request
+        minutes: 45
+        build: "Build the request as text: the request line, a Host header and an Accept header, each line ending in a
+          carriage return and a line feed, then an empty line. Reject a URL whose scheme is not http."
+        outcome: Printing the request with its line endings made visible shows every line ending in a carriage return and a
+          line feed followed by one empty line, and an https URL is rejected with a message on standard error and a
+          non-zero exit status.
+        concepts:
+          - http-message-format
+          - tls-basics
         hints:
-          hint: The server has to be asked for some path. Which path names the very top of a site?
-          example: >-
-            A file browser opened without choosing a folder shows the top folder of the drive, the one every other
-            folder sits inside.
-
-      - title: End the request properly
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This code builds a GET request and sends it. The connection opens, but the server never answers. Find the
-            two problems and say how to fix them.
-          snippet: |-
-            request = method + " " + path + " HTTP/1.1\n"
-            request = request + "Host: " + host + "\n"
-            request = request + "Accept: */*\n"
-            send(socket, request)
-            reply = read_all(socket)
-          rubric:
-            - id: p1
-              point: "There is no empty line after the last header, so the server is still waiting for more headers and never replies"
-            - id: p2
-              point: "Each line ends with only a line feed, but HTTP lines end with a carriage return and a line feed"
-            - id: p3
-              point: "The fix is to end every line with a carriage return and a line feed and to add one more such pair after the headers"
-        build:
-          prompt: >-
-            Print the request once with its line ends made visible, and check that every line ends with a carriage
-            return and a line feed and that the headers are followed by an empty line.
-        hints:
-          hint: How does a server know the client has finished sending its headers?
-          example: >-
-            On a radio, a speaker ends each message with the word over. Without it, the other side keeps waiting in
-            case more is coming.
-    teach_back:
-      prompt: >-
-        Explain how cccurl turns the URL typed on the command line into the exact text of a GET request, and what it
-        does with a URL it cannot handle.
-      rubric:
-        - id: t1
-          concept: url-parsing
-          point: "It splits the URL into scheme, host, port and path, using port 80 when no port is given and a single slash when there is no path"
-        - id: t2
-          concept: http-message-format
-          point: "The request is a request line with the method, path and version, then the Host and Accept headers, each line ending in a carriage return and line feed, then an empty line"
-        - id: t3
-          concept: cli-subcommands
-          point: "The URL comes from the command-line arguments, and a missing URL or a scheme other than http gives a message on the error stream and a non-zero exit status"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Print the request with the invisible characters shown, so you can see each line ending.
   - title: Send it and read the reply
-    summary: Open a TCP connection, send the request, read until the server closes, and print the body or everything.
-    concepts: [tcp-sockets, stream-read-contract, message-framing]
+    summary: Connect, send, and read exactly the reply, whichever way the server frames it.
     steps:
-      - title: Send over a socket
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            The server's reply is 250 bytes long, all of it has already arrived, and then the server closes the
-            connection. cccurl reads into a buffer that holds 100 bytes, and each read hands back as many waiting bytes
-            as fit. How many bytes does the last read that hands back data return? Answer with one number.
-          key:
-            match: number_exact
-            expected: 50
-            derivation: >-
-              The first read fills the buffer with 100 bytes and so does the second, leaving 50. The third read hands
-              back those 50, which is fewer than the buffer holds, and the read after that reports the end because the
-              server has closed. Proof script output: 50.
-        build:
-          prompt: >-
-            Open a TCP connection to the host and port, add a Connection: close header to the request, send it, and
-            read until the server closes the connection, printing everything you received. For
-            http://eu.httpbin.org/get the reply should start with HTTP/1.1 200 OK, carry a Content-Type of
-            application/json, and end with a JSON body that echoes your Host and Accept headers and the URL.
+      - title: Connect and send
+        minutes: 45
+        build: "Resolve the host, open a TCP connection to it, add a Connection: close header, send the request and read until
+          the server closes the connection, printing everything you received."
+        outcome: cccurl http://eu.httpbin.org/get prints a reply whose JSON body echoes back your Host and Accept headers.
+        concepts:
+          - name-resolution
+          - tcp-sockets
         hints:
-          hint: Each read stops at the size of the buffer. Work out what is left over after every full read.
-          example: >-
-            Carrying 25 books in a box that holds 10 takes three trips, and the last box has only 5 books in it.
-
+          hint: Print each address the name resolves to before you connect.
       - title: Know when the reply is over
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            cccurl reads until the server closes the connection. Explain what happens if you leave out the
-            Connection: close header, and why HTTP/1.1 behaves that way.
-          rubric:
-            - id: p1
-              point: "HTTP/1.1 keeps the connection open after a reply by default, so the server does not close it"
-            - id: p2
-              point: "A client that waits for the close then hangs after the whole reply has arrived, until the server gives up and times out"
-            - id: p3
-              point: "Connection: close asks the server to close after this reply, so the end of the stream marks the end of the reply"
-        build:
-          prompt: >-
-            Leave out the Connection: close header once on purpose and watch cccurl sit waiting after the reply has
-            arrived, then put the header back.
+        minutes: 45
+        build: "Leave out Connection: close once and watch the tool wait after the reply. Then parse the status line and
+          headers and read exactly Content-Length bytes of body."
+        outcome: "Without Connection: close, the tool exits right after the body arrives, because it reads exactly the number
+          of bytes Content-Length gives."
+        concepts:
+          - message-framing
         hints:
-          hint: Unless told otherwise, what does an HTTP/1.1 server do with the connection after it has replied?
-          example: >-
-            A phone call where nobody hangs up stays open in silence. When one person says goodbye and hangs up, the
-            other knows the call is over.
-
+          hint: The server is not stuck. Ask what it is waiting for, and what you already know about the body's length.
+      - title: Read a chunked reply
+        minutes: 45
+        build: "When the reply says Transfer-Encoding: chunked, read the body chunk by chunk: a size line in hexadecimal, that
+          many bytes, the line ending, until a chunk of size zero."
+        outcome: cccurl http://eu.httpbin.org/stream/3 prints three lines of JSON and none of the hexadecimal size lines.
+        concepts:
+          - chunked-transfer-encoding
+          - message-framing
+        hints:
+          hint: Print the raw reply once to see the size lines, then make your reader consume them.
       - title: Verbose mode
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            A reply is a status line, three header lines, an empty line, and then a body of three lines whose middle
-            line is empty. With -v, cccurl puts a less-than sign in front of the status line, every header line and the
-            empty line that ends the headers, and prints the body unmarked. How many lines of output begin with the
-            less-than sign? Answer with one number.
-          key:
-            match: number_exact
-            expected: 5
-            derivation: >-
-              Only the first empty line ends the headers. Before it come the status line and three headers, 4 lines,
-              and the empty line itself is marked too, making 5. The empty line inside the body comes after the first
-              empty line, so it belongs to the body and is not marked. Proof script output: 5.
-        build:
-          prompt: >-
-            By default print only the body of the reply. With -v, print every line you sent with a greater-than sign
-            in front, then every line of the reply head with a less-than sign in front, then the body. As on the page,
-            the sent block ends with a line holding only the greater-than sign, and the received head ends with a line
-            holding only the less-than sign.
+        minutes: 30
+        build: By default print only the body. With -v, also print every line you sent with a greater-than sign in front and
+          every line of the reply head with a less-than sign in front.
+        outcome: cccurl -v http://eu.httpbin.org/get shows the request lines marked with greater-than signs, the status line
+          and headers marked with less-than signs, then the body; without -v only the body is printed.
+        concepts:
+          - cli-subcommands
+          - http-message-format
         hints:
-          hint: Find the first empty line in the reply. Which side of it does each line fall on?
-          example: >-
-            A letter has an address block, a gap, then the letter itself. A gap between two paragraphs further down
-            does not make those paragraphs part of the address.
-    teach_back:
-      prompt: >-
-        Explain how cccurl gets the whole reply from the server and how it decides which parts to print with and
-        without -v.
-      rubric:
-        - id: t1
-          concept: tcp-sockets
-          point: "It opens a TCP connection to the host and port, writes the request bytes, and reads the reply from the same two-way byte stream"
-        - id: t2
-          concept: stream-read-contract
-          point: "It reads in a loop, because each read may return only part of the reply, and stops when a read reports that the server closed the connection"
-        - id: t3
-          concept: message-framing
-          point: "With Connection: close the end of the stream marks the end of the reply, and the first empty line splits the head from the body"
-
-  # ------------------------------------------------------------------------------------------
-  - title: Methods and bodies
-    summary: Choose the method with -X, send a body with -d and headers with -H, and support DELETE, POST and PUT.
-    concepts: [cli-subcommands, rest-api-design, message-framing, idempotency]
+          hint: Decide which stream each kind of line belongs on, the way the real curl does.
+  - title: Methods, bodies and redirects
+    summary: Choose the method, send a body with the right length, and see a redirect.
     steps:
       - title: Choose the method
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This option parser is run on the page's POST command, which gives -X POST, then the URL, then -d with a
-            JSON body, then -H with a Content-Type header. The request goes to the wrong place. Find the two problems.
-          snippet: |-
-            method = "GET"
-            body = ""
-            for arg in arguments:
-                if arg == "-X":
-                    method = next argument
-                else if arg == "-d":
-                    body = next argument
-                else:
-                    url = arg
-            send_request(method, url, body)
-          rubric:
-            - id: p1
-              point: "The value after -X or -d is read but not skipped, so the loop meets it again and stores it as the URL"
-            - id: p2
-              point: "-H is not recognised, so it and its header value fall into the URL branch, and the URL ends up as the header text"
-            - id: p3
-              point: "The fix is to step past each option's value once it is read, handle -H by adding the header to a list, and reject unknown options with an error"
-        build:
-          prompt: >-
-            Add -X to choose the method, and send DELETE to http://eu.httpbin.org/delete. The JSON reply should echo
-            your headers and the URL, with an empty data field and a json field of null.
+        minutes: 30
+        build: Add -X to choose the method, and send a DELETE to http://eu.httpbin.org/delete.
+        outcome: The JSON reply to the DELETE echoes your headers and the URL, with an empty data field.
+        concepts:
+          - idempotency
+          - http-message-format
         hints:
-          hint: Walk the arguments one at a time and write down what the parser thinks the URL is after each one.
-          example: >-
-            A waiter hears table four, two coffees, writes down an order for table four, and then also counts four
-            as an order of its own. The same word was used twice.
-
+          hint: Only the request line changes. Which methods could you safely retry if the reply never came?
       - title: Send a body
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            cccurl is run with -X POST on http://eu.httpbin.org/post, with -d giving the four-letter word café, whose e
-            is accented, and with -H setting a plain text Content-Type. What value does cccurl put in the
-            Content-Length header? Answer with one number.
-          key:
-            match: numbers_all
-            expected: [5]
-            derivation: >-
-              Content-Length counts the bytes of the body, not its letters. c, a and f are one byte each in UTF-8 and
-              the accented e takes two, so café is 4 letters but 5 bytes. Matched with numbers_all, so an answer that
-              also mentions the letter count or the encoding still passes. Proof script output: [5].
-        build:
-          prompt: >-
-            Add -d for a body and -H for extra headers. Send the body after the empty line, with a Content-Length
-            header giving its size in bytes. The page's POST to http://eu.httpbin.org/post with the body
-            {"key": "value"} and a Content-Type of application/json should come back with a Content-Length of 16 among
-            the echoed headers, and the same key and value under json.
+        minutes: 45
+        build: Add -d for a body and -H for extra headers. Send the body after the empty line, with a Content-Length header
+          giving its size in bytes, and support POST and PUT.
+        outcome: A POST to http://eu.httpbin.org/post with a small JSON body and a JSON Content-Type echoes the body back
+          under json and a Content-Length equal to its size in bytes, and a PUT to http://eu.httpbin.org/put does the
+          same.
+        concepts:
+          - idempotency
+          - message-framing
         hints:
-          hint: The length is measured in the units that travel over the connection, not in letters.
-          example: The word naïve has 5 letters, but its ï takes 2 bytes in UTF-8, so it is 6 bytes long.
-
-      - title: PUT and retries
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            cccurl now supports GET, DELETE, POST and PUT. A request is idempotent when sending it twice leaves the
-            server in the same state as sending it once. Under the rules of HTTP, how many of these four methods are
-            idempotent? Answer with one number.
-          key:
-            match: number_exact
-            expected: 3
-            derivation: >-
-              GET only reads, so repeating it changes nothing. PUT replaces the resource with the body, and doing that
-              twice leaves the same resource. DELETE removes it, and a second delete leaves it removed. POST asks the
-              server to create or submit something, and a second POST can create a second resource. That makes GET,
-              PUT and DELETE, 3. The proof runs each method once and twice on a small simulated store and compares.
-              Proof script output: 3.
-        build:
-          prompt: >-
-            Support PUT, which sends a body just as POST does. A PUT to http://eu.httpbin.org/put with the body
-            {"key": "value2"} and a JSON Content-Type should echo a Content-Length of 17 and the new value under json.
+          hint: Count the body's length in bytes after encoding it, not in characters.
+      - title: See a redirect
+        minutes: 30
+        build: Request http://eu.httpbin.org/redirect/1 with -v and read the status line and the Location header. Write down
+          how you would follow it and which limits you would set.
+        outcome: With -v your tool shows 302 Found and a Location header of /get, and your notes say how you would turn that
+          into the next request and how many redirects you would follow at most.
+        concepts:
+          - http-redirects
         hints:
-          hint: For each method, picture the server's data after one request and after the same request twice.
-          example: >-
-            Setting a thermostat to 20 degrees twice leaves it at 20, but pressing the up button twice raises it two
-            steps.
-    teach_back:
-      prompt: >-
-        Explain how cccurl builds DELETE, POST and PUT requests from its options, how the server knows where a body
-        ends, and which of these requests are safe to resend after a reply is lost.
-      rubric:
-        - id: t1
-          concept: cli-subcommands
-          point: "-X sets the method, -d gives the body and -H adds a header, and each option takes its value from the argument right after it"
-        - id: t2
-          concept: rest-api-design
-          point: "The method says what to do with the resource the path names: GET reads it, DELETE removes it, POST creates or submits, and PUT replaces it with the body"
-        - id: t3
-          concept: message-framing
-          point: "The body follows the empty line, and a Content-Length header gives its size in bytes so the server knows where it ends"
-        - id: t4
-          concept: idempotency
-          point: "GET, PUT and DELETE are idempotent, so resending them after a lost reply is safe, while resending a POST can create a second resource"
+          hint: Location here is relative. What URL do you get when you resolve it against the one you asked for?

@@ -1,12 +1,9 @@
-# Coding Challenges, Build your own DNS resolver.
-# Source: https://codingchallenges.fyi/challenges/challenge-dns-resolver
-# Written in our own words. The source page is linked, not copied.
-# The page's sample reply has the flags 80 80 in hex, so its recursion desired bit is 0 although the query set it.
-# A real reply from 8.8.8.8 copies the bit back (81 80). No key depends on the reply's RD bit.
-# Every predict and trace key is proven by content/proofs/challenge-dns-resolver.mjs, offline, with Buffer.
+# Coding Challenges, Build your own DNS resolver. Content format 3 (CONTENT_FORMAT.md, "The learning model (v3)").
+# Source: https://codingchallenges.fyi/challenges/challenge-dns-resolver . Written in our own words; the source is linked, not copied.
+# Two tracks: the learning map (concepts, each with an explain-back) and the build plan (the challenge's own steps,
+# each with one checkable outcome). Concept lessons and references live in content/concepts.yaml.
 
-format: 1
-
+format: 3
 project:
   source: coding_challenges
   slug: challenge-dns-resolver
@@ -16,10 +13,9 @@ project:
   status: generated
   figure:
     kind: net
-  summary: >-
-    A resolver that turns a host name into an IP address. It builds DNS query messages byte by byte, sends them over
-    UDP, decodes the binary replies, compressed names included, and finally resolves any name on its own by starting
-    at a root server and following referrals.
+  summary: A resolver that turns a host name into an IP address. It builds DNS query messages byte by byte, sends them
+    over UDP, decodes the binary replies, compressed names included, and finally resolves any name on its own by
+    starting at a root server and following referrals.
   requirements:
     - Build a DNS query by hand, a 12-byte header and a question, with every number big-endian
     - Send the query over UDP to a DNS server on port 53 and read the reply
@@ -27,29 +23,16 @@ project:
     - Decode the header, question and answer records, following compressed name pointers
     - Print the addresses of A records as four numbers joined by dots
     - Resolve a name iteratively from a root server, following referrals until an address comes back
-  restate_rubric:
-    - id: r1
-      point: "It is a DNS resolver that turns a host name into an IP address by sending DNS messages itself"
-    - id: r2
-      point: "It builds the binary query and decodes the binary reply by hand, including compressed names"
-    - id: r3
-      point: "It can start at a root server and follow referrals to the servers that know the answer"
-  reflection_prompt: >-
-    In your own words, how does your resolver turn a name into bytes, bytes back into an address, and one referral
-    into the next query? What would you add so it stays fast when it is asked for the same names again and again?
   primer:
-    what: >-
-      DNS is how a name such as example.com becomes the numeric address a computer can connect to. A resolver sends a
+    what: DNS is how a name such as example.com becomes the numeric address a computer can connect to. A resolver sends a
       small binary message, the query, to a DNS server over UDP and reads back a reply holding the answer. You will
       build these messages byte by byte, read the replies, and then resolve any name yourself, starting from one of
       the root servers at the top of the system.
-    why: >-
-      Every connection to a named host starts with this lookup. Building it shows how a binary protocol packs numbers
+    why: Every connection to a named host starts with this lookup. Building it shows how a binary protocol packs numbers
       and single bits into bytes, and how the work of naming the whole internet is split between many servers.
-    example: >-
-      Inside a DNS message a name is not written with dots. Each part, called a label, is preceded by one byte giving
-      its length, and a zero byte marks the end. The name go.dev becomes the byte 2, the letters g and o, the byte 3,
-      the letters d, e and v, and then a zero byte, which is 8 bytes in all.
+    example: Inside a DNS message a name is not written with dots. Each part, called a label, is preceded by one byte
+      giving its length, and a zero byte marks the end. The name go.dev becomes the byte 2, the letters g and o, the
+      byte 3, the letters d, e and v, and then a zero byte, which is 8 bytes in all.
     words:
       - term: resolver
         meaning: The program that asks DNS servers questions until it has the address for a name.
@@ -58,390 +41,249 @@ project:
       - term: label
         meaning: One part of a name between dots, such as google in dns.google.com, written with its length in front.
       - term: big-endian
-        meaning: Writing a number that takes several bytes with its most significant byte first. DNS writes every number this way.
+        meaning: Writing a number that takes several bytes with its most significant byte first. DNS writes every number this
+          way.
       - term: UDP
-        meaning: A way to send single messages, called datagrams, with no connection. A datagram can be lost, and nothing resends it.
+        meaning: A way to send single messages, called datagrams, with no connection. A datagram can be lost, and nothing
+          resends it.
       - term: root server
         meaning: One of the servers at the top of DNS. It does not know most addresses, but knows who to ask next.
-
+  restate_rubric:
+    - id: r1
+      point: It is a DNS resolver that turns a host name into an IP address by sending DNS messages itself
+    - id: r2
+      point: It builds the binary query and decodes the binary reply by hand, including compressed names
+    - id: r3
+      point: It can start at a root server and follow referrals to the servers that know the answer
+  reflection_prompt: In your own words, how does your resolver turn a name into bytes, bytes back into an address, and
+    one referral into the next query? What would you add so it stays fast when it is asked for the same names again
+    and again?
+  reference_tool: dig, or nslookup where dig is not installed, to compare answers; dig with +trace shows the same walk from the root.
+  done_when: Your resolver builds queries that match the challenge's example byte for byte, sends them over UDP with
+    timeouts and retries, decodes headers, compressed names and answers safely, resolves names from a root server by
+    following referrals to the same addresses dig reports, and caches records by TTL; and your notes explain, in your
+    own words, how a name becomes an address.
+  open_checks:
+    - Whether your network lets UDP on port 53 reach outside servers; some networks force their own resolver.
+    - Whether 198.41.0.4 is still a root server address; the IANA root server list says.
+    - Which test names return replies large enough to be truncated.
+    - What your system does with a datagram larger than your receive buffer.
+learning_map:
+  - concept: dns-message-format
+    where: You build the 12-byte header and the question by hand, and decode the header, question and answer records of
+      every reply.
+    explain_back:
+      prompt: A reply says it holds 2 answers, 0 authority records and 1 additional record. Explain how a DNS message is
+        laid out, how your decoder knows where each section starts, and why it cannot simply jump to the answers.
+      rubric:
+        - id: e1
+          point: A fixed 12-byte header with the ID, the flags and four counts, then the question, answer, authority and
+            additional sections in that order
+        - id: e2
+          point: The counts in the header say how many entries each section holds
+        - id: e3
+          point: Names and record data vary in length, so the decoder must read each entry completely to find where the next one
+            starts, starting with the question the reply repeats
+  - concept: byte-order
+    where: Every number in a DNS message, from the ID to the TTL, is written big-endian, in network byte order.
+    explain_back:
+      prompt: Your query uses the ID 22, but your tool reads the reply's ID as 5632 and rejects it as a mismatch. Explain
+        what went wrong and the rule that avoids it.
+      rubric:
+        - id: e1
+          point: A number wider than a byte can be stored most significant byte first, big-endian, or least significant first,
+            little-endian
+        - id: e2
+          point: Network protocols such as DNS use big-endian, so 22 must go out as the bytes 00 16
+        - id: e3
+          point: Writing it in the machine's little-endian order sends 16 00, which reads back as 5632
+        - id: e4
+          point: Write and read every multi-byte field explicitly in network byte order, never in the machine's own order
+  - concept: bit-packing
+    where: The 16-bit flags field packs the query or response bit, the opcode, AA, TC, RD, RA and the response code into
+      fixed bit positions.
+    explain_back:
+      prompt: Your resolver asks for recursion, but after a teammate's change servers ignore every query because they now
+        look like responses. Explain how the flag bits are packed, and how a program sets or reads one flag without
+        disturbing the others.
+      rubric:
+        - id: e1
+          point: "Single-bit flags and small numbers sit at fixed positions in one 16-bit field: the query or response bit is
+            the top bit and recursion desired is bit 8"
+        - id: e2
+          point: A flag is set by combining the field with a mask using OR, and tested by combining it with the mask using AND
+        - id: e3
+          point: Multi-bit fields such as the response code are read by masking and shifting
+        - id: e4
+          point: Setting the top bit instead of the recursion bit marks the message as a response, so servers ignore it
+  - concept: udp-datagrams
+    where: Queries and replies travel as single UDP datagrams to port 53, with no guarantee that either arrives.
+    explain_back:
+      prompt: Your resolver sometimes waits for ever, and for one large domain the reply has the TC flag set and records
+        missing. Explain both in terms of UDP, and what a resolver should do in each case.
+      rubric:
+        - id: e1
+          point: UDP does not resend lost datagrams, so a lost query or reply is simply gone
+        - id: e2
+          point: The resolver needs a timeout and a small number of retries, and must check that the reply's ID matches
+        - id: e3
+          point: Classic DNS over UDP limits a reply to 512 bytes; a reply that does not fit is cut short and marked truncated
+            with TC
+        - id: e4
+          point: On a truncated reply the resolver should repeat the query over TCP
+  - concept: dns-name-compression
+    where: Names in replies can end with a two-byte pointer back to an earlier place in the message, such as c0 0c
+      pointing at offset 12.
+    explain_back:
+      prompt: Your decoder handles every real reply, but a crafted one makes it run for ever. Explain how DNS name
+        compression works, and what a decoder must check so that it cannot be trapped.
+      rubric:
+        - id: e1
+          point: A name is a series of labels, each preceded by its length, ending with a zero byte
+        - id: e2
+          point: "A byte whose top two bits are both set starts a pointer: the remaining 14 bits give an offset in the message
+            where the rest of the name continues"
+        - id: e3
+          point: A pointer can point at itself or form a cycle, which loops a naive decoder
+        - id: e4
+          point: The decoder must check that each offset lies inside the message, limit the number of jumps and cap the name at
+            255 bytes
+  - concept: iterative-resolution
+    where: Starting at a root server, your resolver follows referrals to the com servers, then to the domain's own
+      servers, until one answers with an address.
+    explain_back:
+      prompt: Explain how your resolver finds the address of dns.google.com starting only from a root server's address, what
+        a referral is, and what glue records are for.
+      rubric:
+        - id: e1
+          point: "Each server answers what it knows: the root refers the resolver to the com servers, they refer it to the
+            google.com servers, and those answer"
+        - id: e2
+          point: A referral is a reply with no answers and NS records in the authority section naming the next servers
+        - id: e3
+          point: Glue records in the additional section give those servers' addresses, so the resolver does not first have to
+            resolve their names
+        - id: e4
+          point: A recursive resolver such as 8.8.8.8 does this walk on the client's behalf when recursion is requested
+  - concept: dns-caching-ttl
+    where: Every record in a reply carries a TTL in seconds, which says how long your resolver may reuse it without asking
+      again.
+    explain_back:
+      prompt: A team moves its website to a new server and updates its DNS record, yet some users keep reaching the old
+        server for hours. Explain why, and what the team should have done beforehand.
+      rubric:
+        - id: e1
+          point: Resolvers cache each record for its TTL and answer from the cache until it runs out
+        - id: e2
+          point: Until then, users of those resolvers get the old address
+        - id: e3
+          point: The team should have lowered the TTL well before the move, at least one old TTL ahead, then changed the record,
+            then raised the TTL again
 milestones:
-  # ------------------------------------------------------------------------------------------
   - title: Build the query
-    summary: Encode the name, pack the header with its ID, flags and counts, and check the bytes against the page.
-    concepts: [dns-message-format, byte-order, bit-packing]
+    summary: Encode the name and header byte by byte, and prove the query matches the challenge's example.
     steps:
-      - title: Encode the name
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            Your resolver writes the name dns.google.com into the question of a query, as length-prefixed labels
-            ending with a zero byte. How many bytes does the encoded name take? Answer with one number.
-          key:
-            match: number_exact
-            expected: 16
-            derivation: >-
-              The labels are dns, google and com. Each costs one length byte plus its letters, so 1 + 3, 1 + 6 and
-              1 + 3, which is 15, and the zero byte at the end makes 16. The proof encodes the name into a Buffer and
-              takes its length. Proof script output: 16.
-        build:
-          prompt: >-
-            Write a routine that encodes a host name as labels, each preceded by its length, followed by a zero byte.
-            For dns.google.com you should get the byte 3, then dns, the byte 6, then google, the byte 3, then com, and
-            the zero byte.
+      - title: Encode the name and the header
+        minutes: 45
+        build: Encode a host name as labels, each preceded by its length and ended by a zero byte. Build the 12-byte header
+          with the ID 22, recursion desired set, a question count of 1 and zero for the other counts, every number
+          written as two bytes, high byte first.
+        outcome: For dns.google.com your encoded name and your header, printed as hexadecimal, match the challenge's example
+          byte for byte.
+        concepts:
+          - dns-message-format
+          - byte-order
+          - bit-packing
         hints:
-          hint: Count what goes in front of each label as well as its letters, and remember how a name ends.
-          example: >-
-            On a shelf of boxes, each box gets a tag saying how many items are inside, and an empty box tagged zero
-            marks the end of the shelf.
-
-      - title: Set the flags
-        minutes: 15
-        think:
-          kind: predict
-          prompt: >-
-            The 16-bit flags field is sent as two bytes, high byte first. Reading the first byte from its leftmost bit,
-            it holds QR as one bit, the opcode as four bits, and then AA, TC and RD as one bit each. A query has only
-            recursion desired, RD, set. What is the value of the first flags byte? Answer with one decimal number.
-          key:
-            match: number_exact
-            expected: 1
-            derivation: >-
-              QR takes the top bit, the opcode the next four, then AA and TC, so RD is the last, lowest bit of the
-              first byte. With only RD set, that byte is 00000001 in binary, which is 1, and the second byte is 0. The
-              proof packs the bits into a Buffer and reads the byte back. Proof script output: 1.
-        build:
-          prompt: >-
-            Build the 12-byte header: the ID 22, the flags with recursion desired set, a question count of 1 and zero
-            for the answer, authority and additional counts, each written as two bytes, high byte first. In hex the
-            header should read 00 16 01 00 00 01 00 00 00 00 00 00.
+          hint: Write the flags as one 16-bit number first, then split it into two bytes.
+      - title: Put the query together and test it
+        minutes: 45
+        build: "Append the question: the encoded name, the type 1 for an A record and the class 1 for internet. Add a test
+          that builds the query for dns.google.com with the ID 22 and compares it with the challenge's hexadecimal."
+        outcome: The test passes, and it fails if you deliberately write one number in the wrong byte order or drop the zero
+          byte at the end of the name.
+        concepts:
+          - dns-message-format
+          - byte-order
         hints:
-          hint: Write out the eight bits of the first byte in the order given, and see where RD lands.
-          example: >-
-            In a row of eight light switches, the one on the far right counts for 1 when it is on, the next one for 2,
-            the next for 4, and so on up to 128 on the far left.
-
-      - title: Put the query together
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            The full query for dns.google.com is the header, then the question: the encoded name, a two-byte type and
-            a two-byte class. The answer, authority and additional sections are empty. How many bytes long is the
-            whole query? Answer with the total only.
-          key:
-            match: number_exact
-            expected: 32
-            derivation: >-
-              The header is always 12 bytes. The name dns.google.com encodes to 16 bytes, and the type and class add 2
-              each. 12 + 16 + 2 + 2 is 32. The proof builds the query in a Buffer, checks that its hex is exactly the
-              query shown on the challenge page, and takes its length. Proof script output: 32.
-        build:
-          prompt: >-
-            Append the question: the encoded name, the type 1 for an A record and the class 1 for internet, each
-            number as two bytes, high byte first. Print the whole query as hex and compare it digit by digit with the
-            query given on the challenge page for dns.google.com with the ID 22.
-        hints:
-          hint: Add up the parts one by one, starting with the size of the header, which never changes.
-          example: >-
-            A parcel's weight is the box, plus the contents, plus the label, each weighed on its own and then added.
-
-      - title: Check the byte order
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This code builds a query, but the server ignores it or replies with an error. Find the two problems and
-            say how to fix them.
-          snippet: |-
-            function append_u16(out, n):
-                append_byte(out, n % 256)
-                append_byte(out, n / 256)
-
-            append_u16(out, id)
-            append_u16(out, flags)
-            append_u16(out, 1)
-            append_u16(out, 0)
-            append_u16(out, 0)
-            append_u16(out, 0)
-            for label in split(name, "."):
-                append_byte(out, length(label))
-                append_text(out, label)
-            append_u16(out, 1)
-            append_u16(out, 1)
-          rubric:
-            - id: p1
-              point: "append_u16 writes the low byte first, but DNS numbers are big-endian, so the high byte must come first"
-            - id: p2
-              point: "With the bytes swapped, the ID 22 goes out as 16 00 in hex and the question count reads as 256"
-            - id: p3
-              point: "The name has no zero byte after its last label, so the server reads the type bytes as another label"
-            - id: p4
-              point: "The fix is to write the high byte first and to append a zero byte after the labels, before the type and class"
-        build:
-          prompt: >-
-            Add a test that builds the query for dns.google.com with the ID 22 and compares it with the page's hex, so
-            a byte order or terminator mistake fails at once.
-        hints:
-          hint: Write out the two bytes this routine produces for the number 22, and compare them with the header the page shows.
-          example: >-
-            Writing a date as day then month, for a reader who expects month then day, turns the 3rd of April into
-            the 4th of March.
-    teach_back:
-      prompt: >-
-        Explain how your resolver turns the name dns.google.com and the ID 22 into the bytes of a query, and why each
-        number and flag is written the way it is.
-      rubric:
-        - id: t1
-          concept: dns-message-format
-          point: "The query is a 12-byte header with the ID, the flags and four counts, then a question holding the name as length-prefixed labels ending in a zero byte, a type and a class"
-        - id: t2
-          concept: byte-order
-          point: "Every number is big-endian, high byte first, so the ID 22 goes out as 00 16 in hex"
-        - id: t3
-          concept: bit-packing
-          point: "Recursion desired is a single bit, the lowest of the first flags byte, so setting only it makes the flags 01 00 in hex"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Make the test fail on purpose once, so you know it can.
   - title: Send it and read the reply
-    summary: Send the query over UDP, check the reply's header, and decode its names and addresses.
-    concepts: [udp-datagrams, bit-packing, dns-message-format, dns-name-compression]
+    summary: Send over UDP, decode the header, the names and the answers, and defend against hostile replies.
     steps:
-      - title: Send over UDP
-        minutes: 15
-        think:
-          kind: explain
-          prompt: >-
-            Your resolver sends the query to 8.8.8.8 on port 53 over UDP and then reads. Explain what UDP does and does
-            not promise here, and what the resolver should check and do as a result.
-          rubric:
-            - id: p1
-              point: "One read returns one whole datagram, so the reply arrives as a single message and needs no framing"
-            - id: p2
-              point: "A datagram can be lost and nothing resends it, so the resolver needs a timeout and then resends the query or tries another server"
-            - id: p3
-              point: "It checks that the reply's ID matches the ID it sent, and ignores a datagram that does not match"
-        build:
-          prompt: >-
-            Open a UDP socket, send the query to 8.8.8.8 on port 53, read one datagram and print it as hex. Check that
-            its first two bytes are 00 16, the ID you sent, and stop with an error if no reply comes within a few
-            seconds.
+      - title: Send over UDP with a timeout
+        minutes: 45
+        build: Open a UDP socket, send the query to 8.8.8.8 on port 53, read one datagram and print it as hexadecimal. Give up
+          after a few seconds with a clear error, and retry a small number of times.
+        outcome: The reply's first two bytes are 00 16, your query's ID, and pointing the tool at an address where nothing
+          answers ends with a timeout message instead of hanging.
+        concepts:
+          - udp-datagrams
         hints:
-          hint: Compare it with TCP. Who resends a lost packet, and who decides where a message ends?
-          example: >-
-            A postcard arrives whole or not at all. If no answer comes back, you send another, and you check the
-            reply is about the card you sent.
-
-      - title: Read the header
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This code reads the header of the page's sample reply, whose first four bytes are 00 16 80 80 in hex. It
-            reports the wrong ID and says the message is not a response. Find the problems.
-          snippet: |-
-            id = reply[0] + reply[1] * 256
-            if reply[2] % 2 == 1:
-                print("this is a response")
-            else:
-                print("not a response")
-            answers = reply[7]
-          rubric:
-            - id: p1
-              point: "The ID is read low byte first, so 00 16 comes out as 5632 instead of 22; it should be the first byte times 256 plus the second"
-            - id: p2
-              point: "QR is the top bit of the first flags byte, worth 128, not the lowest bit, which is recursion desired"
-            - id: p3
-              point: "The answer count uses only its second byte, so a count above 255 would be wrong; both bytes are needed, high byte first"
-        build:
-          prompt: >-
-            Parse the 12-byte header of the reply and print the ID, whether QR marks it as a response, and the four
-            counts. The sample reply on the page should give the ID 22, 1 question, 2 answers, 0 authority records and
-            0 additional records.
+          hint: Decide how long to wait and how many times to try before you send anything.
+      - title: Read the header and its flags
+        minutes: 30
+        build: "Parse the 12-byte header of the reply: the ID, each flag and the four counts."
+        outcome: For the reply from 8.8.8.8 your tool prints the ID 22, the response flag set, recursion available set, one
+          question and the number of answers the reply holds.
+        concepts:
+          - bit-packing
+          - dns-message-format
         hints:
-          hint: Write the first flags byte out as eight bits. Which of them is QR, and which is RD?
-          example: >-
-            In the number 47 the 4 is worth ten times the 7 because it comes first. DNS writes its two-byte numbers
-            the same way, the first byte worth 256 times the second.
-
-      - title: Follow a pointer
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            While reading a name, your parser meets the byte 192 followed by the byte 28, which are c0 and 1c in hex.
-            The top two bits of 192 are both set. At which offset in the message does the rest of the name start?
-            Answer with one decimal number.
-          key:
-            match: number_exact
-            expected: 28
-            derivation: >-
-              Two set top bits mark a compression pointer, and the other 14 bits of the two bytes give the offset. 192
-              is 11000000 in binary, so once the two flag bits are removed the first byte adds nothing, and the offset
-              is the second byte, 28. Taking all 16 bits as a number would give the wrong 49180. Proof script output:
-              28.
-        build:
-          prompt: >-
-            Decode names in the reply, joining labels with dots, and follow a pointer whenever a length byte has its
-            top two bits set. The page's reply uses c0 0c, a pointer to offset 12, where the name in the question
-            starts.
+          hint: Test each flag with its own mask, and print them all, not only the ones you expect.
+      - title: Decode names and follow pointers
+        minutes: 45
+        build: Decode names by joining labels with dots, and follow a pointer whenever a length byte has its top two bits set.
+          Bound every jump.
+        outcome: The question name and every answer name decode as dns.google.com, and a hand-made message whose pointer
+          points at itself is rejected with an error instead of hanging.
+        concepts:
+          - dns-name-compression
         hints:
-          hint: Of the 16 bits in the two bytes, two only say this is a pointer. What do the other 14 say?
-          example: >-
-            A footnote mark tells you the text continues somewhere else, and the number beside it says exactly where.
-
+          hint: "After a pointer, where does the rest of the record continue: at the jump target or after the two pointer
+            bytes?"
       - title: Read the answers
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            In the sample reply, the first answer record begins with the two bytes c0 0c, a pointer to the name
-            dns.google.com at offset 12. How many bytes does the name take up inside the answer record itself, before
-            the type field starts? Answer with one number.
-          key:
-            match: number_exact
-            expected: 2
-            derivation: >-
-              The pointer stands in for the whole name, so the record spends only the 2 pointer bytes on it. The 16
-              bytes of dns.google.com live at offset 12 and are not repeated, and reading the record continues right
-              after the pointer. The proof decodes the page's sample reply and measures where the type field starts.
-              Proof script output: 2.
-        build:
-          prompt: >-
-            After each answer's name, read the type, class, TTL, data length and data, and print an A record's data as
-            four numbers joined by dots. The sample reply should give two answers for dns.google.com, each of type 1
-            and class 1 with a TTL above zero, with the addresses 8.8.8.8 and 8.8.4.4.
+        minutes: 45
+        build: After each answer's name, read the type, class, TTL, data length and data, and print an A record's data as four
+          numbers joined by dots.
+        outcome: For dns.google.com your tool prints the same IPv4 addresses that dig or nslookup prints for the name, each
+          with its TTL.
+        concepts:
+          - dns-message-format
+          - byte-order
         hints:
-          hint: The pointer replaces the name in the record. How many bytes did the record itself spend on it?
-          example: >-
-            A note saying see page 12 takes a few words on this page, however long the text on page 12 is.
-    teach_back:
-      prompt: >-
-        Explain how your resolver sends a query over UDP and turns the reply that comes back into names and
-        addresses.
-      rubric:
-        - id: t1
-          concept: udp-datagrams
-          point: "It sends one datagram and reads one back whole, with a timeout and a retry because UDP may lose it, and it checks that the ID matches"
-        - id: t2
-          concept: bit-packing
-          point: "It checks the QR bit, the top bit of the flags, to confirm that the message is a response"
-        - id: t3
-          concept: dns-message-format
-          point: "It reads the counts in the header, passes over the question, then reads each answer's name, type, class, TTL, data length and data, where an A record's data is a 4-byte address"
-        - id: t4
-          concept: dns-name-compression
-          point: "A length byte with its top two bits set starts a two-byte pointer whose other 14 bits give the offset of the rest of the name, and reading carries on right after the pointer"
-
-  # ------------------------------------------------------------------------------------------
+          hint: Use the data length to skip records you do not understand.
   - title: Resolve from the root
-    summary: Ask a root server directly and follow referrals down to the server that knows the address.
-    concepts: [iterative-resolution, bit-packing, dns-message-format]
+    summary: Ask a root server, follow referrals to an answer, and cache what you learn.
     steps:
       - title: Ask a root server
-        minutes: 10
-        think:
-          kind: predict
-          prompt: >-
-            Your resolver now sends its query straight to a root server, such as 198.41.0.4, and will follow the
-            referrals itself instead of asking one server to do the whole lookup. What should the recursion desired
-            bit be in this query? Answer with 0 or 1.
-          key:
-            match: number_exact
-            expected: 0
-            derivation: >-
-              Recursion desired asks the server to do the whole lookup for you. Here the resolver does that work itself,
-              and root and authoritative servers do not offer recursion anyway, so the bit is cleared and the flags are
-              00 00, as the page asks. The proof builds the header for iterative mode in a Buffer and reads the bit
-              back. Proof script output: 0.
-        build:
-          prompt: >-
-            Set the flags to zero and send the query for dns.google.com to the root server 198.41.0.4. Print the
-            reply's counts and sections: it should hold no answers, NS records for the com servers in the authority
-            section, and usually their addresses in the additional section.
+        minutes: 30
+        build: Clear the recursion-desired flag and send the query for dns.google.com to the root server 198.41.0.4. Print
+          every section of the reply.
+        outcome: The reply has no answers, NS records for the com servers in its authority section and their addresses in its
+          additional section, and your tool prints all three sections.
+        concepts:
+          - iterative-resolution
         hints:
-          hint: Who is doing the work of following the chain now, your resolver or the server you ask?
-          example: >-
-            If you ask a librarian to find a book for you, you say so. If you only want to know which floor to try
-            next, you do not ask them to fetch it.
-
+          hint: An empty answer section is not a failure here. What else did the server give you?
       - title: Follow the referrals
-        minutes: 15
-        think:
-          kind: trace
-          prompt: >-
-            Your resolver looks up www.example.org with no cache, starting every lookup at the root. The root refers it
-            to the org servers and gives their addresses. An org server refers it to the server ns1.example.net but
-            gives no address for it. Looking up ns1.example.net works the usual way: the root refers to net with
-            addresses, a net server refers to example.net with addresses, and that server returns the address.
-            Finally ns1.example.net returns the address of www.example.org. How many queries does the resolver send in
-            all? Answer with one number.
-          key:
-            match: number_exact
-            expected: 6
-            derivation: >-
-              The main lookup asks the root (1) and an org server (2). The referral names ns1.example.net without an
-              address, so a side lookup starts at the root: the root (3), a net server (4) and the example.net server
-              (5), which returns the address of ns1.example.net. Asking that server (6) gives the address of
-              www.example.org. The proof walks a small model of these servers and counts the queries. Proof script
-              output: 6.
-        build:
-          prompt: >-
-            Loop: send the query to the current server, and if the answer section holds an A record, print the address
-            and stop. Otherwise take a name server from the authority section, find its address in the additional
-            section, and ask it next. Print each server you query. For dns.google.com you should see 198.41.0.4, then
-            a com server such as 192.12.94.30, then a google.com server such as 216.239.34.10, and finally the address
-            8.8.8.8.
+        minutes: 60
+        build: "Loop: send the query to the current server; stop when the answer section holds an A record; otherwise take a
+          name server from the authority section and its address from the additional section, and ask it. When a name
+          server has no address, resolve its name from the root first. Stop after a fixed number of queries."
+        outcome: Resolving dns.google.com from the root prints each server queried and ends with the same address as dig, and
+          a name whose servers have no glue is still resolved, with the total number of queries capped.
+        concepts:
+          - iterative-resolution
+          - udp-datagrams
         hints:
-          hint: When a referral gives a server's name but not its address, what must happen before you can ask it?
-          example: >-
-            Told to ask Sam at the post office, you first have to find out where the post office is before you can
-            ask Sam anything.
-
-      - title: Handle every kind of referral
-        minutes: 15
-        think:
-          kind: spot_bug
-          prompt: >-
-            This loop resolves some names but fails on others. Find the problems and say how to fix them.
-          snippet: |-
-            server = "198.41.0.4"
-            while true:
-                reply = ask(server, name)
-                if reply.answers is not empty:
-                    return reply.answers[0].data
-                server = reply.authority[0].data
-          rubric:
-            - id: p1
-              point: "An NS record in the authority section holds a server's name, not its address, so it cannot be used directly as the next server"
-            - id: p2
-              point: "The address should come from the A record for that name in the additional section, and when there is none, the server's name must be resolved from the root first"
-            - id: p3
-              point: "There is no limit on the number of queries and no check for a reply with an error or an empty authority section, so it can loop forever or crash"
-        build:
-          prompt: >-
-            Handle a referral whose name server has no address in the additional section by resolving that server's
-            name from the root first, then carry on. Stop with an error after a fixed number of queries, or when a
-            reply reports that the name does not exist.
+          hint: Print each step of the walk, the way dig with its trace option does, and compare the two.
+      - title: Cache answers by TTL
+        minutes: 45
+        build: Keep every record you receive, including referrals, in a cache keyed by name and type, and reuse it until its
+          TTL runs out. Accept several names in one run to test it.
+        outcome: Resolving a list in which one name appears twice sends no queries for the second copy, and after its TTL has
+          passed, shortened in a test, the name is queried again.
+        concepts:
+          - dns-caching-ttl
         hints:
-          hint: Look at what kind of value the authority section holds, and ask whether the loop can ever give up.
-          example: >-
-            A forwarding note that says ask the town hall is no use until you look up the town hall's address, and
-            someone who follows notes forever with no limit may walk in circles.
-    teach_back:
-      prompt: >-
-        Explain how your resolver finds the address of any name starting from a root server, and how it reads each
-        reply to decide what to do next.
-      rubric:
-        - id: t1
-          concept: iterative-resolution
-          point: "It asks a root server, which refers it to the top-level domain's servers, which refer it to the domain's authoritative servers, which return the address"
-        - id: t2
-          concept: bit-packing
-          point: "It clears the recursion desired bit, because it follows the referrals itself and these servers do not resolve for it"
-        - id: t3
-          concept: dns-message-format
-          point: "An A record in the answer section ends the search, while a referral puts NS records in the authority section and, when given, their addresses in the additional section"
-        - id: t4
-          concept: iterative-resolution
-          point: "When a referral names a server without its address, it resolves that server's name first and then carries on"
+          hint: Store the time each record expires, not the TTL itself.

@@ -3,7 +3,11 @@
 Status: draft for review. Owner: Abid. Date: 2026-10-29.
 Target: a working prototype for the No Hands challenge (Builders track), built so it can grow into the final product.
 v0.3: the command layer is removed (input is plain typing or Wispr Flow), completion is logic-first with an optional language, and the whole brief was checked for conflicts. The data model is in `DATA_MODEL.md`.
-v0.5 (29 Oct): content is **concept-first**. Each project is taught through the 3 to 5 deep concepts it builds, for example text encoding (UTF-8, UTF-16 surrogates, grapheme clusters) and constant-memory streaming for wc. Each concept gets a lesson, and questions test it in real situations, not the tool's output on toy inputs. The rules are in the "Concept-first" section of `CONTENT_FORMAT.md`.
+v0.6 (30 Oct): the learning model follows the user's own workflow (`learning2026/learning-java`). There are two tracks, a **learning map** and a **build plan**, linked by concept tags.
+- **Learning map:** Part A covers the concepts. Each has a lesson, where it shows up in this project, checked references and one explain-back. Part B (how the chosen language handles each concept) and Part C (packages for the plumbing) are generated at runtime by an agent with web search.
+- **Build plan:** the challenge's own steps, 30 to 60 minutes each, each with one checkable outcome.
+- **Progress** is Seen, Applied or Explained per concept, plus steps done, a help log and a session log.
+- There are no keyed quizzes. The full rules are in the "learning model (v3)" section of `CONTENT_FORMAT.md`, and they override anything below that conflicts.
 v0.4: the product must not be rigid for newcomers. A support level (Guided, Standard or Independent) is chosen at Start, every project opens with a plain-language primer, and the app never suggests code. Implementation of v0.4 is queued in `HANDOFF.md`.
 
 ## 1. Problem and idea
@@ -28,7 +32,7 @@ What "done" means for the prototype.
 | O1 | A guest reaches their first step in under 2 minutes, with no sign-up. |
 | O2 | A project goes in, and concepts come out. If the learner picks a language and framework, the concepts are translated to them. |
 | O3 | The learner controls how much help they get, under the help rule in section 5, and picks a support level at Start that suits them (Guided, Standard or Independent). |
-| O4 | Understanding is shown by answering Think tasks and gate questions (typed or dictated) and is recorded as evidence. |
+| O4 | Understanding is shown by answering each concept's explain-back (typed or dictated), graded by rubric with quotes, and is recorded as evidence. |
 | O5 | If the learner picks a language, a public GitHub repo can be read, including what changed since the last check. This is optional. |
 | O6 | Everything learned can be exported (Markdown and JSON). |
 | O7 | It meets the challenge rules: live link, free for judges to use, 2-minute demo, built by voice, spend capped. |
@@ -43,8 +47,8 @@ What "done" means for the prototype.
 | F2 | Project in: every Coding Challenges and roadmap.sh project is listed, each with its own overview page. The app maps a project to concepts. Pasting any requirements comes later. |
 | F3 | Language and framework: both optional, chosen in the Start box (a few suggestions, or type your own) and changeable later. With none, the project runs concept-only. With one, the concepts are translated to it (APIs, pitfalls, links). |
 | F4 | Restate step: the learner restates the project in their own words and the app checks it against a rubric. |
-| F5 | Concepts: a short brief and one verified link each. A concept counts as explained when a gate question mapped to it is passed. |
-| F6 | Steps of about 10 to 20 minutes inside milestones of 30 to 60 minutes. Each step has a Think task that decides completion and an optional Build task. Help levels follow section 5. |
+| F5 | Concepts: a lesson (how it works, examples, misconceptions, where else it shows up), where it shows up in this project, 2 to 4 checked references, and one explain-back. A concept counts as explained when its explain-back passes. |
+| F6 | Build steps of 30 to 60 minutes, following the challenge's own steps and grouped into milestones. Each has one checkable outcome and the concepts it uses, and is done when the learner ticks the outcome as met. Help levels follow section 5. |
 | F7 | Repo check (optional, only with a language): a public repo URL, covering commits since the last check. It sets "applied" and the Built badge and never blocks. |
 | F8 | Memory: concept status, evidence (quotes, commits), and a short summary of each session. |
 | F9 | Export: a Markdown learning log and a JSON dump. |
@@ -81,8 +85,8 @@ The learner picks a support level in the Start box, and can change it on the pro
 |---|---|---|---|
 | Primer | Shown first, in full | On the overview, collapsed on the project home | Collapsed |
 | Concept brief | Opened before each step | One click away | One click away |
-| Hint | Shown straight after a wrong Think attempt, and offered after half the step's estimate | Offered when the step passes its estimate | Only when asked |
-| Teach-back | Split into its parts as prompts, one box each | One open question | One open question |
+| Hint | Shown straight after a "not yet" explain-back, and offered after half the step's estimate | Offered when the step passes its estimate | Only when asked |
+| Explain-back | Split into its rubric points as prompts, one box each | One open question | One open question |
 | Wording | Short sentences, terms explained when first used | Plain | Plain |
 
 At every level the learner can ask for any help at any time and nothing is refused. The completion rules are identical, so evidence means the same thing whichever level was used.
@@ -103,7 +107,7 @@ Content is written as YAML files (one concept catalogue and one file per project
 
 ## 7. User flow
 
-The landing page lists every project. Opening one shows its overview on its own route, which also suits phones better than a pop-up. Start asks for an optional name, email, language, framework and support level. With no language the learner works concept-only. On the project home the learner restates the project in their own words. Then the loop runs per milestone: learn the concepts, work through each step's Think task, optionally build and run a repo check, and answer the milestone's gate questions. Progress and export are always reachable.
+The landing page lists every project. Opening one shows its overview on its own route, which also suits phones better than a pop-up. Start asks for an optional name, email, language, framework and support level. With no language the learner works concept-only. On the project home the learner restates the project in their own words. Then the loop runs per milestone: learn its concepts (lesson, references, and the language's tools when a language is chosen), build each step against its checkable outcome, and answer each concept's explain-back. Progress and export are always reachable.
 
 ### Input
 
@@ -119,9 +123,9 @@ Every page shares one frame: a top bar (Projects, Your learning, Export), a brea
 | By concept view | Browse by concept | The same projects grouped under each concept area, with the learner's status on each concept |
 | Project overview (its own route) | Decide to start | What to build, a plain-language primer, what it needs to do (our own summary), concepts by area, milestones with time estimates, the Start box (optional name, email, language, framework and support level, or continue as a guest concept-only), and a link to the original at the bottom |
 | Project home | Work on the project | Progress, a Start here card the first time (the primer in Guided, then restate the project in your own words) and a Next up card after, milestones, concepts, a repo box (only with a language), and the help log |
-| Step | Work on a step | The Think task (required), the Build task (optional, with a language), the help buttons and level, and an answer box |
-| Concept | Learn one concept | A short brief, one verified link, notes for the learner's language when chosen, and the help buttons |
-| Milestone gate | Close a milestone | The 3 questions with answer boxes and feedback by rubric point |
+| Step | Work on a step | The step's outcome and the concepts it uses, the help buttons and level, the mentor, and a "Mark outcome met" control |
+| Concept | Learn one concept | The lesson, where it shows up in this project, checked references, the language's tools and packages when chosen (Parts B and C), the explain-back, and the help buttons |
+| Explain-back | Show understanding of a concept | One open question with an answer box and feedback by rubric point, with quotes from the learner's own words |
 | Repo check | Read the work (only with a language) | Repo URL box, commits since the last check, findings per concept |
 | Your learning | See progress | Projects in progress, concepts by area with status and the learner's own words, the help log, Export |
 
@@ -146,10 +150,12 @@ Status is derived from an append-only event log: step started, help used, answer
 
 | Level | Complete when |
 |---|---|
-| Concept | It moves new, then seen (the learner says they read the brief), then explained (a gate question mapped to it passed), then applied (the repo shows it in code) |
-| Step | Its Think task passes (predict, trace, spot the bug, or explain). Writing code is optional and never blocks it |
-| Milestone | All its steps are done and all 3 gate questions are passed. This is Understood. If the repo also shows the code, it is Built too |
-| Project | All milestones are Understood and the closing reflection is submitted. Built is a second badge, earned when the repo covers the milestones |
+| Concept | It moves new, then seen (the learner read the lesson), then applied (used in the build: the learner ticks it, or a repo check shows it), and explained (its explain-back passed) |
+| Step | The learner ticks its checkable outcome as met. Concept-only learners skip the build steps |
+| Milestone | Understood when all its concepts are explained. Built when all its steps are done |
+| Project | All milestones are Understood and the closing reflection is submitted. Built is a second badge, earned when every step is done |
+
+> Superseded by v0.6: the example and the gate and Think-task rules below describe the old model (keyed Think tasks and gate questions). Keep them for history only. The learning model in `CONTENT_FORMAT.md` (v3) is current.
 
 Example, `wc` milestone 1 (Bytes and lines, 3 steps, about 45 minutes). Each step has a Think task that decides completion and a Build task that needs a language and is optional. The learner checks the Build result on their own machine, and the app does not verify it:
 
@@ -253,4 +259,4 @@ The judging weights are unconfirmed.
 | Real problem in your work | Juniors buried in AI-generated code; the author is that user |
 | Wispr use | Built by voice: every prompt, note and message is dictated. In the product, Think answers, gate answers and the restate step are long text, which is where dictation helps most. There is no voice-specific code, so this score rests on the build process and a demo that shows dictation in use |
 | Works | Guest start, live link, a concept-only default that needs no setup, no payment |
-| Demo | Pick a project, answer a Think task by dictation, ask for a hint, pass the milestone gate, export. Add a language and a repo link only if time allows |
+| Demo | Pick a project, read a concept's lesson, pick a language and see its generated tools, answer the explain-back by dictation, ask the mentor, tick a step, export |

@@ -27,6 +27,7 @@ The craft comes from editorial and technical manuals:
   - Name it with the referral link https://wisprflow.ai/r?MD13753 ("Referral link: sign up through it for a 30-day free trial of Flow Pro. Flow also has a free plan.").
   - Don't copy their logo. Don't mention command mode.
   - Show shortcut keys by OS: Mac `fn`, Windows `Ctrl` + `Win`. Note "Default shortcut. You can change it in Flow's settings."
+  - **Only on the landing page** (user, 30 Oct). No Wispr cue, key hint or Flow mention in answer boxes, the workspace, the mentor or any inner page. Plain text boxes work with dictation anyway.
 - **Piyush Garg quote:** at most one short line, linked to https://x.com/piyushgarg_dev/status/2115347356074045483. Never reproduce the whole post.
 - **The app never suggests code.** Hints and examples are words, analogies and small cases.
 - **Questions test understanding, not arithmetic.** Ask "how will you process stdin that might be 2 KB or 20 GB?", not "20,000 ÷ 8,192 = ?".

@@ -12,55 +12,109 @@ content/
   REVIEW_SHEET.md                     generated: every key, its derivation and its proof, for a person to check
 ```
 
-## Concept-first (v2, 29 Oct 2026): this section overrides anything below that conflicts with it
+## The learning model (v3, 30 Oct 2026): this section overrides anything below that conflicts with it
 
-The user rejected the v1 content. It followed the challenge page step by step and asked trivia about the tool on toy inputs ("hi plus a newline: how many bytes does ccwc -c report?"). That tests whether someone can run the tool in their head, not whether they learned anything. ThinkAloud exists to teach **the concepts a developer learns by building the project**, in enough depth to carry them to other work.
+This model comes from the learning workflow that worked for the user (`learning2026/learning-java`). It is general: the same shape serves every project, every language and every framework. Nothing in it is written for one language.
 
-**1. Start from the concepts, not from the challenge's steps.**
-- For each project, list the 3 to 5 big ideas it really teaches: what a good senior engineer would say "you learn X by building this".
-- Go beyond what the challenge page mentions when the idea needs it. For wc, "bytes vs characters" is not enough. The real idea is **how text is encoded**:
-  - code points
-  - UTF-8 as a variable-length encoding and why it is designed that way
-  - UTF-16 code units and surrogate pairs (why `length` of an emoji is 2 in Java and JavaScript)
-  - UTF-32
-  - byte order marks
-  - grapheme clusters (an emoji with a skin tone, or a family emoji, is one visible character but several code points)
-  - normalisation (é as one code point or as e plus a combining accent)
-  - why a decoder must carry a half-finished character across a chunk boundary
-- **Milestones are concepts** (or a tight group of them), ordered the way they should be learned, not the order of the challenge's steps. Each challenge step still appears as a Build task, attached to the milestone whose concept it applies.
+**Two tracks, linked by concept tags.**
+1. **Learning map**: what the project teaches.
+2. **Build plan**: what the learner builds, following the challenge's own steps.
 
-**2. Teach before you test.** Every concept gets a **lesson**, not just a 2 to 3 sentence brief:
-- how it works underneath
-- one or two concrete real-world examples (emoji in a username, a CSV from Excel with a BOM, a 20 GB log)
-- the usual misconceptions
-- where else it shows up (databases, APIs, other languages)
+Each build step names the concepts it uses. The concepts are not the milestones.
 
-Lessons are in words and small worked examples. The no-code rule still holds.
+### 1. Learning map, per project
 
-**3. Questions test the concept in the real world, not the tool on a toy input.**
-- Good:
-  - "😀 is U+1F600. How many bytes does it take in UTF-8, and why can't it take fewer?"
-  - "In Java, the length of a string holding 😀 is 2. What is being counted, and why?"
-  - "👍🏽 looks like one character. What is it made of, and what should a character count report?"
-  - "You decode a UTF-8 file in 4 KB chunks, each chunk on its own. What breaks, and where?"
-  - "Why does a streaming counter use the same memory for 2 KB and 20 GB, and what changes if it reads the whole file first?"
-- Bad, and no longer allowed:
-  - "A file holds h, i and a newline. What does ccwc -c report?"
-  - "hello world arrives as hel and lo world. How many words does the buggy counter report?"
-  - Any count of a made-up input whose only lesson is "you ran the tool in your head".
-- A `predict` or `trace` key is allowed only when the number or fact **is** a fact about the concept (4 bytes for U+1F600, 2 UTF-16 code units, 3 bytes for a BOM). Prefer `explain` with a rubric that asks for the reasoning, and pair a keyed fact with a "why".
-- Questions must be answerable by someone who understood the lesson, without having built the tool yet.
+**Part A: concepts.** These are the 3 to 12 ideas the project really teaches, written language-neutral.
+- Go as deep as the idea needs, beyond the challenge page. For wc: how text is encoded (code points, variable-length UTF-8, UTF-16 code units and surrogate pairs, grapheme clusters, normalisation), decoding a stream across chunk boundaries, and reading in constant memory.
+- Each concept has:
+  - **What it is:** the shared lesson in `concepts.yaml`. It covers how it works underneath, real-world examples, common misconceptions, and where else it shows up. One lesson serves every project that uses the concept.
+  - **Where it shows up in this project:** one or two sentences, written per project.
+  - **Read:** 2 to 4 references that were opened and checked to teach the concept: specs, RFCs, official docs, well-known articles. Mark each opened or not opened, and never guess a URL.
+  - **Explain-back:** one open question the learner answers in their own words, with a rubric of 2 to 4 points. This is the only graded check for a concept.
+- Concepts are named for the idea, shared across projects, and never duplicated.
 
-**4. The teach-back joins the milestone's concept into one explanation, out loud.** For example: "Explain to a teammate why counting characters in a UTF-8 file is harder than counting bytes, and what your tool does about it."
+**Part B: how the chosen language handles each concept.** This is generated at runtime by the language-layer agent, never hand-written per language.
+- It covers the mechanism, the standard-library types, modules and APIs that express it, the pitfalls ("why it bites in this language"), and checked official-docs links.
+- It is cached per concept, language and framework.
 
-**5. Concepts are shared and named for the idea, not the tool.**
-- Use `text-encoding-utf8`, not `bytes-vs-characters`, and `constant-memory-streaming`, not `read-in-chunks`.
-- One concept lesson serves every project that uses it.
-- Merge near-duplicates (`lexical-analysis` and `lexer-states`, `checksums` and `content-digests`).
+**Part C: packages and tools for the plumbing.** Also generated, for the chosen language or framework:
+- the industry-standard package or framework part for each need (command line, tests, lint, JSON, persistence and so on)
+- why it's used, and a checked link
+- what the learner writes by hand: only the part the project exists to teach
 
-**6. Process.** Rewrite `wc` first as the worked example and show it to the user. Rewrite the other projects only after the user accepts it, in the same shape.
+### 2. Build plan, per project
+- **Spec:** the challenge in our own words, the source link, expected outputs and edge cases.
+- **Milestones** group the build steps in the challenge's own order.
+- **Steps take 30 to 60 minutes**, each with **one checkable outcome** ("`-c` and `-l` match the reference on the sample file") and the concepts it uses.
+- **Open checks:** facts nobody has verified yet, settled by experiment while building, never stated as fact.
+- **Done when:** the project's completion criteria.
 
-**7. How the checker applies v2 (implemented 29 Oct 2026).**
+### 3. Progress
+- **Per concept:** Seen (read the lesson), Applied (used in the build: the learner ticks it, or a repo check confirms it), Explained (the explain-back passed).
+- **Per step:** done when the learner ticks its outcome as met. The app cannot run their code.
+- **Logs:** every hint, example or code given goes in the help log, and each working session is summarised in a session log.
+- **Milestones:** a milestone is **Understood** when its concepts are explained, and **Built** when its steps are done.
+- **Concept-only learners** (no language) work the learning map alone and can still reach Understood.
+
+### 4. Questions
+- The explain-back tests the idea in a real situation, answerable by someone who understood the lesson.
+- No keyed quizzes and no counts of made-up inputs ("a file holds h, i and a newline: what does it report?").
+- The restate step and the closing reflection stay.
+
+### 5. Who produces what (agents)
+- **Curriculum author:**
+  - reads the challenge page
+  - writes the spec, Part A, the per-project "where it shows up", the explain-backs and the build plan
+  - finds and opens the references with web search (Linkup)
+  - confirms technical facts by running code
+- **Language-layer agent:** Parts B and C, at runtime, with web search over official docs.
+- **Mentor:** teaches with the "How to explain" method, gives help on request with no budget, and answers in short actionable steps.
+- **Grader:** grades explain-backs and the restate step against their rubrics, with verbatim quotes.
+
+### 6. Project file shape, format 3
+
+```yaml
+format: 3
+project:
+  source, slug, title, source_url, level, status: generated, figure: { kind }   # as before
+  summary: ...                      # our own words, under 400 characters
+  requirements: [2 to 8]            # what it must do, our own words
+  primer: { what, why, example, words }          # as before, no code
+  restate_rubric: [2 to 4 points]
+  reflection_prompt: ...
+  reference_tool: ...               # what to compare against, if a real tool exists (for example GNU wc), else omit
+  done_when: ...                    # the project's completion criteria, one paragraph
+  open_checks: [0 to 6]             # facts to settle by experiment while building, never stated as fact
+
+learning_map:                       # Part A, 3 to 12 concepts, in the order to learn them
+  - concept: slug                   # in concepts.yaml, with a lesson and 2 to 4 resources
+    where: ...                      # 1 to 2 sentences: where it shows up in THIS project
+    explain_back:
+      prompt: ...                   # one open question about the idea in a real situation
+      rubric:                       # 2 to 4 points a learner can say in their own words
+        - id: e1
+          point: "..."
+
+milestones:                         # 2 to 5, grouping the challenge's own steps in order
+  - title: ...
+    summary: ...
+    steps:                          # 1 to 5
+      - title: ...
+        minutes: 45                 # 30 to 60
+        build: ...                  # what to build in this step, in words
+        outcome: ...                # ONE checkable outcome ("-c and -l match the reference on test.txt")
+        concepts: [slug]            # 1 to 3, each in learning_map
+        hints:
+          hint: ...                 # a nudge in words
+          example: ...              # optional, a parallel case in words
+```
+
+- Every learning-map concept is used by at least one step. Milestone concepts are the union of their steps' concepts.
+- Resources live on the concept in `concepts.yaml`. Each has `title`, `url` and `opened: true` once someone has read it and confirmed it teaches the concept. Concept resources are language-neutral; language links come from the language-layer agent.
+- No code anywhere, except names of tools, flags, protocols and file formats.
+- Parts B and C are not in these files. They are generated at runtime.
+
+### 7. Checker notes carried over from v2 (implemented 29 Oct 2026)
 - A concept-first project file says `format: 2`. Format 1 files (the first 21 projects) still load until they are rewritten.
 - In format 2 a milestone lists 1 to 4 concepts (one big idea or a tight group), and the teach-back still tags every one.
 - Every concept a format 2 project uses must have a `lesson` in `concepts.yaml`, and must not be `superseded_by` another concept:

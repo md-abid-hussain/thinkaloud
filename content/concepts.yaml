@@ -21,13 +21,13 @@ concepts:
     kind: foundation
     status: reviewed
     brief: A byte is a unit of storage. A character is a unit of text. In UTF-8 one character takes one to four bytes.
-    superseded_by: text-encoding-utf8   # content v2 teaches this inside the full encoding lesson
+    superseded_by: text-encoding-utf8 # content v2 teaches this inside the full encoding lesson
 
   - slug: explicit-charsets
     name: Explicit charsets
     area: text-encodings
     kind: foundation
-    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
+    status: generated # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: Decoding bytes needs a named encoding. Relying on a platform default breaks when the tool runs elsewhere.
     lesson:
       how_it_works: |-
@@ -47,8 +47,8 @@ concepts:
         When a UTF-8 file does start with a byte order mark, decide what to do with it. Most readers should skip it,
         since it is not part of the text.
       examples:
-        - A CSV saved by Excel as CSV UTF-8 starts with EF BB BF. A script that does not skip it reads the first column
-          name as an invisible character followed by name, and lookups by that name fail.
+        - A CSV saved by Excel as CSV UTF-8 starts with EF BB BF. A script that does not skip it reads the first
+          column name as an invisible character followed by name, and lookups by that name fail.
         - A program that shows é correctly on a developer's Mac shows Ã© on a Windows build server, because it decoded
           with the default encoding instead of UTF-8.
         - A web page served with the wrong charset in its Content-Type header shows mojibake, although the file itself
@@ -62,13 +62,23 @@ concepts:
         - Command-line tools read the locale to decide how to decode, so the same command can count differently on two
           machines.
         - APIs that accept text should say which encoding they expect, and reject or convert anything else.
-    prerequisites: [text-encoding-utf8]
+    prerequisites: [ text-encoding-utf8 ]
+    resources:
+      - title: "W3C, Character encodings: Essential concepts"
+        url: https://www.w3.org/International/articles/definitions-characters/
+        opened: true
+      - title: W3C, Choosing and applying a character encoding
+        url: https://www.w3.org/International/questions/qa-choosing-encodings
+        opened: true
+      - title: Mojibake (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Mojibake
+        opened: true
 
   - slug: decoding-across-chunks
     name: Decoding across chunk boundaries
     area: text-encodings
     kind: foundation
-    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
+    status: generated # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: A chunk of bytes can end in the middle of a character, so a decoder keeps the leftover bytes for the next chunk.
     lesson:
       how_it_works: |-
@@ -90,28 +100,35 @@ concepts:
         Byte-level counts such as bytes and newlines need no decoding at all, because in UTF-8 a newline byte never
         appears inside a multi-byte character.
       examples:
-        - A tool counts characters correctly on a short test file but reports a few extra on a large Chinese text, where
-          three-byte characters often straddle the 4096-byte boundary.
+        - A tool counts characters correctly on a short test file but reports a few extra on a large Chinese text,
+          where three-byte characters often straddle the 4096-byte boundary.
         - A chat server that decodes each network packet separately sometimes shows a broken symbol in the middle of a
           message with emoji, whenever a packet boundary splits one.
-        - A log shipper that cuts files into fixed-size pieces for upload must cut on line boundaries, or each piece can
-          no longer be decoded on its own.
+        - A log shipper that cuts files into fixed-size pieces for upload must cut on line boundaries, or each piece
+          can no longer be decoded on its own.
       misconceptions:
         - Decoding chunk by chunk is the same as decoding the whole file. Only when no character crosses a boundary.
         - A bigger buffer fixes it. It only makes boundaries rarer, so the bug hides better.
         - Counting bytes and lines needs decoding too. In UTF-8 newline bytes can be counted on the raw bytes.
       elsewhere:
-        - Anything that carries text over a stream, such as chat, WebSockets or server-sent events, needs a decoder that
-          keeps state.
+        - Anything that carries text over a stream, such as chat, WebSockets or server-sent events, needs a decoder
+          that keeps state.
         - "Compression and encryption streams have the same shape: state is carried from one block to the next."
         - Editors that open huge files in pieces must align the pieces to character boundaries.
-    prerequisites: [explicit-charsets, stream-read-contract]
+    prerequisites: [ explicit-charsets, stream-read-contract ]
+    resources:
+      - title: WHATWG Encoding Standard (streaming decode and end-of-stream flush)
+        url: https://encoding.spec.whatwg.org/
+        opened: true
+      - title: UTF-8 (Wikipedia), self-synchronisation and byte sequences
+        url: https://en.wikipedia.org/wiki/UTF-8
+        opened: true
 
   - slug: streaming-constant-memory
     name: Streaming in constant memory
     area: streams-io
     kind: foundation
-    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
+    status: generated # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: Read input in fixed-size chunks and keep running totals, so memory does not grow with the input.
     lesson:
       how_it_works: |-
@@ -134,27 +151,37 @@ concepts:
       examples:
         - Counting the lines of a 20 GB web server log with a streaming counter takes a few megabytes of memory and
           finishes as fast as the disk can be read. Loading it first fails on most laptops.
-        - A video player decodes a few seconds ahead and throws away what it has shown, so a two-hour film never sits in
-          memory at once.
-        - Database backups are written and read as streams, so the size of the database is not limited by the memory of
-          the machine that makes the backup.
+        - A video player decodes a few seconds ahead and throws away what it has shown, so a two-hour film never sits
+          in memory at once.
+        - Database backups are written and read as streams, so the size of the database is not limited by the memory
+          of the machine that makes the backup.
       misconceptions:
         - Reading line by line is always streaming. It is, until the code collects the lines into a list.
         - A bigger buffer is always faster. Beyond some tens of kilobytes the disk is the limit, and more buffer only
           costs memory.
-        - Streaming is only for huge files. The same code handles small files and pipes, so there is no reason to write
-          two versions.
+        - Streaming is only for huge files. The same code handles small files and pipes, so there is no reason to
+          write two versions.
       elsewhere:
         - HTTP servers stream request and response bodies, so a large upload does not need to fit in memory.
         - grep, gzip, checksum programs and the merge phase of sort all stream.
         - Data pipelines are designed around what state they must keep per record.
-    prerequisites: [stream-read-contract]
+    prerequisites: [ stream-read-contract ]
+    resources:
+      - title: Data buffer (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Data_buffer
+        opened: true
+      - title: Pipeline (Unix) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Pipeline_(Unix)
+        opened: true
+      - title: read(2), Linux manual page
+        url: https://man7.org/linux/man-pages/man2/read.2.html
+        opened: true
 
   - slug: stdin-vs-file
     name: Standard input vs file
     area: streams-io
     kind: foundation
-    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
+    status: generated # brief reviewed for v1; lesson added 2026-10-29, not reviewed
     brief: A file and standard input can be treated as the same kind of byte stream, so one loop serves both.
     lesson:
       how_it_works: |-
@@ -187,13 +214,24 @@ concepts:
         - Compilers, formatters and build tools read standard input so editors and scripts can pipe code through them.
         - Containers and services write logs to standard output so the platform can collect the stream.
         - "Network sockets behave like pipes: no size and no rewind."
+    resources:
+      - title: Standard streams (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Standard_streams
+        opened: true
+      - title: stdin(3), Linux manual page
+        url: https://man7.org/linux/man-pages/man3/stdin.3.html
+        opened: true
+      - title: Pipeline (Unix) (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Pipeline_(Unix)
+        opened: true
 
   - slug: stream-read-contract
     name: The read contract
     area: streams-io
     kind: foundation
-    status: generated          # brief reviewed for v1; lesson added 2026-10-29, not reviewed
-    brief: A read can return fewer bytes than the buffer holds. The returned count says how many are valid, and -1 means the end.
+    status: generated # brief reviewed for v1; lesson added 2026-10-29, not reviewed
+    brief: A read can return fewer bytes than the buffer holds. The returned count says how many are valid, and -1 means
+      the end.
     lesson:
       how_it_works: |-
         When a program asks the operating system to read into a buffer, it says how many bytes it wants at most. The
@@ -211,22 +249,29 @@ concepts:
         counts leftover bytes again. A loop that breaks the second stops early on pipes and networks while appearing to
         work on files, which is why the bug often survives testing.
       examples:
-        - A 10 KB file read with a 4 KB buffer usually comes back as 4 KB, 4 KB and 2 KB, then the end marker. A program
-          that always adds 4 KB reports 12 KB.
+        - A 10 KB file read with a 4 KB buffer usually comes back as 4 KB, 4 KB and 2 KB, then the end marker. A
+          program that always adds 4 KB reports 12 KB.
         - When a slow program writes into a pipe a line at a time, each read may return one short line, although much
           more is coming.
-        - Network code that expects one read to return one whole message works on a fast local network and fails when a
-          message is split across packets.
+        - Network code that expects one read to return one whole message works on a fast local network and fails when
+          a message is split across packets.
       misconceptions:
         - A read fills the buffer unless the input is over. It can return fewer bytes at any time.
         - Getting fewer bytes than asked for means the end. Only the end marker means the end.
-        - The bytes beyond the count are zero. They are left over from earlier reads, so counting them adds real-looking
-          data.
+        - The bytes beyond the count are zero. They are left over from earlier reads, so counting them adds
+          real-looking data.
       elsewhere:
         - Sockets follow the same contract, which is why network protocols need message framing.
         - Every language wraps it, for example InputStream in Java, the read call in C and streams in Node.
         - "Writes have a matching contract: a write can accept fewer bytes than offered, and the rest must be written
           again."
+    resources:
+      - title: read(2), Linux manual page (return value and short reads)
+        url: https://man7.org/linux/man-pages/man2/read.2.html
+        opened: true
+      - title: read(3p), POSIX Programmer's Manual
+        url: https://man7.org/linux/man-pages/man3/read.3p.html
+        opened: true
 
   # ---- added for wc ----
   - slug: line-endings
@@ -235,9 +280,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A line is the text up to and including a newline byte, so tools count lines by counting newlines. A last
-      line with no newline after it is not counted. Files written on Windows end each line with a carriage return
-      and a newline, and the carriage return is an extra byte that line counting ignores but byte counting sees.
+      A line is the text up to and including a newline byte, so tools count lines by counting newlines. A last line
+      with no newline after it is not counted. Files written on Windows end each line with a carriage return and a
+      newline, and the carriage return is an extra byte that line counting ignores but byte counting sees.
     lesson:
       how_it_works: |-
         A file has no lines, only bytes. A line is a convention: in Unix, the text up to a newline byte, 0A. POSIX
@@ -272,7 +317,7 @@ concepts:
         - HTTP, SMTP and many other protocols require a carriage return and a newline at the end of every header line.
         - Git's autocrlf setting and attributes file exist to control this conversion.
         - Diff tools show a whole file as changed when only its line endings changed.
-    related: [text-encoding-utf8]
+    related: [ text-encoding-utf8 ]
     resources:
       - title: Newline (Wikipedia)
         url: https://en.wikipedia.org/wiki/Newline
@@ -308,11 +353,12 @@ concepts:
         the same file can have different word counts on two machines.
       examples:
         - The phrase rock-and-roll is one word to wc and three to a person or a search engine.
-        - Text pasted from a web page often has no-break spaces between words, and a counter that does not treat them as
-          whitespace reports fewer words than the author expects.
+        - Text pasted from a web page often has no-break spaces between words, and a counter that does not treat them
+          as whitespace reports fewer words than the author expects.
         - Japanese text usually has no spaces between words, so wc counts whole sentences as single words.
       misconceptions:
-        - Counting words means counting spaces and adding one. Double spaces, leading spaces and empty files break that.
+        - Counting words means counting spaces and adding one. Double spaces, leading spaces and empty files break
+          that.
         - A word is what a dictionary calls a word. For wc it is any run of non-whitespace.
         - Whitespace means the space bar. Tabs, newlines and several Unicode characters count too, depending on the
           locale.
@@ -320,10 +366,14 @@ concepts:
         - "Lexers in compilers use the same idea with more states: inside a number, a string or a comment."
         - Editors and search engines use the Unicode word boundary rules to select and index words.
         - Protocol parsers carry a small state across network packets in exactly this way.
-    related: [streaming-constant-memory]
+    related: [ streaming-constant-memory ]
     resources:
       - title: Finite-state machine (Wikipedia)
         url: https://en.wikipedia.org/wiki/Finite-state_machine
+        opened: true
+      - title: Newline (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Newline
+        opened: true
 
   - slug: differential-testing
     name: Testing against a reference tool
@@ -331,9 +381,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Run your tool and a trusted reference on the same inputs and compare the outputs. Your own expected values
-      only test what you already believe, while the reference exposes cases you did not think of, such as odd
-      whitespace or line endings. Pin the reference version and settings, since they can change its answers.
+      Run your tool and a trusted reference on the same inputs and compare the outputs. Your own expected values only
+      test what you already believe, while the reference exposes cases you did not think of, such as odd whitespace or
+      line endings. Pin the reference version and settings, since they can change its answers.
     lesson:
       how_it_works: |-
         Unit tests compare your program with expected values that you wrote. That checks the cases you thought of,
@@ -354,8 +404,8 @@ concepts:
         - The real wc in Git Bash reports 58070 words for the challenge's file when run from a script and 58164 in its
           terminal, because the locale differs, so a test that compares against it must pin the locale first.
         - Compiler teams compile the same programs with two compilers and compare the results to find miscompilations.
-        - When a service is rewritten, running the old and new versions side by side on real traffic and comparing their
-          responses catches differences before users do.
+        - When a service is rewritten, running the old and new versions side by side on real traffic and comparing
+          their responses catches differences before users do.
       misconceptions:
         - If my unit tests pass, my tool matches the original. Only for the cases and answers you wrote down.
         - The reference is always right. It has bugs and version differences too, so a difference is a question, not a
@@ -368,6 +418,10 @@ concepts:
     resources:
       - title: Differential testing (Wikipedia)
         url: https://en.wikipedia.org/wiki/Differential_testing
+        opened: true
+      - title: Command Line Interface Guidelines (output and behaviour scripts rely on)
+        url: https://clig.dev/
+        opened: true
 
   # ---- added for the static site generator ----
   - slug: site-directory-layout
@@ -376,9 +430,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A site generator treats folders as its data model. Content holds what the author writes, themes hold how
-      pages look, and the output folder holds what gets published. Keeping them apart lets each change without
-      touching the others, and lets the output be rebuilt from the other two.
+      A site generator treats folders as its data model. Content holds what the author writes, themes hold how pages
+      look, and the output folder holds what gets published. Keeping them apart lets each change without touching the
+      others, and lets the output be rebuilt from the other two.
     resources:
       - title: Hugo, directory structure
         url: https://gohugo.io/getting-started/directory-structure/
@@ -390,8 +444,8 @@ concepts:
     status: generated
     brief: >-
       A command-line tool reads its options, subcommands and file names from its arguments, and rejects ones it does
-      not understand. It writes results to standard output and problems to the error stream, and exits with a
-      non-zero status on failure, so scripts can tell success from failure.
+      not understand. It writes results to standard output and problems to the error stream, and exits with a non-zero
+      status on failure, so scripts can tell success from failure.
     lesson:
       how_it_works: |-
         A command-line tool has a contract with its caller, which is often another program rather than a person. The
@@ -426,6 +480,13 @@ concepts:
     resources:
       - title: Command Line Interface Guidelines
         url: https://clig.dev/
+        opened: true
+      - title: Exit status (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Exit_status
+        opened: true
+      - title: Standard streams (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Standard_streams
+        opened: true
 
   - slug: untrusted-paths
     name: Untrusted names in file paths
@@ -433,10 +494,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A name that ends up inside a file path, from a command line or a web request, can contain .. and climb out
-      of the folder you meant. Resolve the full path, normalise it, and check that it still sits inside the base
-      folder before you read or write.
-    related: [site-directory-layout]
+      A name that ends up inside a file path, from a command line or a web request, can contain .. and climb out of
+      the folder you meant. Resolve the full path, normalise it, and check that it still sits inside the base folder
+      before you read or write.
+    related: [ site-directory-layout ]
     resources:
       - title: OWASP, Path traversal
         url: https://owasp.org/www-community/attacks/Path_Traversal
@@ -461,7 +522,7 @@ concepts:
       A Markdown renderer works in two layers. It finds the block structure first, such as headings and paragraphs,
       then handles inline marks such as emphasis and links inside each block. The result is written out as HTML
       elements.
-    related: [explicit-charsets]
+    related: [ explicit-charsets ]
     resources:
       - title: CommonMark specification
         url: https://spec.commonmark.org/
@@ -487,9 +548,9 @@ concepts:
     status: generated
     brief: >-
       A template is text with named holes, such as {{ Title }}. Filling it in one pass over the template, instead of
-      one replace per name, keeps text that merely looks like a placeholder inside a value from being filled in
-      a second time.
-    prerequisites: [markup-to-html, output-escaping]
+      one replace per name, keeps text that merely looks like a placeholder inside a value from being filled in a
+      second time.
+    prerequisites: [ markup-to-html, output-escaping ]
     resources:
       - title: Hugo, introduction to templating
         url: https://gohugo.io/templates/introduction/
@@ -501,9 +562,9 @@ concepts:
     status: generated
     brief: >-
       A build reads inputs, transforms them and writes outputs, and the same inputs should always give the same
-      output. Writing everything into a freshly cleared output folder, instead of editing files in place, keeps
-      stale files out and makes the result safe to publish as a whole.
-    prerequisites: [site-directory-layout]
+      output. Writing everything into a freshly cleared output folder, instead of editing files in place, keeps stale
+      files out and makes the result safe to publish as a whole.
+    prerequisites: [ site-directory-layout ]
     resources:
       - title: Static site generator (Wikipedia)
         url: https://en.wikipedia.org/wiki/Static_site_generator
@@ -517,7 +578,7 @@ concepts:
       A static server turns a URL path into a file. It maps / to index.html, sends the file with the right
       Content-Type, and answers 404 when nothing matches. The browser trusts the Content-Type header, not the file
       extension.
-    prerequisites: [untrusted-paths]
+    prerequisites: [ untrusted-paths ]
     resources:
       - title: MDN, MIME types
         url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types
@@ -565,7 +626,7 @@ concepts:
       A page cannot know that the server rebuilt it unless something tells it. The development server keeps a
       connection open, for example with server-sent events, and sends a message after each rebuild. A small script
       added to pages in development only then reloads the browser.
-    prerequisites: [static-file-serving, file-watching]
+    prerequisites: [ static-file-serving, file-watching ]
     resources:
       - title: MDN, Using server-sent events
         url: https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
@@ -577,10 +638,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Tab- and comma-separated files store one record per line, split into fields at a delimiter character. Fields
-      are numbered from 1, and two delimiters in a row mean an empty field, not a missing one. Plain splitting breaks
-      when a value contains the delimiter inside quotes, which full CSV parsers handle and simple tools do not.
-    related: [line-endings]
+      Tab- and comma-separated files store one record per line, split into fields at a delimiter character. Fields are
+      numbered from 1, and two delimiters in a row mean an empty field, not a missing one. Plain splitting breaks when
+      a value contains the delimiter inside quotes, which full CSV parsers handle and simple tools do not.
+    related: [ line-endings ]
     resources:
       - title: Delimiter-separated values (Wikipedia)
         url: https://en.wikipedia.org/wiki/Delimiter-separated_values
@@ -594,7 +655,7 @@ concepts:
       Small tools that read standard input and write standard output can be chained, so each does one job and the
       shell joins them. Lines of text are the shared format. The order of the chain matters, because some tools only
       work on what they see next to each other, such as uniq, which only removes adjacent duplicates.
-    prerequisites: [stdin-vs-file]
+    prerequisites: [ stdin-vs-file ]
     resources:
       - title: Pipeline (Unix) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Pipeline_(Unix)
@@ -605,9 +666,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A regular expression describes a set of strings using literal characters, classes such as any digit or any
-      word character, and anchors for the start and end of a line. A line matches when the pattern succeeds starting
-      at some position in it, so an unanchored pattern can match anywhere and an empty pattern matches every line.
+      A regular expression describes a set of strings using literal characters, classes such as any digit or any word
+      character, and anchors for the start and end of a line. A line matches when the pattern succeeds starting at
+      some position in it, so an unanchored pattern can match anywhere and an empty pattern matches every line.
     resources:
       - title: Regular expression (Wikipedia)
         url: https://en.wikipedia.org/wiki/Regular_expression
@@ -633,10 +694,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A case-insensitive match maps both the pattern and the text to one common form before comparing. In ASCII that is
-      a simple swap between upper and lower letters, but in Unicode some letters change length or have more than one
-      lower-case form, so the language's case-folding rules are safer than a hand-made table.
-    related: [bytes-vs-characters]
+      A case-insensitive match maps both the pattern and the text to one common form before comparing. In ASCII that
+      is a simple swap between upper and lower letters, but in Unicode some letters change length or have more than
+      one lower-case form, so the language's case-folding rules are safer than a hand-made table.
+    related: [ bytes-vs-characters ]
     resources:
       - title: Unicode FAQ, case mapping
         url: https://unicode.org/faq/casemap_charprop.html
@@ -648,9 +709,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A lexer reads characters and groups them into tokens, such as a brace, a string, a number or a keyword, and skips
-      the whitespace between them. The parser then works with meaningful pieces instead of single characters, and the
-      lexer is the natural place to reject a character that cannot start any token.
+      A lexer reads characters and groups them into tokens, such as a brace, a string, a number or a keyword, and
+      skips the whitespace between them. The parser then works with meaningful pieces instead of single characters,
+      and the lexer is the natural place to reject a character that cannot start any token.
     resources:
       - title: Lexical analysis (Wikipedia)
         url: https://en.wikipedia.org/wiki/Lexical_analysis
@@ -664,7 +725,7 @@ concepts:
       A recursive descent parser has one function per rule of the grammar, and a rule that contains other rules calls
       their functions, so nesting in the input becomes nesting of calls. It looks at the next token to decide which
       rule applies and reports an error at the first token no rule allows.
-    prerequisites: [lexical-analysis]
+    prerequisites: [ lexical-analysis ]
     resources:
       - title: Recursive descent parser (Wikipedia)
         url: https://en.wikipedia.org/wiki/Recursive_descent_parser
@@ -678,7 +739,7 @@ concepts:
       A JSON value is an object, an array, a string, a number, true, false or null, and objects and arrays can hold
       any value, nested as deep as you like. The rules are strict: keys are double-quoted strings, there are no
       trailing commas or comments, and numbers have no leading zeros.
-    related: [recursive-descent-parsing]
+    related: [ recursive-descent-parsing ]
     resources:
       - title: Introducing JSON (json.org)
         url: https://www.json.org/json-en.html
@@ -691,10 +752,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A conformance suite is a shared set of inputs, each with the verdict a correct implementation must give, valid or
-      invalid. Running it shows whether you follow the specification in the corners nobody thinks of, and an invalid
-      input that is accepted is as much a failure as a valid one that is rejected.
-    related: [differential-testing]
+      A conformance suite is a shared set of inputs, each with the verdict a correct implementation must give, valid
+      or invalid. Running it shows whether you follow the specification in the corners nobody thinks of, and an
+      invalid input that is accepted is as much a failure as a valid one that is rejected.
+    related: [ differential-testing ]
     resources:
       - title: Conformance testing (Wikipedia)
         url: https://en.wikipedia.org/wiki/Conformance_testing
@@ -735,7 +796,7 @@ concepts:
       Huffman coding gives frequent symbols short bit codes and rare symbols long ones. It builds a binary tree by
       repeatedly joining the two least frequent nodes, and each symbol's code is the path from the root to its leaf,
       for example 0 for left and 1 for right.
-    prerequisites: [frequency-map, priority-queue]
+    prerequisites: [ frequency-map, priority-queue ]
     resources:
       - title: Huffman coding (Wikipedia)
         url: https://en.wikipedia.org/wiki/Huffman_coding
@@ -749,7 +810,7 @@ concepts:
       In a prefix-free code no code is the start of another, so a stream of bits can be decoded without separators:
       read bits until they spell a whole code, emit its symbol, and start again. Codes read from the leaves of a
       binary tree are prefix-free by construction.
-    related: [huffman-coding]
+    related: [ huffman-coding ]
     resources:
       - title: Prefix code (Wikipedia)
         url: https://en.wikipedia.org/wiki/Prefix_code
@@ -763,7 +824,7 @@ concepts:
       Files hold whole bytes, so single bits and codes of any length have to be packed eight to a byte. Bit n lives in
       byte n divided by 8, at position n modulo 8. When the last byte is not full it is padded, so the reader needs to
       know how many bits are real, from a stored count or the header.
-    related: [bytes-vs-characters]
+    related: [ bytes-vs-characters ]
     resources:
       - title: Bit array (Wikipedia)
         url: https://en.wikipedia.org/wiki/Bit_array
@@ -803,7 +864,7 @@ concepts:
       When one step undoes another, such as compress and decompress or save and load, feed many inputs through both
       and check that you get back exactly what you started with, byte for byte. Include awkward inputs, such as an
       empty file, a single repeated symbol and every possible byte value.
-    related: [differential-testing]
+    related: [ differential-testing ]
     resources:
       - title: Round-trip format conversion (Wikipedia)
         url: https://en.wikipedia.org/wiki/Round-trip_format_conversion
@@ -814,9 +875,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A hash function turns any input into a fixed-size number. The same input always gives the same number, and a good
-      non-cryptographic hash such as FNV-1a spreads similar inputs across the whole range. Different inputs can still
-      collide, so code that uses hashes has to decide what a collision means.
+      A hash function turns any input into a fixed-size number. The same input always gives the same number, and a
+      good non-cryptographic hash such as FNV-1a spreads similar inputs across the whole range. Different inputs can
+      still collide, so code that uses hashes has to decide what a collision means.
     resources:
       - title: Fowler-Noll-Vo hash function (Wikipedia)
         url: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
@@ -829,10 +890,10 @@ concepts:
     brief: >-
       A Bloom filter answers "is this item in the set?" with a bit array and several hash functions. Adding an item
       sets the bit chosen by each hash, and a lookup that finds any of those bits clear means definitely not present.
-      All bits set only means probably present, and the bit count and hash count are chosen from the expected number of
-      items and the false positive rate you accept.
-    prerequisites: [hash-functions]
-    related: [bit-packing]
+      All bits set only means probably present, and the bit count and hash count are chosen from the expected number
+      of items and the false positive rate you accept.
+    prerequisites: [ hash-functions ]
+    related: [ bit-packing ]
     resources:
       - title: Bloom filter (Wikipedia)
         url: https://en.wikipedia.org/wiki/Bloom_filter
@@ -847,7 +908,7 @@ concepts:
       A TCP server binds to an address and port, listens, and accepts connections, each of which becomes its own
       socket. A connection is a two-way stream of bytes that arrives in order, and a read that returns nothing means
       the other side closed it.
-    related: [stream-read-contract]
+    related: [ stream-read-contract ]
     resources:
       - title: Beej's Guide to Network Programming
         url: https://beej.us/guide/bgnet/
@@ -860,11 +921,11 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      TCP keeps no message boundaries: two sends can arrive in one read, and one send can arrive split over several.
-      A protocol therefore marks where a message ends, with a delimiter such as a newline or a blank line, or with a
+      TCP keeps no message boundaries: two sends can arrive in one read, and one send can arrive split over several. A
+      protocol therefore marks where a message ends, with a delimiter such as a newline or a blank line, or with a
       length sent first, and the reader buffers bytes until a whole message is there.
-    prerequisites: [tcp-sockets]
-    related: [stream-read-contract]
+    prerequisites: [ tcp-sockets ]
+    related: [ stream-read-contract ]
     resources:
       - title: Beej's Guide to Network Programming
         url: https://beej.us/guide/bgnet/
@@ -878,7 +939,7 @@ concepts:
       A server that handles one connection at a time makes every other client wait, even for a slow one that sends
       nothing. Giving each connection its own thread, a thread from a pool, or a slot in an event loop lets clients be
       served side by side. Any state they share then needs protecting.
-    prerequisites: [tcp-sockets]
+    prerequisites: [ tcp-sockets ]
     resources:
       - title: C10k problem (Wikipedia)
         url: https://en.wikipedia.org/wiki/C10k_problem
@@ -889,10 +950,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      UDP sends separate messages, called datagrams, with no connection. Each read returns exactly one datagram and the
-      address it came from, so a reply goes back to that address. Datagrams can be lost, duplicated or reordered, and
-      nothing retries them for you.
-    related: [tcp-sockets]
+      UDP sends separate messages, called datagrams, with no connection. Each read returns exactly one datagram and
+      the address it came from, so a reply goes back to that address. Datagrams can be lost, duplicated or reordered,
+      and nothing retries them for you.
+    related: [ tcp-sockets ]
     resources:
       - title: RFC 768, User Datagram Protocol
         url: https://www.rfc-editor.org/rfc/rfc768
@@ -905,7 +966,7 @@ concepts:
     brief: >-
       To stop a server without losing work, first stop accepting new connections, then let the work already in flight
       finish, then close what is left. A time limit keeps one stuck client from blocking the exit forever.
-    related: [concurrent-connections]
+    related: [ concurrent-connections ]
     resources:
       - title: Graceful exit (Wikipedia)
         url: https://en.wikipedia.org/wiki/Graceful_exit
@@ -919,7 +980,7 @@ concepts:
       An HTTP/1.1 request is a request line with the method, path and version, then header lines, then an empty line,
       then an optional body. A response has the same shape, starting with a status line such as 200 OK. Every line
       ends with a carriage return and a newline, and the empty line is what ends the headers.
-    prerequisites: [message-framing]
+    prerequisites: [ message-framing ]
     resources:
       - title: MDN, HTTP messages
         url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages
@@ -936,7 +997,7 @@ concepts:
       A REST API names resources with paths and acts on them with HTTP methods: POST to create, GET to read, DELETE to
       remove. The status code tells the client what happened, such as 201 for created, 400 for a bad request, 404 for
       an unknown resource and 429 for too many requests, and the body explains it.
-    prerequisites: [http-message-format]
+    prerequisites: [ http-message-format ]
     resources:
       - title: MDN, HTTP request methods
         url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods
@@ -952,7 +1013,7 @@ concepts:
       A redirect is a response with a 3xx status and a Location header that names where to go instead, and the browser
       follows it by itself. A permanent redirect such as 301 may be cached by the browser, so later visits never reach
       the server, while a temporary one such as 302 is asked for again each time.
-    prerequisites: [http-message-format]
+    prerequisites: [ http-message-format ]
     resources:
       - title: MDN, Redirections in HTTP
         url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Redirections
@@ -966,7 +1027,7 @@ concepts:
       A short ID can come from hashing the long value and keeping a few characters, from a counter, or from random
       characters. Hashing gives the same ID for the same input, and a counter never collides but is guessable. Short
       IDs from a hash or a random source can collide, so the store must check and pick another when the ID is taken.
-    related: [hash-functions]
+    related: [ hash-functions ]
     resources:
       - title: Base62 (Wikipedia)
         url: https://en.wikipedia.org/wiki/Base62
@@ -995,7 +1056,7 @@ concepts:
       A request is idempotent when sending it twice leaves the system as sending it once does. Deleting the same item
       twice, or shortening the same URL twice and getting the same key back, are examples. It matters because clients
       retry when a reply is lost.
-    related: [rest-api-design]
+    related: [ rest-api-design ]
     resources:
       - title: MDN, Idempotent
         url: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
@@ -1022,7 +1083,7 @@ concepts:
       A fixed window limiter cuts time into windows of equal length, such as each whole minute, and counts requests in
       the current one, rejecting any over the limit. It is cheap, but a client can send a full window's worth just
       before a boundary and another just after, so twice the limit in a short time.
-    related: [token-bucket]
+    related: [ token-bucket ]
     resources:
       - title: Rate limiting (Wikipedia)
         url: https://en.wikipedia.org/wiki/Rate_limiting
@@ -1033,10 +1094,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A sliding window log keeps the time of every accepted request. For each new request it drops the times older than
-      the window and accepts only if the remaining count is under the limit. It is exact, but its memory grows with the
-      limit for every client.
-    related: [fixed-window-counter]
+      A sliding window log keeps the time of every accepted request. For each new request it drops the times older
+      than the window and accepts only if the remaining count is under the limit. It is exact, but its memory grows
+      with the limit for every client.
+    related: [ fixed-window-counter ]
     resources:
       - title: Rate limiting (Wikipedia)
         url: https://en.wikipedia.org/wiki/Rate_limiting
@@ -1050,7 +1111,7 @@ concepts:
       A sliding window counter keeps only two counts, for the current and the previous fixed window. It estimates the
       requests in the last full window by adding the current count to the previous count, weighted by how much of the
       previous window still overlaps. It smooths the boundary problem with almost no memory.
-    prerequisites: [fixed-window-counter]
+    prerequisites: [ fixed-window-counter ]
     resources:
       - title: Cloudflare, How we built rate limiting capable of scaling to millions of domains
         url: https://blog.cloudflare.com/counting-things-a-lot-of-different-things/
@@ -1064,7 +1125,7 @@ concepts:
       When several servers enforce one limit, the count has to live in a shared store. If each server reads the count,
       adds one and writes it back, two servers can read the same value and one update is lost. An atomic increment in
       the store, which does the read and the write as one step, avoids that race.
-    related: [key-value-store]
+    related: [ key-value-store ]
     resources:
       - title: Race condition (Wikipedia)
         url: https://en.wikipedia.org/wiki/Race_condition
@@ -1079,10 +1140,10 @@ concepts:
     status: generated
     brief: >-
       Sorting text compares two strings character by character and decides at the first difference, so apple comes
-      before apricot and a shorter prefix comes first. Comparing raw byte values puts every capital letter before every
-      small one, while a locale's collation rules order text the way a dictionary does, so the same lines can sort
-      differently on two machines.
-    related: [bytes-vs-characters]
+      before apricot and a shorter prefix comes first. Comparing raw byte values puts every capital letter before
+      every small one, while a locale's collation rules order text the way a dictionary does, so the same lines can
+      sort differently on two machines.
+    related: [ bytes-vs-characters ]
     resources:
       - title: Lexicographic order (Wikipedia)
         url: https://en.wikipedia.org/wiki/Lexicographic_order
@@ -1098,7 +1159,7 @@ concepts:
       Merge sort, quicksort, heapsort and radix sort all put items in order but differ in cost. Merge sort is stable,
       meaning equal items keep their input order, and always takes order n log n time; quicksort is usually faster but
       can degrade on unlucky input; heapsort needs no extra memory; radix sort avoids comparisons altogether.
-    prerequisites: [time-space-complexity]
+    prerequisites: [ time-space-complexity ]
     resources:
       - title: Sorting algorithm (Wikipedia)
         url: https://en.wikipedia.org/wiki/Sorting_algorithm
@@ -1110,10 +1171,10 @@ concepts:
     status: generated
     brief: >-
       When the input is larger than memory, sort it in pieces that fit, write each sorted piece to a temporary file,
-      then merge the pieces by repeatedly taking the smallest front line among them. Only one line per piece needs to be
-      in memory during the merge.
-    prerequisites: [sorting-algorithms]
-    related: [streaming-constant-memory]
+      then merge the pieces by repeatedly taking the smallest front line among them. Only one line per piece needs to
+      be in memory during the merge.
+    prerequisites: [ sorting-algorithms ]
+    related: [ streaming-constant-memory ]
     resources:
       - title: External sorting (Wikipedia)
         url: https://en.wikipedia.org/wiki/External_sorting
@@ -1140,7 +1201,7 @@ concepts:
       A subsequence keeps items in order but may skip some, so ACE is a subsequence of ABCDE. The longest common
       subsequence of two sequences is the longest one that both contain, and it is what stays the same between an old
       and a new file. It is found with a table where each cell holds the answer for two shorter prefixes.
-    prerequisites: [dynamic-programming]
+    prerequisites: [ dynamic-programming ]
     resources:
       - title: Longest common subsequence (Wikipedia)
         url: https://en.wikipedia.org/wiki/Longest_common_subsequence
@@ -1154,7 +1215,7 @@ concepts:
       Dynamic programming solves a problem by solving its smaller overlapping parts once each and storing the answers
       in a table, then building the full answer from them. It turns an exponential search into polynomial work, at the
       price of the memory the table needs.
-    related: [time-space-complexity]
+    related: [ time-space-complexity ]
     resources:
       - title: Dynamic programming (Wikipedia)
         url: https://en.wikipedia.org/wiki/Dynamic_programming
@@ -1166,9 +1227,9 @@ concepts:
     status: generated
     brief: >-
       A diff describes how to turn the old version into the new one: lines only in the old version are removed, lines
-      only in the new version are added, and the common subsequence stays. Classic diff output marks removed lines with
-      a less-than sign and added lines with a greater-than sign, grouped by where they occur.
-    prerequisites: [longest-common-subsequence]
+      only in the new version are added, and the common subsequence stays. Classic diff output marks removed lines
+      with a less-than sign and added lines with a greater-than sign, grouped by where they occur.
+    prerequisites: [ longest-common-subsequence ]
     resources:
       - title: Diff (Wikipedia)
         url: https://en.wikipedia.org/wiki/Diff
@@ -1182,9 +1243,9 @@ concepts:
     status: generated
     brief: >-
       Writing a small failing test before the code makes you decide what the code should do, including edge cases such
-      as empty input, before you decide how. Each test stays as a guard, so later changes and optimisations can be made
-      without silently breaking what already worked.
-    related: [differential-testing]
+      as empty input, before you decide how. Each test stays as a guard, so later changes and optimisations can be
+      made without silently breaking what already worked.
+    related: [ differential-testing ]
     resources:
       - title: Test-driven development (Wikipedia)
         url: https://en.wikipedia.org/wiki/Test-driven_development
@@ -1195,10 +1256,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      The same characters mean different things in different places: two slashes start a comment in code but not inside
-      a string. A scanner therefore tracks which context it is in, such as code, string, line comment or block comment,
-      and each character can switch the context. A pattern search that ignores context removes too much.
-    related: [lexical-analysis, word-state-machine]
+      The same characters mean different things in different places: two slashes start a comment in code but not
+      inside a string. A scanner therefore tracks which context it is in, such as code, string, line comment or block
+      comment, and each character can switch the context. A pattern search that ignores context removes too much.
+    related: [ lexical-analysis, word-state-machine ]
     resources:
       - title: Comment (computer programming) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Comment_(computer_programming)
@@ -1212,7 +1273,7 @@ concepts:
       Some comments are instructions, not notes. Doc comments right before a declaration become documentation, build
       constraints decide which files compile, and directives tell a linter to skip a line. A tool that strips comments
       has to recognise and keep these, or it changes what the program does.
-    related: [lexer-states]
+    related: [ lexer-states ]
     resources:
       - title: Go Doc Comments
         url: https://go.dev/doc/comment
@@ -1242,7 +1303,7 @@ concepts:
       The shunting yard algorithm turns an infix expression into postfix order. Numbers go straight to the output, and
       operators wait on a stack until an operator of lower or equal precedence, or a closing bracket, pushes them out.
       The result can be evaluated without any brackets.
-    prerequisites: [operator-precedence]
+    prerequisites: [ operator-precedence ]
     resources:
       - title: Shunting yard algorithm (Wikipedia)
         url: https://en.wikipedia.org/wiki/Shunting_yard_algorithm
@@ -1253,10 +1314,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      In postfix order an operator follows its operands, so an expression is evaluated with one stack: push each number,
-      and for each operator pop two numbers, apply it and push the result. The second number popped is the left
-      operand, which matters for subtraction and division. A well-formed expression leaves exactly one number.
-    related: [shunting-yard]
+      In postfix order an operator follows its operands, so an expression is evaluated with one stack: push each
+      number, and for each operator pop two numbers, apply it and push the result. The second number popped is the
+      left operand, which matters for subtraction and division. A well-formed expression leaves exactly one number.
+    related: [ shunting-yard ]
     resources:
       - title: Reverse Polish notation (Wikipedia)
         url: https://en.wikipedia.org/wiki/Reverse_Polish_notation
@@ -1267,9 +1328,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      Integers are exact, but integer division drops the remainder. Floating-point numbers hold fractions in binary, so
-      many decimals such as 0.1 are stored approximately and small errors appear in results. A calculator has to choose
-      how it divides and how it prints results.
+      Integers are exact, but integer division drops the remainder. Floating-point numbers hold fractions in binary,
+      so many decimals such as 0.1 are stored approximately and small errors appear in results. A calculator has to
+      choose how it divides and how it prints results.
     resources:
       - title: The Floating-Point Guide
         url: https://floating-point-gui.de/
@@ -1311,7 +1372,7 @@ concepts:
       Instead of interpreting source text directly, a compiler first turns it into a compact list of instructions,
       dropping comments and working out jump targets once. A small virtual machine then runs the list, which is faster
       because the slow decisions were made ahead of time.
-    related: [interpreter-loop]
+    related: [ interpreter-loop ]
     resources:
       - title: Bytecode (Wikipedia)
         url: https://en.wikipedia.org/wiki/Bytecode
@@ -1325,7 +1386,7 @@ concepts:
       A peephole optimiser looks at short runs of instructions and replaces them with fewer that do the same thing,
       such as five increments becoming one add of five, or a loop that only empties a cell becoming one clear. Each
       rewrite must leave the program's output unchanged.
-    prerequisites: [bytecode-compilation]
+    prerequisites: [ bytecode-compilation ]
     resources:
       - title: Peephole optimization (Wikipedia)
         url: https://en.wikipedia.org/wiki/Peephole_optimization
@@ -1353,7 +1414,7 @@ concepts:
       When comparing many items, rule out most pairs with a cheap test first and save the expensive test for what is
       left. Files of different sizes cannot be duplicates, so group by size before hashing, and only compare bytes for
       files whose hashes match.
-    related: [time-space-complexity]
+    related: [ time-space-complexity ]
     resources:
       - title: Data deduplication (Wikipedia)
         url: https://en.wikipedia.org/wiki/Data_deduplication
@@ -1364,10 +1425,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A digest such as MD5 or SHA-256 reduces a file of any size to a short fingerprint, computed by streaming the file
-      through it. Equal files always have equal digests, and different files almost never do, but MD5 collisions can be
-      made on purpose, so a byte comparison is the final proof.
-    related: [hash-functions, streaming-constant-memory]
+      A digest such as MD5 or SHA-256 reduces a file of any size to a short fingerprint, computed by streaming the
+      file through it. Equal files always have equal digests, and different files almost never do, but MD5 collisions
+      can be made on purpose, so a byte comparison is the final proof.
+    related: [ hash-functions, streaming-constant-memory ]
     resources:
       - title: Cryptographic hash function (Wikipedia)
         url: https://en.wikipedia.org/wiki/Cryptographic_hash_function
@@ -1390,10 +1451,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A command that deletes or overwrites should show exactly what it will do, ask before doing it, and treat anything
-      other than a clear yes as no. Keeping at least one copy of every duplicate, and logging what was removed, makes a
-      mistake recoverable.
-    related: [cli-subcommands]
+      A command that deletes or overwrites should show exactly what it will do, ask before doing it, and treat
+      anything other than a clear yes as no. Keeping at least one copy of every duplicate, and logging what was
+      removed, makes a mistake recoverable.
+    related: [ cli-subcommands ]
     resources:
       - title: Command Line Interface Guidelines
         url: https://clig.dev/
@@ -1405,9 +1466,9 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A URL names a scheme, a host, an optional port and a path, as in http, eu.httpbin.org, 80 and /get. When the port
-      is missing the scheme's default is used, 80 for http and 443 for https, and an empty path means the root, a single
-      slash.
+      A URL names a scheme, a host, an optional port and a path, as in http, eu.httpbin.org, 80 and /get. When the
+      port is missing the scheme's default is used, 80 for http and 443 for https, and an empty path means the root, a
+      single slash.
     resources:
       - title: MDN, What is a URL?
         url: https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL
@@ -1420,11 +1481,11 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A DNS message starts with a 12-byte header: an ID that pairs a reply with its query, a flags field with bits such
-      as query or response and recursion desired, and four counts. Then come the question, answer, authority and
+      A DNS message starts with a 12-byte header: an ID that pairs a reply with its query, a flags field with bits
+      such as query or response and recursion desired, and four counts. Then come the question, answer, authority and
       additional sections, with every number big-endian.
-    prerequisites: [byte-order]
-    related: [udp-datagrams]
+    prerequisites: [ byte-order ]
+    related: [ udp-datagrams ]
     resources:
       - title: RFC 1035, Domain names, implementation and specification
         url: https://www.rfc-editor.org/rfc/rfc1035
@@ -1435,10 +1496,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      DNS writes a name as labels, each preceded by its length, ending with a zero byte, so dns.google.com becomes 3 dns
-      6 google 3 com 0. To save space, a reply can replace the end of a name with a two-byte pointer whose top two bits
-      are set, giving the offset where the rest of the name already appears.
-    prerequisites: [dns-message-format]
+      DNS writes a name as labels, each preceded by its length, ending with a zero byte, so dns.google.com becomes 3
+      dns 6 google 3 com 0. To save space, a reply can replace the end of a name with a two-byte pointer whose top two
+      bits are set, giving the offset where the rest of the name already appears.
+    prerequisites: [ dns-message-format ]
     resources:
       - title: RFC 1035, Domain names, implementation and specification
         url: https://www.rfc-editor.org/rfc/rfc1035
@@ -1449,10 +1510,10 @@ concepts:
     kind: foundation
     status: generated
     brief: >-
-      A resolver that does the work itself starts at a root server, which does not know the answer but names the servers
-      for the top-level domain. It asks those, follows the next referral, and so on until an authoritative server
-      returns the address. A referral that names a server without its address means resolving that name first.
-    prerequisites: [dns-message-format]
+      A resolver that does the work itself starts at a root server, which does not know the answer but names the
+      servers for the top-level domain. It asks those, follows the next referral, and so on until an authoritative
+      server returns the address. A referral that names a server without its address means resolving that name first.
+    prerequisites: [ dns-message-format ]
     resources:
       - title: Domain Name System (Wikipedia)
         url: https://en.wikipedia.org/wiki/Domain_Name_System
@@ -1467,9 +1528,10 @@ concepts:
     status: generated
     brief: >-
       RESP marks each value with its first byte, such as plus for a simple string, colon for an integer, dollar for a
-      bulk string and star for an array, and ends lines with a carriage return and newline. Bulk strings and arrays give
-      their length first, so the reader knows exactly how many bytes or items follow, even when the data has newlines.
-    prerequisites: [message-framing]
+      bulk string and star for an array, and ends lines with a carriage return and newline. Bulk strings and arrays
+      give their length first, so the reader knows exactly how many bytes or items follow, even when the data has
+      newlines.
+    prerequisites: [ message-framing ]
     resources:
       - title: Redis serialization protocol specification
         url: https://redis.io/docs/latest/develop/reference/protocol-spec/
@@ -1481,9 +1543,9 @@ concepts:
     status: generated
     brief: >-
       A key with a time to live disappears after a set time. Storing the absolute moment it expires, rather than the
-      time left, makes the check one comparison. Checking on every read catches expired keys cheaply, and an occasional
-      background sweep removes ones nobody reads.
-    related: [key-value-store]
+      time left, makes the check one comparison. Checking on every read catches expired keys cheaply, and an
+      occasional background sweep removes ones nobody reads.
+    related: [ key-value-store ]
     resources:
       - title: Redis, EXPIRE
         url: https://redis.io/docs/latest/commands/expire/
@@ -1495,9 +1557,9 @@ concepts:
     status: generated
     brief: >-
       An in-memory store can survive a restart by writing its whole state to a file and reading it back at startup.
-      Writing to a temporary file and renaming it over the old one means a crash mid-write leaves the previous snapshot
-      intact, and anything changed since the last snapshot is lost on a crash.
-    related: [key-value-store]
+      Writing to a temporary file and renaming it over the old one means a crash mid-write leaves the previous
+      snapshot intact, and anything changed since the last snapshot is lost on a crash.
+    related: [ key-value-store ]
     resources:
       - title: Redis persistence
         url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
@@ -1509,8 +1571,8 @@ concepts:
     status: generated
     brief: >-
       An append-only store never changes a record in place: every write, including an update, adds a new record at the
-      end of the active file. Appending is fast and a crash can only damage the last record. The latest record for a key
-      wins, and old ones are cleaned up later.
+      end of the active file. Appending is fast and a crash can only damage the last record. The latest record for a
+      key wins, and old ones are cleaned up later.
     resources:
       - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
         url: https://riak.com/assets/bitcask-intro.pdf
@@ -1537,8 +1599,8 @@ concepts:
       Keeping every value in memory does not scale, but keeping only where each value lives does. An in-memory hash
       table maps each key to the file, the position and the size of its latest value, so a read is one lookup and one
       disk seek.
-    prerequisites: [append-only-log]
-    related: [key-value-store]
+    prerequisites: [ append-only-log ]
+    related: [ key-value-store ]
     resources:
       - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
         url: https://riak.com/assets/bitcask-intro.pdf
@@ -1550,9 +1612,9 @@ concepts:
     status: generated
     brief: >-
       In an append-only store a delete cannot remove the old record, so it appends a tombstone, a record that says the
-      key is gone. Reads and rebuilds treat the tombstone as the latest word on that key, and compaction drops both the
-      tombstone and the old values.
-    prerequisites: [append-only-log]
+      key is gone. Reads and rebuilds treat the tombstone as the latest word on that key, and compaction drops both
+      the tombstone and the old values.
+    prerequisites: [ append-only-log ]
     resources:
       - title: Tombstone (data store) (Wikipedia)
         url: https://en.wikipedia.org/wiki/Tombstone_(data_store)
@@ -1566,7 +1628,7 @@ concepts:
       An append-only log keeps growing with stale values and tombstones. Compaction, which Bitcask calls merging,
       rewrites the closed files keeping only the latest live value of each key, can write a small hint file listing
       where each key now lives, and then deletes the old files.
-    prerequisites: [append-only-log, tombstones]
+    prerequisites: [ append-only-log, tombstones ]
     resources:
       - title: Bitcask, A Log-Structured Hash Table for Fast Key/Value Data
         url: https://riak.com/assets/bitcask-intro.pdf
@@ -1578,9 +1640,9 @@ concepts:
     status: generated
     brief: >-
       After a crash a store rebuilds its in-memory state from what is on disk, by replaying the log from the start or
-      by reading smaller hint files. Records that fail their checksum, usually a half-written last one, are dropped, so
-      the store comes back with every write that fully reached the disk.
-    related: [checksums, hash-index]
+      by reading smaller hint files. Records that fail their checksum, usually a half-written last one, are dropped,
+      so the store comes back with every write that fully reached the disk.
+    related: [ checksums, hash-index ]
     resources:
       - title: Write-ahead logging (Wikipedia)
         url: https://en.wikipedia.org/wiki/Write-ahead_logging
@@ -1591,8 +1653,8 @@ concepts:
     area: text-encodings
     kind: foundation
     status: generated
-    brief: Unicode gives every character a number, its code point. UTF-8 stores each code point in one to four bytes,
-      with plain ASCII in one byte, so the byte count and the character count of the same text often differ.
+    brief: Unicode gives every character a number, its code point. UTF-8 stores each code point in one to four bytes, with
+      plain ASCII in one byte, so the byte count and the character count of the same text often differ.
     lesson:
       how_it_works: |-
         Text in a file is only bytes. To turn bytes into letters, the program that wrote them and the program that
@@ -1618,16 +1680,16 @@ concepts:
         Some programs write the three bytes EF BB BF at the very start of a UTF-8 file. This byte order mark only says
         "this is UTF-8", and many tools do not expect it.
       examples:
-        - The word café is 4 characters but 5 bytes in UTF-8, because é (U+00E9) needs two bytes. A column limited to 4
-          bytes cannot hold it, and a tool that counts bytes as letters reports 5.
+        - The word café is 4 characters but 5 bytes in UTF-8, because é (U+00E9) needs two bytes. A column limited to
+          4 bytes cannot hold it, and a tool that counts bytes as letters reports 5.
         - For years the MySQL encoding called utf8 stored at most three bytes per character, so saving an emoji in a
           username failed or cut the text short. The fix was a separate encoding, utf8mb4, which allows four.
         - "A web address cannot contain é directly, so browsers send its two UTF-8 bytes in percent form: café becomes
           caf%C3%A9."
       misconceptions:
         - UTF-8 means 8 bits per character. It means the code unit is 8 bits, and a character takes one to four units.
-        - Unicode is an encoding. Unicode is the list of characters and their numbers; UTF-8, UTF-16 and UTF-32 are ways
-          to store those numbers.
+        - Unicode is an encoding. Unicode is the list of characters and their numbers; UTF-8, UTF-16 and UTF-32 are
+          ways to store those numbers.
         - A file's size in bytes is its number of characters. That holds only for plain ASCII text.
         - A UTF-8 file must start with a byte order mark. It needs none, and the mark can break tools that read the
           first line or column name.
@@ -1640,19 +1702,27 @@ concepts:
       - utf16-code-units
       - grapheme-clusters
     resources:
+      - title: "RFC 3629: UTF-8, a transformation format of ISO 10646"
+        url: https://www.rfc-editor.org/rfc/rfc3629
+        opened: true
+      - title: "Unicode FAQ: UTF-8, UTF-16, UTF-32 and BOM"
+        url: https://www.unicode.org/faq/utf_bom.html
+        opened: true
+      - title: Joel Spolsky, The Absolute Minimum Every Software Developer Must Know About Unicode
+        url: https://www.joelonsoftware.com/2003/10/08/the-absolute-minimum-every-software-developer-absolutely-positively-must-know-about-unicode-and-character-sets-no-excuses/
+        opened: true
       - title: UTF-8 (Wikipedia)
         url: https://en.wikipedia.org/wiki/UTF-8
-      - title: Unicode FAQ, UTF-8, UTF-16, UTF-32 and BOM
-        url: https://www.unicode.org/faq/utf_bom.html
+        opened: true
 
   - slug: utf16-code-units
     name: UTF-16, UTF-32 and code units
     area: text-encodings
     kind: foundation
     status: generated
-    brief: "UTF-16 stores code points in 16-bit units: one unit for most characters and a surrogate pair of two units
-      for the rest, including most emoji. Java, JavaScript, C# and Windows use it, so their string length counts
-      units, not characters."
+    brief: "UTF-16 stores code points in 16-bit units: one unit for most characters and a surrogate pair of two units for
+      the rest, including most emoji. Java, JavaScript, C# and Windows use it, so their string length counts units,
+      not characters."
     lesson:
       how_it_works: |-
         UTF-16 stores text in units of 16 bits. A code point up to U+FFFF, the Basic Multilingual Plane that holds almost
@@ -1675,12 +1745,12 @@ concepts:
         Before Unicode, single-byte encodings such as Latin-1 and Windows-1252 mapped 256 values to the letters of one
         group of languages. Reading UTF-8 bytes as Windows-1252 turns café into cafÃ©, the garbled text called mojibake.
       examples:
-        - A social app limits posts by JavaScript string length. A post of 140 emoji measures 280, so users meet a limit
-          that seems to shrink.
+        - A social app limits posts by JavaScript string length. A post of 140 emoji measures 280, so users meet a
+          limit that seems to shrink.
         - A notification cuts a message at 100 units to fit the screen. If unit 100 is the first half of a surrogate
           pair, the phone shows a broken symbol at the end.
-        - Excel's Unicode Text export writes UTF-16LE with the mark FF FE, so a script expecting UTF-8 sees a zero byte
-          after every English letter.
+        - Excel's Unicode Text export writes UTF-16LE with the mark FF FE, so a script expecting UTF-8 sees a zero
+          byte after every English letter.
       misconceptions:
         - UTF-16 uses exactly two bytes per character. Characters above U+FFFF take four bytes, two units.
         - String length in Java or JavaScript counts characters. It counts UTF-16 units, so most emoji count as two.
@@ -1693,8 +1763,15 @@ concepts:
     prerequisites:
       - text-encoding-utf8
     resources:
+      - title: "Unicode FAQ: UTF-8, UTF-16, UTF-32 and BOM"
+        url: https://www.unicode.org/faq/utf_bom.html
+        opened: true
       - title: UTF-16 (Wikipedia)
         url: https://en.wikipedia.org/wiki/UTF-16
+        opened: true
+      - title: Byte order mark (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Byte_order_mark
+        opened: true
       - title: MDN, String length
         url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/length
         language: javascript
@@ -1737,8 +1814,8 @@ concepts:
         - One code point is one character. A visible character can be many code points.
         - Strings that look the same are equal. They are equal only when their code points match, which may need
           normalising first.
-        - Reversing or cutting text one code point at a time is safe. It can separate an accent from its letter or break
-          up an emoji.
+        - Reversing or cutting text one code point at a time is safe. It can separate an accent from its letter or
+          break up an emoji.
       elsewhere:
         - Text editors move the cursor and delete by grapheme cluster, so one backspace removes a whole family emoji.
         - Search and databases need normalisation and collation rules so that café finds café however it was typed.
@@ -1746,19 +1823,27 @@ concepts:
     prerequisites:
       - text-encoding-utf8
     resources:
-      - title: Unicode Standard Annex 29, Text Segmentation
+      - title: "UAX #29: Unicode Text Segmentation"
         url: https://www.unicode.org/reports/tr29/
-      - title: Unicode Standard Annex 15, Normalization Forms
+        opened: true
+      - title: "UTS #51: Unicode Emoji"
+        url: https://www.unicode.org/reports/tr51/
+        opened: true
+      - title: "UAX #15: Unicode Normalization Forms"
         url: https://unicode.org/reports/tr15/
+        opened: true
+      - title: Unicode equivalence (Wikipedia)
+        url: https://en.wikipedia.org/wiki/Unicode_equivalence
+        opened: true
 
   - slug: io-buffering
     name: Buffered I/O and system calls
     area: streams-io
     kind: foundation
     status: generated
-    brief: Every read from the operating system is a system call with a fixed cost, so reading one byte at a time is
-      slow even though the data is the same. Reading into a buffer of some kilobytes and working from memory spreads
-      that cost over many bytes.
+    brief: Every read from the operating system is a system call with a fixed cost, so reading one byte at a time is slow
+      even though the data is the same. Reading into a buffer of some kilobytes and working from memory spreads that
+      cost over many bytes.
     lesson:
       how_it_works: |-
         Programs do not read files by themselves. They ask the operating system through a system call, and each call
@@ -1778,17 +1863,18 @@ concepts:
         disk or copying memory, not into calls, and a bigger buffer only uses more memory. Measuring is the honest way to
         choose a size.
       examples:
-        - Counting a 1 GB file one byte per system call makes about a billion calls and can take minutes. Reading 64 KB
-          at a time makes about sixteen thousand calls and takes seconds.
-        - Writing a log without a buffer slows a busy server down, so logging libraries buffer and write out the buffer
-          on a timer or when it fills.
-        - Running wc twice on the same large file is faster the second time, because the file now sits in the page cache.
+        - Counting a 1 GB file one byte per system call makes about a billion calls and can take minutes. Reading 64
+          KB at a time makes about sixteen thousand calls and takes seconds.
+        - Writing a log without a buffer slows a busy server down, so logging libraries buffer and write out the
+          buffer on a timer or when it fills.
+        - Running wc twice on the same large file is faster the second time, because the file now sits in the page
+          cache.
       misconceptions:
         - A buffered reader holds the whole file. It holds one buffer's worth at a time.
         - When code asks for one byte, the disk reads one byte. Disks and the operating system work in blocks of
           kilobytes.
-        - Buffered output is written the moment the code writes it. It waits in the buffer until the buffer fills or is
-          flushed, so a crash can lose the last part.
+        - Buffered output is written the moment the code writes it. It waits in the buffer until the buffer fills or
+          is flushed, so a crash can lose the last part.
       elsewhere:
         - Sockets, database drivers and file uploads all buffer for the same reason.
         - Forgetting to flush a buffered writer before a program exits is a classic cause of missing last lines in
@@ -1808,8 +1894,8 @@ concepts:
     area: formats-parsing
     kind: foundation
     status: generated
-    brief: "Real input breaks its format: invalid UTF-8 bytes, a truncated last record, a value out of range. A tool
-      must decide whether to reject it, replace the bad part or skip it, and say clearly where the problem was."
+    brief: "Real input breaks its format: invalid UTF-8 bytes, a truncated last record, a value out of range. A tool must
+      decide whether to reject it, replace the bad part or skip it, and say clearly where the problem was."
     lesson:
       how_it_works: |-
         Every format has rules, and real input breaks them: a file cut off in the middle of a write, a byte that cannot
@@ -1848,10 +1934,12 @@ concepts:
     related:
       - decoding-across-chunks
     resources:
-      - title: Robustness principle (Wikipedia)
-        url: https://en.wikipedia.org/wiki/Robustness_principle
-      - title: Specials, the Unicode block with the replacement character (Wikipedia)
+      - title: WHATWG Encoding Standard (replacement and fatal error modes)
+        url: https://encoding.spec.whatwg.org/
+        opened: true
+      - title: Specials Unicode block and U+FFFD (Wikipedia)
         url: https://en.wikipedia.org/wiki/Specials_(Unicode_block)
+        opened: true
 
   - slug: locale-settings
     name: Locales and the environment
@@ -1882,13 +1970,14 @@ concepts:
       examples:
         - The challenge's test file gives 339292 for wc -m in a UTF-8 locale and 342190, its byte count, in the C
           locale, on the same machine.
-        - A nightly job that sorts customer names produces a different order from the same command typed in a terminal,
-          because the scheduler runs it with the C locale.
+        - A nightly job that sorts customer names produces a different order from the same command typed in a
+          terminal, because the scheduler runs it with the C locale.
         - A container image without locale data falls back to C, so a tool that handled accented names on a laptop
           treats them as bytes in production.
       misconceptions:
         - A program behaves the same wherever it runs. Its environment, including the locale, is part of its input.
-        - The locale only changes language and date formats. It also decides decoding, character classes and sort order.
+        - The locale only changes language and date formats. It also decides decoding, character classes and sort
+          order.
         - A UTF-8 file is always read as UTF-8. The tool uses the locale's encoding, whatever the file holds.
       elsewhere:
         - sort, grep, awk and many language runtimes read the locale.

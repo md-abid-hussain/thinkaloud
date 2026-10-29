@@ -44,6 +44,13 @@ Both were briefed fresh (not forked). Both ask the user before changing a decisi
 - **Content (v1, superseded):** 21 projects pass the checker; 135 keys are proven; answer matching handles dictation; 52 tests pass. Everything stays "generated" until the user reviews `content/REVIEW_SHEET.md`.
 - **John Crickett.** No public email. The user is messaging him on X.
 
+
+## 30 Oct: content rebuilt on the user's learning-java model
+- **The model is general and has two tracks:** a learning map (concepts, each with a lesson, a per-project where, 2 to 4 checked references and one explain-back) and a build plan (the challenge's steps, 30 to 60 minutes each, each with one checkable outcome). Parts B and C (the language's tools and packages) are generated at runtime with Linkup. Rules: `CONTENT_FORMAT.md` "The learning model (v3)" and section 6 (format 3). The product brief's conflicting rules are fixed and marked superseded.
+- **The orchestrator wrote all 21 projects** in format 3, using forks: wc first, then 4 sample projects evaluated, then 16 in themed batches. Every project passes `content/scripts/evaluate-v3.mjs` with 0 errors and 0 warnings. Readable pages are in `content/previews/`. The commits run from `16af9c6` to `374f4fa`.
+- **ta-content is stopped.** **ta-build owns `app/` and `db/`** and is loading format 3, fixing the content tests and finishing wc end to end.
+- **The user's latest rules (30 Oct):** don't ask, build to completion, keep LLM and API calls minimal, keep the agent loop simple, and mention Wispr only on the landing page.
+
 ## Artifacts
 
 - **Landing page:** https://claude.ai/artifact/Uh5KdriLNM9jksvua2tXMg, file `design/landing.html`, version 11. The reference build.

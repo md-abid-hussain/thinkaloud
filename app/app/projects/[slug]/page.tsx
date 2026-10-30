@@ -1,117 +1,135 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { overview, readyCount, type ConceptStatus } from "@/lib/catalogue";
-import { currentLearnerId, enrollmentFor } from "@/lib/learner";
-import { ChoiceLine, StartButton, StartProvider } from "./StartDialog";
+import { catalog, challengeNumber, inSentence, shortName } from "@/lib/catalog";
 import "./overview.css";
 
-export const dynamic = "force-dynamic";
-
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-  const p = await overview(slug, null);
-  return { title: p ? `${p.short} · ThinkAloud` : "ThinkAloud" };
+export async function generateStaticParams() {
+  return (await catalog()).map((m) => ({ slug: m.project.slug }));
 }
 
-const STATUS: Record<ConceptStatus, string> = { new: "New", seen: "Seen", explained: "Explained", applied: "Applied" };
-
-function duration(n: number) {
-  const h = Math.floor(n / 60), r = n % 60;
-  return "about " + (h ? h + " h" : "") + (r ? (h ? " " : "") + r + " min" : "");
+export async function generateMetadata({ params }: PageProps<"/projects/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const map = (await catalog()).find((m) => m.project.slug === slug);
+  return { title: map ? `${shortName(map)} · ThinkAloud` : "ThinkAloud" };
 }
 
-export default async function ProjectOverview({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const learnerId = await currentLearnerId();
-  const [p, enr, ready] = await Promise.all([overview(slug, learnerId), enrollmentFor(learnerId, slug), readyCount()]);
-  if (!p) notFound();
+export default function ProjectOverview({ params }: PageProps<"/projects/[slug]">) {
+  return (
+    <Suspense fallback={null}>
+      <Overview params={params} />
+    </Suspense>
+  );
+}
 
-  const ideas = p.milestones.reduce((a, m) => a + m.ideas.length, 0);
-  const minutes = p.milestones.reduce((a, m) => a + m.minutes, 0);
-  const explained = p.milestones.reduce((a, m) => a + m.ideas.filter((i) => i.status === "explained" || i.status === "applied").length, 0);
-  const level = p.level ? p.level[0].toUpperCase() + p.level.slice(1) : null;
-  const facts = [p.n ? `Challenge #${p.n}` : null, level, `${ideas} ideas in ${p.milestones.length} milestones`, minutes ? duration(minutes) : null, p.reviewed ? "Checked" : "Not yet checked"].filter(Boolean) as string[];
-  const enrolled = enr ? { supportLevel: enr.support_level, language: enr.language } : null;
-  const challenge = p.n ? `Coding Challenges #${p.n}` : "Coding Challenges";
-  let n = 0;
+async function Overview({ params }: { params: PageProps<"/projects/[slug]">["params"] }) {
+  const { slug } = await params;
+  const maps = await catalog();
+  const map = maps.find((m) => m.project.slug === slug);
+  if (!map) notFound();
+
+  const { project, concepts, steps } = map;
+  const short = shortName(map);
+  const n = challengeNumber(slug);
+  const required = steps.filter((s) => !s.optional);
+  const optional = steps.length - required.length;
+  const level = project.level[0].toUpperCase() + project.level.slice(1);
+  const facts = [
+    n ? `Challenge #${n}` : null,
+    level,
+    `${concepts.length} concepts`,
+    `${required.length} steps${optional ? ` + ${optional} optional` : ""}`,
+    "Not yet checked",
+  ].filter(Boolean) as string[];
+  const challenge = n ? `Coding Challenges #${n}` : "Coding Challenges";
+  const start = `/projects/${slug}/learn`;
+  const stepNumber = (id: string) => required.findIndex((s) => s.id === id) + 1;
 
   return (
     <div className="pg-overview">
-      <Header variant="inner" current="projects" readyCount={ready} />
-      <StartProvider slug={p.slug} short={p.short} enrolled={enrolled} known={explained} ideas={ideas}>
-        <div className="wrap" id="top">
-          <div className="page">
-            <section className="head" aria-labelledby="page-title">
-              <p className="label crumb"><Link href="/projects">Projects</Link><span aria-hidden="true">/</span><b>{p.short}</b></p>
-              <h1 id="page-title">{p.title}</h1>
-              {p.summary && <p className="lede">{p.summary}</p>}
-              <p className="src">From <a href={p.sourceUrl}>{challenge} ↗</a> by <a href="https://x.com/johncrickett">John Crickett</a></p>
-              <ul className="facts">{facts.map((f) => <li key={f}>{f}</li>)}</ul>
-              <div className="go">
-                <StartButton />
-                <ChoiceLine />
-              </div>
-            </section>
+      <Header variant="inner" current="projects" readyCount={maps.length} />
+      <div className="wrap" id="top">
+        <div className="page">
+          <section className="head" aria-labelledby="page-title">
+            <p className="label crumb"><Link href="/projects">Projects</Link><span aria-hidden="true">/</span><b>{short}</b></p>
+            <h1 id="page-title">{project.title}</h1>
+            <p className="lede">{project.summary}</p>
+            <p className="src">From <a href={project.source_url}>{challenge} ↗</a> by <a href="https://x.com/johncrickett">John Crickett</a></p>
+            <ul className="facts">{facts.map((f) => <li key={f}>{f}</li>)}</ul>
+            <div className="go">
+              <Link className="btn btn-primary" href={start}>Start {short}</Link>
+              <p className="fine">No sign-up. You tell the mentor your language: Java, Python or Node.js.</p>
+            </div>
+          </section>
 
-            {p.primer && (
-              <section className="sec" aria-labelledby="primer-h">
-                <div className="sec-h"><p className="label">Before you start</p><h2 id="primer-h">The problem in plain words</h2></div>
-                <dl className="rows">
-                  <div><dt className="label">What it is</dt><dd>{p.primer.what}</dd></div>
-                  <div><dt className="label">Why it matters</dt><dd>{p.primer.why}</dd></div>
-                  <div><dt className="label"><b>A tiny example</b></dt><dd>{p.primer.example}</dd></div>
-                </dl>
-              </section>
-            )}
-
-            <section className="sec" aria-labelledby="ideas-h">
-              <div className="sec-h">
-                <p className="label"><b>First</b> · the ideas</p>
-                <h2 id="ideas-h">Understand and explain each idea</h2>
-                <p className="fine">{ideas} ideas, in the order the milestones teach them. Each milestone ends with explaining its ideas back.{explained ? ` ${explained} already explained.` : ""}</p>
-              </div>
-              <ol className="track">
-                {p.milestones.map((m) => (
-                  <li key={m.position}>
-                    <div className="mile-row">
-                      <p className="label"><b>Milestone {m.position}</b></p>
-                      <h3>{m.title}</h3>
-                      <p className="fine">{m.steps} steps · {m.minutes} min</p>
-                    </div>
-                    <ol className="ideas">
-                      {m.ideas.map((i) => (
-                        <li className="idea" key={i.id}>
-                          <span className="n">{++n}</span>
-                          <span className="nm">{i.name}</span>
-                          <span className={`st ${i.status}`}>{STATUS[i.status]}</span>
-                          {i.brief && <p className="br">{i.brief}</p>}
-                        </li>
+          <section className="sec" aria-labelledby="ideas-h">
+            <div className="sec-h">
+              <p className="label"><b>What you&apos;ll learn</b> · {concepts.length} concepts</p>
+              <h2 id="ideas-h">The concepts behind {short}</h2>
+              <p className="fine">In the order the steps use them. Each one links to the best places to learn it, and you explain it in your own words once its steps are built.</p>
+            </div>
+            <ol className="ideas">
+              {concepts.map((c, i) => {
+                const usedIn = required.filter((s) => s.concepts.includes(c.id)).map((s) => stepNumber(s.id));
+                return (
+                  <li className="idea" key={c.id}>
+                    <span className="n">{i + 1}</span>
+                    <span className="nm">{c.name}</span>
+                    <span className="st new">{usedIn.length ? `Step ${usedIn.join(", ")}` : "Optional"}</span>
+                    <p className="br">{c.why_here}</p>
+                    {c.covers.length > 0 && <p className="fine covers">Covers: {c.covers.join(" · ")}</p>}
+                    <p className="fine reads">
+                      {c.resources.map((r, k) => (
+                        <span key={r.url}>{k > 0 && " · "}<a href={r.url}>{r.title} ↗</a></span>
                       ))}
-                    </ol>
+                    </p>
                   </li>
-                ))}
-              </ol>
-            </section>
+                );
+              })}
+            </ol>
+          </section>
 
-            {p.requirements.length > 0 && (
-              <section className="sec" aria-labelledby="code-h">
-                <div className="sec-h"><p className="label"><b>Then</b> · the code</p><h2 id="code-h">Build {p.short} in your language</h2><p className="fine">Optional. Pick a language when you start.</p></div>
-                <ol className="reqs">{p.requirements.map((r, i) => <li key={i}>{r}</li>)}</ol>
-              </section>
-            )}
+          <section className="sec" aria-labelledby="code-h">
+            <div className="sec-h">
+              <p className="label"><b>What you&apos;ll build</b> · {required.length} steps</p>
+              <h2 id="code-h">Build {short} step by step</h2>
+              <p className="fine">Steps of 30 to 60 minutes, in your own editor and language. Each one has a check, so you know when it works.</p>
+            </div>
+            <ol className="steps">
+              {steps.map((s) => {
+                const uses = s.concepts.map((id) => concepts.find((c) => c.id === id)?.name).filter((n): n is string => !!n);
+                return (
+                  <li key={s.id} className="step">
+                    <span className="n" aria-hidden="true">{s.optional ? "+" : String(stepNumber(s.id)).padStart(2, "0")}</span>
+                    <div className="body">
+                      <h3>
+                        {s.title}
+                        {s.optional && <span className="pill plain">Optional</span>}
+                      </h3>
+                      <p className="obj">{s.objective}</p>
+                      <p className="check">
+                        <span className="label"><b>Check</b></span>
+                        <span>{s.check}</span>
+                      </p>
+                      {uses.length > 0 && <p className="fine uses">Concepts: {uses.map(inSentence).join(" · ")}</p>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
 
-            <section className="end" aria-labelledby="end-h">
-              <h2 id="end-h">{enrolled ? `You've started ${p.short}.` : `Ready to start ${p.short}?`}</h2>
-              <StartButton />
-            </section>
+          <section className="end" aria-labelledby="end-h">
+            <h2 id="end-h">Ready to start {short}?</h2>
+            <Link className="btn btn-primary" href={start}>Start {short}</Link>
+          </section>
 
-            <Footer left={<>From <a href={p.sourceUrl}>{challenge} ↗</a> by John Crickett. Brief written in our own words.</>} />
-          </div>
+          <Footer left={<>From <a href={project.source_url}>{challenge} ↗</a> by John Crickett. Notes written in our own words.</>} />
         </div>
-      </StartProvider>
+      </div>
     </div>
   );
 }

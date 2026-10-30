@@ -5,6 +5,8 @@ Every ThinkAloud screen follows this file. The landing page is the reference bui
 
 Copy tokens, components and patterns from it rather than inventing new ones.
 
+> **Reset on 30 Oct 2026 (`PRODUCT_BRIEF.md` v1.2).** Sections 1 to 8 still apply: the identity, the user's rules, the tokens, type, layout, components, figures and motion. **Sections 9 and 10 are superseded.** v1 has two pages, the landing page and one project chat (one text box, the mentor's messages, and a progress panel). The step workspace, teach-back, help ladder, grading states, catalogue and overview pages described there belong to the old product. `workspace.html`, `FIX_LIST.md` and `style-directions.html` are in the archive. The chat page gets designed in the UI step, after the engine works.
+
 ## 1. Identity in one paragraph
 
 The product is about explaining your thinking out loud. The page reads like an interview transcript:
@@ -188,7 +190,7 @@ Each project's figure is drawn from data by a small SVG generator: `viewBox 0 0 
 
 **Scroll stories:** pick the active step from where its top sits against a fixed line (the header height + 28px + 25% of the viewport). Never use a thin IntersectionObserver band, which can show the wrong step.
 
-## 9. Page status
+## 9. Page status (superseded on 30 Oct, see the note at the top)
 
 Design freeze approved by the user on 29 Oct 2026. Open items from finished pages are in `design/FIX_LIST.md` and get fixed in code during the build.
 
@@ -215,7 +217,7 @@ Design freeze approved by the user on 29 Oct 2026. Open items from finished page
 - Save-progress: inside the Start dialog in `overview.html`.
 - Empty, loading and error states: built in code, using the catalogue's empty state (`.empty`: dashed muted border, a heading, one sentence and ghost buttons) as the pattern.
 
-## 10. Step workspace (`workspace.html`)
+## 10. Step workspace (`workspace.html`, superseded on 30 Oct, see the note at the top)
 
 The main screen. Plain classes and the tokens above, so the CSS can move into the Next.js app as it is. Content is concept-first (`CONTENT_FORMAT.md` v2): every milestone is a concept that opens with a lesson. The sample is wc concept 2, "How text is encoded": its lesson, step 4 ("Decode across chunks", spot the bug, copied from `challenge-wc.yaml`) and its teach-back. The concept names, the other step titles and the lesson text are design samples until wc is rewritten. The learner's answers are samples too, and each highlighted part is a verbatim substring of the answer.
 

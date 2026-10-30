@@ -1,0 +1,225 @@
+project:
+  slug: json-parser
+  title: Build your own JSON parser
+  source_url: https://codingchallenges.fyi/challenges/challenge-json-parser
+  level: intermediate
+  summary: >-
+    A program that reads a file and says whether it is valid JSON, exiting with 0 if it is and 1
+    if it isn't, with a message that helps fix the problem. Building it step by step teaches the
+    two stages every parser and compiler has, breaking text into tokens and then checking them
+    against a grammar, and how a precise specification settles every edge case.
+
+concepts:
+  - id: grammar-and-parsing
+    name: Grammar and parsing
+    covers:
+      - the grammar as the definition of valid
+      - "lexing: characters into tokens"
+      - recursive descent
+      - nesting depth and the call stack
+    explanation: |-
+      JSON is defined by a grammar: a few rules saying what a value, an object and an array are.
+      The rules refer to each other (a value can be an object, and an object contains values),
+      which is how a handful of rules allows nesting of any depth. A parser checks input against
+      the grammar in two stages. The lexer groups characters into tokens (braces, brackets,
+      colon, comma, strings, numbers, true, false, null) and skips whitespace. The parser then
+      checks the order of the tokens. In recursive descent, each grammar rule becomes one routine,
+      and the routines call each other, so nesting is handled by recursion. Each level of nesting
+      uses some of the call stack, so very deep input can crash a parser that sets no limit.
+
+      Real example: RFC 8259 and the railroad diagrams on json.org are the same grammar written
+      two ways, and many production compilers are recursive descent parsers.
+
+      Common mistake: building from examples instead of the grammar, then accepting things JSON
+      forbids, such as a trailing comma or single quotes. Validating with regular expressions or
+      by counting brackets can't handle nesting at all.
+    why_here: >-
+      "Valid" means "matches the JSON grammar". Each step adds more of its rules, and step 4
+      brings in nesting.
+    origin: step
+    resources:
+      - title: "RFC 8259: the JSON specification"
+        url: https://www.rfc-editor.org/rfc/rfc8259.html
+      - title: "Crafting Interpreters: Scanning"
+        url: https://craftinginterpreters.com/scanning.html
+      - title: "Crafting Interpreters: Parsing Expressions"
+        url: https://craftinginterpreters.com/parsing-expressions.html
+
+  - id: strings-escapes-unicode
+    name: "Strings: escapes and Unicode"
+    covers:
+      - required escapes and control characters
+      - backslash-u escapes and surrogate pairs
+    explanation: |-
+      A JSON string sits between double quotes. The double quote, the backslash and control
+      characters such as newline and tab must be escaped with a backslash, and may not appear
+      raw. Any character can also be written as a backslash, the letter u and four hex digits,
+      which give one UTF-16 code unit. Characters above U+FFFF, such as most emoji, need two of
+      these escapes, a surrogate pair, which together mean one character.
+
+      Real example: an emoji written in a JSON file as two backslash-u escapes in a row.
+
+      Common mistake: accepting a raw tab or newline inside a string, or treating half of a
+      surrogate pair as a character on its own.
+    why_here: >-
+      Step 2 adds string keys and values, and the test suite checks escapes and illegal control
+      characters.
+    origin: step
+    resources:
+      - title: "RFC 8259, section 7: Strings"
+        url: https://www.rfc-editor.org/rfc/rfc8259.html#section-7
+      - title: "Introducing JSON (json.org)"
+        url: https://www.json.org/json-en.html
+
+  - id: number-grammar-precision
+    name: "Numbers: grammar and precision"
+    covers:
+      - the number grammar
+      - floating-point precision
+    explanation: |-
+      A JSON number is an optional minus sign, then either a single 0 or a digit from 1 to 9
+      followed by more digits, then an optional fraction and an optional exponent. That rules out
+      leading zeros, a plus sign, hex, a trailing dot, NaN and Infinity. The specification sets no
+      size limit. A program that stores every number as a 64-bit floating-point value silently
+      loses precision above 2 to the power 53.
+
+      Real example: some web APIs send large IDs both as a number and as a string, because
+      clients that read the number rounded it to a different ID.
+
+      Common mistake: reusing a general-purpose "read a number" routine, which accepts forms
+      JSON forbids.
+    why_here: >-
+      Step 3 adds numeric values, and the test suite includes leading zeros and other malformed
+      numbers.
+    origin: step
+    resources:
+      - title: "RFC 8259, section 6: Numbers"
+        url: https://www.rfc-editor.org/rfc/rfc8259.html#section-6
+      - title: "The Floating-Point Guide"
+        url: https://floating-point-gui.de/
+
+  - id: error-reporting
+    name: "Error reporting: where and why input is invalid"
+    covers:
+      - tracking line and column
+      - expected versus found
+    explanation: |-
+      Saying "invalid" is easy. Saying where and why is what makes a parser usable. That means
+      tracking the position while reading, and reporting what was expected against what was
+      found, for example "expected a comma or a closing brace at line 3, column 15, but found a
+      string". A simple parser stops at the first error rather than guessing.
+
+      Real example: an API answering "unexpected token at position 214" saves the caller a long
+      search through a large payload.
+
+      Common mistake: reporting where the parser gave up instead of where the problem started.
+    why_here: >-
+      Step 5 asks for useful error messages on invalid input.
+    origin: step
+    resources:
+      - title: "Crafting Interpreters: Parsing Expressions, Syntax Errors"
+        url: https://craftinginterpreters.com/parsing-expressions.html#syntax-errors
+
+  - id: exit-codes
+    name: Exit codes as a program's answer
+    explanation: |-
+      This parser's verdict is its exit code: 0 for valid, 1 for invalid. Every process ends with
+      a number from 0 to 255, where 0 means success. Scripts, test runners and build pipelines
+      read this number, not the printed text, so a program that prints "invalid" but exits with
+      0 looks successful to every tool around it.
+
+      Real example: a deploy pipeline validates its configuration files first, and stops as soon
+      as the validator exits with a non-zero code.
+
+      Common mistake: printing the result but forgetting to set the exit code.
+    why_here: >-
+      The challenge defines valid and invalid by exit code, starting in step 1.
+    origin: step
+    resources:
+      - title: "Bash manual: Exit Status"
+        url: https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+      - title: "exit(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/exit.3.html
+
+  - id: conformance-tests
+    name: Conformance test suites
+    covers:
+      - pass and fail cases
+      - suites older than the specification
+    explanation: |-
+      Formats with a specification usually come with shared test files: inputs that must be
+      accepted and inputs that must be rejected, each aimed at one rule. Running them finds the
+      cases you didn't think of, and automating the run checks every change against every case.
+      A suite can be older than the current specification, so a failing case is worth reading,
+      not just obeying.
+
+      Real example: the JSON_checker suite was written before RFC 8259, which allows any value at
+      the top level, so its case that rejects a lone top-level string no longer matches the
+      current specification. A later community suite showed that popular parsers disagree on
+      dozens of edge cases.
+
+      Common mistake: writing only tests that your current code already passes.
+    why_here: >-
+      Each step comes with its own folder of test files, and the last step runs a public suite.
+    origin: step
+    resources:
+      - title: "JSON_checker (json.org)"
+        url: https://www.json.org/JSON_checker/
+      - title: "Parsing JSON is a Minefield (Nicolas Seriot)"
+        url: https://seriot.ch/security/parsing_json.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and download the challenge's test data, a folder of valid and invalid
+      files for each step.
+    check: >-
+      You can run your program on a file and see its exit code.
+    concepts: [conformance-tests]
+
+  - id: s1
+    title: An empty object
+    objective: >-
+      Accept the simplest valid input, an empty object, and reject an invalid file. Print a
+      message and exit with 0 for valid and 1 for invalid. Start with a very simple lexer and
+      parser, and automate running the tests.
+    check: >-
+      Every file in the step 1 test folder gets the right exit code.
+    concepts: [grammar-and-parsing, exit-codes]
+
+  - id: s2
+    title: String keys and values
+    objective: >-
+      Accept an object whose keys and values are strings.
+    check: >-
+      Every file in the step 2 test folder gets the right exit code.
+    concepts: [strings-escapes-unicode, grammar-and-parsing]
+
+  - id: s3
+    title: Numbers, booleans and null
+    objective: >-
+      Accept objects whose values are strings, numbers, true, false or null.
+    check: >-
+      Every file in the step 3 test folder gets the right exit code.
+    concepts: [number-grammar-precision, grammar-and-parsing]
+
+  - id: s4
+    title: Nested objects and arrays
+    objective: >-
+      Accept objects whose values are themselves objects or arrays, nested to any reasonable
+      depth.
+    check: >-
+      Every file in the step 4 test folder gets the right exit code.
+    concepts: [grammar-and-parsing]
+
+  - id: s5
+    title: Your own tests and the full suite
+    objective: >-
+      Add your own valid and invalid cases, make error messages say where and why the input is
+      invalid, then run the public JSON_checker suite.
+    check: >-
+      Your parser accepts the suite's pass files and rejects its fail files with useful messages.
+      Any case where it disagrees with the suite, you can explain using the current
+      specification.
+    concepts: [error-reporting, conformance-tests, grammar-and-parsing]

@@ -32,10 +32,10 @@ const SCREENS: { head: [string, string]; body: React.ReactNode }[] = [
 ];
 
 const CHAPTERS = [
-  { label: "about 2 minutes", h: "Read the problem in plain words", p: "Every project opens with a short primer: what you're building, why it exists, a tiny worked example, and the terms you'll meet." },
-  { label: "10 to 20 minutes a step", h: "Answer each step", p: "Each step asks how you'd approach a piece of the problem, or what a bit of code will do. It's done when your reasoning is right, not when your code compiles." },
-  { label: "once per milestone", h: "Explain it back, out loud", p: "Talk the milestone through. Each idea you cover lights up, and your own words are kept as proof you understood it." },
-  { label: "always yours", h: "Keep what you learned", p: "Ideas you've explained stay explained in every project that uses them. Export your learning log any time." },
+  { label: "about a minute", h: "Pick a project and your language", p: "Tell the mentor whether you build in Java, Python or Node.js. It looks up the classes and docs to study for each step." },
+  { label: "30 to 60 minutes a step", h: "Build each step", p: "Each step says what to build, how to check it, and the concepts it uses, with links to the best places to learn them. Ask anything, any time." },
+  { label: "when a step works", h: "Explain it back, out loud", p: "The mentor asks you to explain what the step taught. Your own words are kept as proof you understood it." },
+  { label: "always yours", h: "Keep what you learned", p: "Export your learning log any time: every concept in your own words, the links you learned from, and the help you used." },
 ];
 
 function Screen({ i, swap }: { i: number; swap?: boolean }) {

@@ -17,6 +17,7 @@ const L = (a: number, b: number, c: number, d: number, k?: string) => `<line x1=
 const P = (d: string, k?: string) => `<path d="${d}" class="${k || "k-ink"}"/>`;
 const W = (s: string) => Math.max(40, Math.round(s.length * 6.7 + 14));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each figure kind takes its own data shape
 const FIG: Record<FigureKind, (d?: any) => string> = {
   stream() { const segs = [8192, 8192, 3616]; let x = 14, o = T(14, 8, "stdin · any size", "k-m", "start");
     segs.forEach((s, i) => { const w = 252 * s / 20000; o += R(x, 16, w, 20, "k-soft") + R(x, 16, w, 20, "k-fill", A("ta-blink", 2.4, i * 0.8)) + T(x + w / 2, 26, i < 2 ? "chunk" : "rest", "k-tf"); x += w; });

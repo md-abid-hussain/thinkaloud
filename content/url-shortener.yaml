@@ -1,0 +1,315 @@
+project:
+  slug: url-shortener
+  title: Build your own URL shortener
+  source_url: https://codingchallenges.fyi/challenges/challenge-url-shortener
+  level: beginner
+  summary: >-
+    A small web service, like bit.ly, that turns a long URL into a short code, redirects anyone
+    who opens the short link, and lets a link be deleted. It's an introduction to designing an
+    HTTP API: choosing methods and status codes, generating short keys that don't clash, keeping
+    data safe across restarts, and making requests safe to repeat.
+
+concepts:
+  - id: http-basics
+    name: "HTTP: methods, status codes and headers"
+    covers:
+      - methods
+      - status code classes
+      - headers and bodies
+    explanation: |-
+      Every interaction with the service is an HTTP request: a method (GET to read, POST to
+      create, DELETE to remove), a path, headers and an optional body. The server answers with a
+      status code, headers and a body. The status code is the machine-readable answer: 2xx
+      success (201 means something was created), 3xx look elsewhere, 4xx the client got something
+      wrong (400 bad request, 404 not found), 5xx the server failed.
+
+      Real example: a browser, a command-line client and a monitoring tool all work with your
+      service only because they read the same codes and headers.
+
+      Common mistake: returning 200 with an error message in the body, so every client believes
+      the request succeeded.
+    why_here: >-
+      Creating, following and deleting a short link use three different methods, and each
+      outcome needs the right status code.
+    origin: step
+    resources:
+      - title: "An overview of HTTP (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview
+      - title: "HTTP response status codes (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status
+      - title: "RFC 9110: HTTP Semantics"
+        url: https://www.rfc-editor.org/rfc/rfc9110.html
+
+  - id: api-contract
+    name: "The API contract: request shape, validation and errors"
+    covers:
+      - request and response shape
+      - validating input at the edge
+      - error responses that say what's wrong
+    explanation: |-
+      An API is a promise. Clients depend on the exact shape of requests and responses: field
+      names, types, and what an error looks like. Validating input at the edge means checking a
+      request against that promise before doing anything with it, and when it fails, answering
+      with a 4xx code and a message that says exactly what's wrong.
+
+      Real example: the response with a key, the long URL and the short URL is a small contract.
+      Renaming one field breaks every client that reads it.
+
+      Common mistake: letting a malformed request reach the storage code and fail there with a
+      500, or answering with a vague "bad request".
+    why_here: >-
+      Step 1 defines the response fields and asks for a clear 400 error when the URL field is
+      missing.
+    origin: step
+    resources:
+      - title: "RFC 9457: Problem Details for HTTP APIs"
+        url: https://www.rfc-editor.org/rfc/rfc9457.html
+      - title: "Zalando RESTful API Guidelines"
+        url: https://opensource.zalando.com/restful-api-guidelines/
+
+  - id: short-keys
+    name: "Short keys: hashing, base 62 and collisions"
+    covers:
+      - hash functions
+      - base-62 encoding
+      - collisions and the birthday problem
+    explanation: |-
+      The short code must be short and unique, and ideally shouldn't reveal how many links exist.
+      One way is to hash the long URL (a hash function maps any input to a fixed-size number) and
+      keep the first few characters of that number written in base 62: digits plus lowercase and
+      uppercase letters. Another is a counter written in base 62, which never clashes but gives
+      sequential, guessable codes. A shortened hash will clash sooner than intuition says. With N
+      possible keys, expect the first collision after roughly the square root of N links. That's
+      the birthday problem, where 23 people give a 50% chance of a shared birthday.
+
+      Real example: 6 base-62 characters allow about 56.8 billion codes, yet a collision becomes
+      likely after only a few hundred thousand links.
+
+      Common mistake: reading "57 billion possibilities" as "no collisions for billions of links",
+      and never checking whether a new key already belongs to a different URL.
+    why_here: >-
+      Step 1 asks how to generate a key for each URL, warns about short hashes colliding, and its
+      bonus asks you to handle a duplicate key from a different URL.
+    origin: step
+    resources:
+      - title: "Hash function (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Hash_function
+      - title: "Birthday problem (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Birthday_problem
+
+  - id: redirects
+    name: "Redirects: permanent, temporary and cached"
+    covers:
+      - the Location header
+      - permanent versus temporary codes
+      - caching of redirects
+    explanation: |-
+      A redirect is a 3xx response with a Location header that names where to go, and the client
+      then requests that address itself. 301 (moved permanently) lets browsers and search engines
+      remember the redirect and stop asking your server. 302 (found) and 307 are temporary, so
+      every visit comes back to you. That choice decides whether you can count clicks, change or
+      delete a link later, and how much traffic your server handles.
+
+      Real example: shorteners that show click statistics use temporary redirects, so every click
+      reaches them.
+
+      Common mistake: using 301 for links that might change or be deleted. Browsers that have
+      remembered it keep sending people to the old target.
+    why_here: >-
+      Step 2 turns a request for a short key into a redirect, and step 3's delete only works if
+      clients keep coming back.
+    origin: step
+    resources:
+      - title: "Redirections in HTTP (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Redirections
+      - title: "RFC 9110, section 15.4: Redirection 3xx"
+        url: https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4
+
+  - id: idempotency
+    name: "Idempotency: requests that are safe to repeat"
+    explanation: |-
+      Networks fail halfway. A client sends a request, the connection drops, and it can't tell
+      whether the server acted. If repeating the request is harmless, it can simply retry. An
+      operation is idempotent when doing it twice leaves the system in the same state as doing it
+      once. HTTP defines GET, PUT and DELETE as idempotent and POST as not, but an API can make a
+      POST idempotent on purpose, for example by returning the existing link when the same URL is
+      submitted again.
+
+      Real example: payment APIs accept an idempotency key, so a retried charge doesn't bill the
+      customer twice.
+
+      Common mistake: confusing idempotent with "always returns the same response". What must not
+      change is the state.
+    why_here: >-
+      Step 1 asks for creation to be idempotent, and step 3 asks for deleting a missing link to do
+      nothing.
+    origin: step
+    resources:
+      - title: "Idempotent (MDN Glossary)"
+        url: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+      - title: "Designing robust and predictable APIs with idempotency (Stripe)"
+        url: https://stripe.com/blog/idempotency
+
+  - id: persistence
+    name: Persistence and races in storage
+    covers:
+      - choosing a store
+      - indexes for each lookup
+      - uniqueness and check-then-insert races
+    explanation: |-
+      Anything held only in the program's memory disappears when it restarts. Persistence means
+      keeping the key-to-URL mapping in something that survives: a relational database, a
+      key-value store or a file. Then come the real questions. Which lookups are needed? By key
+      for redirects, and by long URL to make creation idempotent, so that needs an index too.
+      What happens when two requests create the same key at the same moment? A uniqueness rule in
+      the store settles that race.
+
+      Real example: an in-memory map is perfect for a prototype, and loses every link on the next
+      deploy.
+
+      Common mistake: checking "does this key exist?" and then inserting as two separate
+      operations, which lets two simultaneous requests both pass the check.
+    why_here: >-
+      Step 1 asks where the links are stored, and step 3 requires that deleted links are gone from
+      storage.
+    origin: step
+    resources:
+      - title: "PostgreSQL documentation: Constraints"
+        url: https://www.postgresql.org/docs/current/ddl-constraints.html
+      - title: "Time-of-check to time-of-use (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Time-of-check_to_time-of-use
+
+  - id: url-validation
+    name: "URLs: structure, validation and abuse"
+    covers:
+      - the parts of a URL
+      - which schemes to accept
+      - open redirects and phishing
+    explanation: |-
+      A URL has parts: a scheme (https), a host, an optional port, a path, a query and a
+      fragment. A shortener should check that what it receives really is a URL, with a scheme it's
+      willing to send people to. Accepting anything lets your domain redirect to script links,
+      addresses inside a private network or phishing pages, and your short links become a way to
+      hide where a link really goes.
+
+      Real example: public shorteners scan the targets of new links and disable links reported as
+      malicious.
+
+      Common mistake: storing the raw string without parsing it.
+    why_here: >-
+      Step 1 takes a URL from any client and later sends visitors to it, so what you accept decides
+      what your service can be used for.
+    origin: beyond
+    resources:
+      - title: "What is a URL? (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL
+      - title: "URL Standard (WHATWG)"
+        url: https://url.spec.whatwg.org/
+      - title: "OWASP Unvalidated Redirects and Forwards Cheat Sheet"
+        url: https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html
+
+  - id: cross-origin-requests
+    name: Cross-origin requests from a browser
+    covers:
+      - the same-origin policy
+      - CORS headers and preflight requests
+    explanation: |-
+      A web page can only read responses from its own origin (scheme, host and port) unless the
+      other server says it may. That's the same-origin policy, and servers grant exceptions with
+      CORS headers. For some requests the browser first sends a preflight request to ask
+      permission.
+
+      Real example: a front end on one port calling an API on another during local development is
+      the classic first CORS error.
+
+      Common mistake: allowing every origin just to make the error go away.
+    why_here: >-
+      The optional web form calls your API from a browser, possibly from a different origin.
+    origin: beyond
+    resources:
+      - title: "Cross-Origin Resource Sharing (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
+      - title: "Same-origin policy (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy
+
+  - id: ci-cd
+    name: Automated build, test and deploy
+    explanation: |-
+      A pipeline runs on every change: it builds the project, runs the tests and, only if they
+      pass, deploys the new version. That turns "it works on my machine" into a repeatable check,
+      and makes small, frequent releases safe. Secrets such as database passwords live in the
+      pipeline's settings, not in the code.
+
+      Real example: a push to the main branch triggers the tests, and a failing test blocks the
+      deploy.
+
+      Common mistake: a pipeline that deploys even when tests fail.
+    why_here: >-
+      The second optional step asks for every change to be built, tested and deployed
+      automatically.
+    origin: step
+    resources:
+      - title: "Continuous Integration (Martin Fowler)"
+        url: https://martinfowler.com/articles/continuousIntegration.html
+      - title: "GitHub Actions documentation"
+        url: https://docs.github.com/en/actions
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project for a small web service that you can run locally.
+    check: >-
+      The service starts and answers a request.
+    concepts: []
+
+  - id: s1
+    title: Create a short link
+    objective: >-
+      Accept a POST with a long URL in a JSON body, generate a short key, store the pair, and
+      return the key, the long URL and the short URL. Submitting the same URL again returns the
+      existing link. A malformed request gets a clear error. Bonus: handle two different URLs that
+      produce the same key.
+    check: >-
+      Submitting a URL returns a success code and the three fields. Submitting it again returns
+      the same key. A body without the URL field returns 400 with a message naming the missing
+      field.
+    concepts: [http-basics, api-contract, short-keys, idempotency, persistence, url-validation]
+
+  - id: s2
+    title: Redirect
+    objective: >-
+      A request for a short key redirects to its long URL. An unknown key gets a not-found
+      answer.
+    check: >-
+      A known key returns 302 with a Location header pointing at the long URL, and following it
+      reaches the page. An unknown key returns 404 with a short message.
+    concepts: [redirects, http-basics]
+
+  - id: s3
+    title: Delete a short link
+    objective: >-
+      A DELETE for a short key removes it if it exists and does nothing if it doesn't.
+    check: >-
+      After a delete, the key returns 404 and the pair is gone from storage. Deleting it again
+      still succeeds.
+    concepts: [idempotency, persistence]
+
+  - id: s4
+    title: Web form
+    objective: >-
+      A page where a user pastes a long URL, submits it to your API and sees the short link,
+      ideally with a button to copy it.
+    check: >-
+      Shortening a URL from the page shows the short link, and opening it redirects.
+    concepts: [cross-origin-requests, api-contract]
+    optional: true
+
+  - id: s5
+    title: Build, test and deploy pipeline
+    objective: >-
+      Every change to the code is built, tested and, if the tests pass, deployed automatically.
+    check: >-
+      A pushed change runs the tests, and when they pass the deployed service has the change.
+    concepts: [ci-cd]
+    optional: true

@@ -1,262 +1,252 @@
-# ThinkAloud (working name): product brief v0.4
+# ThinkAloud: product brief v1.2
 
-Status: draft for review. Owner: Abid. Date: 2026-10-29.
-Target: a working prototype for the No Hands challenge (Builders track), built so it can grow into the final product.
-v0.3: the command layer is removed (input is plain typing or Wispr Flow), completion is logic-first with an optional language, and the whole brief was checked for conflicts. The data model is in `DATA_MODEL.md`.
-v0.6 (30 Oct): the learning model follows the user's own workflow (`learning2026/learning-java`). There are two tracks, a **learning map** and a **build plan**, linked by concept tags.
-- **Learning map:** Part A covers the concepts. Each has a lesson, where it shows up in this project, checked references and one explain-back. Part B (how the chosen language handles each concept) and Part C (packages for the plumbing) are generated at runtime by an agent with web search.
-- **Build plan:** the challenge's own steps, 30 to 60 minutes each, each with one checkable outcome.
-- **Progress** is Seen, Applied or Explained per concept, plus steps done, a help log and a session log.
-- There are no keyed quizzes. The full rules are in the "learning model (v3)" section of `CONTENT_FORMAT.md`, and they override anything below that conflicts.
-v0.4: the product must not be rigid for newcomers. A support level (Guided, Standard or Independent) is chosen at Start, every project opens with a plain-language primer, and the app never suggests code. Implementation of v0.4 is queued in `HANDOFF.md`.
+Status: agreed with Abid, ready to build. Owner: Abid. Date: 2026-10-30.
+This replaces every earlier version. The archive (`no-hands-archive/`, git tag `v0-archive`) is not a source for anything here.
+Principle: build the simplest version first, check it, then improve.
 
-## 1. Problem and idea
+## 1. Problem
 
-AI now writes most of the code. A junior or new developer who just prompts and accepts generated code is buried in output they cannot explain, and cannot tell when the AI is wrong. They still need to learn the fundamentals, because that is what lets them drive the AI. Today's tools hand over code by default, and courses are fixed and not tied to the learner's own stack.
-
-**The idea:** take a project that comes with requirements (Coding Challenges, roadmap.sh projects, or any spec). The app maps the project to the concepts needed to build it and checks that the learner understands them. If the learner picks a language or framework, the concepts are translated to it. The learner builds the project themselves, and the agent assists at the level the learner chooses.
-
-Origin: the idea was first tried as a manual workflow in Claude on two projects. That was a prototype, and its rough edges are not the problem the product solves.
+AI writes code faster than a junior developer can understand it. A developer who accepts generated code ends up with a project they can't explain or debug, and can't tell when the AI is wrong. What lets them drive the AI is knowing the concepts underneath and how their language really handles them.
 
 ## 2. Who it is for
 
-- **v1:** a junior or new developer who can write basic code and wants to learn by building. They can work concept-only, or pick a language and optional framework. They arrive as a guest.
-- **Not for now:** teachers or cohorts, absolute beginners, and private codebases.
+- **v1:** a junior developer who works in Java, Python or Node.js and wants to go deeper, both into the concepts and into their own language, by building real projects. The author, a junior Java developer, is the first user.
+- **Not v1:** students learning to program, absolute beginners, teams.
 
-## 3. Objectives
+## 3. The idea
 
-What "done" means for the prototype.
+You pick a project (a Coding Challenges challenge) and build it yourself in your own editor. ThinkAloud is one chat beside it. The mentor shows you the concepts the project needs and where to learn them, tells you what to study in your language, helps whenever you ask, and asks you to explain each concept in your own words.
 
-| # | Objective |
-|---|---|
-| O1 | A guest reaches their first step in under 2 minutes, with no sign-up. |
-| O2 | A project goes in, and concepts come out. If the learner picks a language and framework, the concepts are translated to them. |
-| O3 | The learner controls how much help they get, under the help rule in section 5, and picks a support level at Start that suits them (Guided, Standard or Independent). |
-| O4 | Understanding is shown by answering each concept's explain-back (typed or dictated), graded by rubric with quotes, and is recorded as evidence. |
-| O5 | If the learner picks a language, a public GitHub repo can be read, including what changed since the last check. This is optional. |
-| O6 | Everything learned can be exported (Markdown and JSON). |
-| O7 | It meets the challenge rules: live link, free for judges to use, 2-minute demo, built by voice, spend capped. |
+There are two layers. Only the second depends on the learner:
 
-## 4. Features
-
-**Must (v1)**
-
-| ID | Feature |
-|---|---|
-| F1 | Guest start: everything can be browsed without signing up. Starting a project asks for an optional name and email. Leaving both empty continues as a guest with a random ID kept in the browser. |
-| F2 | Project in: every Coding Challenges and roadmap.sh project is listed, each with its own overview page. The app maps a project to concepts. Pasting any requirements comes later. |
-| F3 | Language and framework: both optional, chosen in the Start box (a few suggestions, or type your own) and changeable later. With none, the project runs concept-only. With one, the concepts are translated to it (APIs, pitfalls, links). |
-| F4 | Restate step: the learner restates the project in their own words and the app checks it against a rubric. |
-| F5 | Concepts: a lesson (how it works, examples, misconceptions, where else it shows up), where it shows up in this project, 2 to 4 checked references, and one explain-back. A concept counts as explained when its explain-back passes. |
-| F6 | Build steps of 30 to 60 minutes, following the challenge's own steps and grouped into milestones. Each has one checkable outcome and the concepts it uses, and is done when the learner ticks the outcome as met. Help levels follow section 5. |
-| F7 | Repo check (optional, only with a language): a public repo URL, covering commits since the last check. It sets "applied" and the Built badge and never blocks. |
-| F8 | Memory: concept status, evidence (quotes, commits), and a short summary of each session. |
-| F9 | Export: a Markdown learning log and a JSON dump. |
-| F10 | Plain inputs: large answer boxes that work with typing or Wispr Flow. There is no voice-specific code and no command layer. |
-| F11 | Primer: every project opens with a plain-language explanation of the problem: what it is, why it exists, a tiny worked example in words, and the key terms. |
-| F12 | Support level: Guided, Standard or Independent, chosen in the Start box and changeable at any time. It changes what is shown and offered by default, never what is available or what counts as done. |
-
-**Should (if time allows):** optional email to save progress, a "delete my data" button.
-
-**Later:** a command layer and smart router (OpenAI Decisions API or another), a voice sidebar listener, a graph view, spaced repetition, private repos with GitHub sign-in, running the learner's code, cohorts.
-
-**Not now:** anything not listed above.
-
-## 5. Help rule
-
-The learner decides how much help they get. The agent never takes over the work on its own.
-
-1. **Default:** the agent explains, asks questions and reviews. It does not write the learner's solution.
-2. **On request, at any time:** the learner can ask for a hint, an example (a similar case, not their exact code), or code for the exact piece. It is given, with no justification and no limit.
-3. **Code comes in small explained parts,** about 30 lines at most each. A bigger piece is given part by part, so the learner reads and types it.
-4. **The agent never raises the level by itself.** When the learner is stuck past the step's estimate, it offers the next level, and the learner accepts or declines.
-5. **Everything above a hint is logged.** A concept helped by an example or code counts as understood only after the learner explains it back in their own words.
-6. **The agent never edits the learner's code.** The repo is read-only.
-7. **The app never suggests code.** Hints, examples and the tutor use words, analogies and small cases that are not code. Code for the learner's exact piece is given only when they explicitly ask for it, from a "More help" menu, and is never offered by the timer or the tutor. Language notes name the tools a language offers and link to its documentation, without code expressions.
-8. **No dead ends.** Every Think task and teach-back has an "I'm not sure" button. It shows the hint, counts as help used, and lets the learner try again. There is no limit on attempts and no penalty.
-
-Enforcement: the help level is a setting on each step. It is passed to the model on every turn and recorded. The prompt cannot raise it.
-
-### Support levels
-
-The learner picks a support level in the Start box, and can change it on the project home at any time. It is saved with the enrollment and every change is logged. The content is the same at every level. Only the presentation and the defaults for what is offered change.
-
-| | Guided (for newcomers) | Standard (default) | Independent |
+| Layer | What it holds | Made when | Shared by |
 |---|---|---|---|
-| Primer | Shown first, in full | On the overview, collapsed on the project home | Collapsed |
-| Concept brief | Opened before each step | One click away | One click away |
-| Hint | Shown straight after a "not yet" explain-back, and offered after half the step's estimate | Offered when the step passes its estimate | Only when asked |
-| Explain-back | Split into its rubric points as prompts, one box each | One open question | One open question |
-| Wording | Short sentences, terms explained when first used | Plain | Plain |
+| **Project map** | The concepts to learn, with short notes and links to learn from, and the coding steps. No language | Ahead of time, in a Claude Code session, then reviewed by Abid | Everyone |
+| **Language layer** | For one language: how it handles each concept, the classes, modules and packages to study, each with a link, and guides from the language's own docs | The first time someone picks that language for that project, by the language agent using Linkup search. Then kept | Everyone who picks that language |
 
-At every level the learner can ask for any help at any time and nothing is refused. The completion rules are identical, so evidence means the same thing whichever level was used.
+The depth lives in the links and in the chat. ThinkAloud doesn't rewrite the material. It points to the best place to learn it and helps you understand it.
 
-## 6. How content is generated
+## 4. Project map (one file per project, `content/<slug>.yaml`)
 
-Three layers, so the learning is conceptual first and the language comes second.
+The skeleton works for any project: a CLI tool, a parser, a web service or something else.
 
-1. **Foundation:** language-neutral concepts (for `wc`: bytes vs characters, streaming in constant memory, state machines, stdin vs file, reference-tool testing). For the two seeded projects these are reviewed by Abid. For every other project they are generated on first open, cached, and marked unreviewed. Concepts that recur across projects are one shared node.
-2. **Language layer:** the APIs, pitfalls and links for the learner's chosen language. Generated on first use for each concept and language, then cached, so one note serves every project that uses the concept. Skipped when the learner works concept-only.
-3. **Framework layer (optional):** the same, for a framework such as Spring Boot.
+```yaml
+project:
+  slug: ...
+  title: ...
+  source_url: ...         # the original challenge
+  level: ...              # the challenge's own tag: beginner, intermediate or advanced
+  summary: ...            # our own words, 2 to 3 sentences: what you build and what building it teaches
 
-Seed content: `learning-java/INDEX.md` lists all 134 projects with their links and seeds the landing list. The `wc` and Task Tracker folders in `learning-java` already hold checked concept tables, briefs and links. Reuse them after a check; `task-tracker/LEARNING.md` row 3 (Jackson) is known to be stale.
+concepts:                 # the main ideas to learn; no language, no code
+  - id: ...
+    name: ...
+    covers: [...]         # optional: the parts of this concept, as short names. They are not separate concepts
+    explanation: |        # a short overview: what it is, a real example, a common mistake
+      ...
+    why_here: ...         # 1 to 2 sentences: why this project needs it
+    origin: step          # step: the challenge's steps lead to it; beyond: deeper than the page goes
+    resources:            # 1 to 3 links to learn from: specs, official docs, well-known articles
+      - { title: ..., url: ... }
 
-Rules: no link is shown unless it comes from a curated list or has returned HTTP 200. Generated content is marked as generated.
-
-Content is written as YAML files (one concept catalogue and one file per project), checked and loaded by `db/scripts/import-content.mjs`. The format, with a worked example for Coding Challenges #77, is in `CONTENT_FORMAT.md`.
-
-## 7. User flow
-
-The landing page lists every project. Opening one shows its overview on its own route, which also suits phones better than a pop-up. Start asks for an optional name, email, language, framework and support level. With no language the learner works concept-only. On the project home the learner restates the project in their own words. Then the loop runs per milestone: learn its concepts (lesson, references, and the language's tools when a language is chosen), build each step against its checkable outcome, and answer each concept's explain-back. Progress and export are always reachable.
-
-### Input
-
-Input is plain: typing, or Wispr Flow dictating into ordinary text boxes. There is no command box and no voice-specific code in v1. Navigation is by links and buttons, and help is three buttons (hint, example, code).
-
-### Pages (draft)
-
-Every page shares one frame: a top bar (Projects, Your learning, Export), a breadcrumb (project, milestone, step), and the current help level.
-
-| Page | Purpose | What the learner sees |
-|---|---|---|
-| Landing (all projects) | Find a project | A short intro, search, filters for source and concept area, and a card for every Coding Challenges and roadmap.sh project, with concept chips where known |
-| By concept view | Browse by concept | The same projects grouped under each concept area, with the learner's status on each concept |
-| Project overview (its own route) | Decide to start | What to build, a plain-language primer, what it needs to do (our own summary), concepts by area, milestones with time estimates, the Start box (optional name, email, language, framework and support level, or continue as a guest concept-only), and a link to the original at the bottom |
-| Project home | Work on the project | Progress, a Start here card the first time (the primer in Guided, then restate the project in your own words) and a Next up card after, milestones, concepts, a repo box (only with a language), and the help log |
-| Step | Work on a step | The step's outcome and the concepts it uses, the help buttons and level, the mentor, and a "Mark outcome met" control |
-| Concept | Learn one concept | The lesson, where it shows up in this project, checked references, the language's tools and packages when chosen (Parts B and C), the explain-back, and the help buttons |
-| Explain-back | Show understanding of a concept | One open question with an answer box and feedback by rubric point, with quotes from the learner's own words |
-| Repo check | Read the work (only with a language) | Repo URL box, commits since the last check, findings per concept |
-| Your learning | See progress | Projects in progress, concepts by area with status and the learner's own words, the help log, Export |
-
-### How projects are grouped by concept
-
-- Every concept belongs to one area from a fixed list and has a kind: foundation (language-neutral), language, or framework.
-- A project covers many concepts, and a concept appears in many projects. The landing page lists every project and filters by source and concept area. The By concept view groups the projects under each area.
-- Chips show the learner's `concept_state`: new, seen, explained, applied. A concept explained in one project shows as explained in every project, so recurring concepts such as explicit charsets are not relearned.
-- Prerequisite edges order the concepts within an area and drive "suggested next".
-- Areas: Text and encodings; Streams and I/O; Data formats and parsing; State and storage; Process and testing; Design and structure; Networking and HTTP; Concurrency; APIs and backends; Data stores.
-- v1 fills the first six from the two seeded projects. Every other project gets its concepts worked out on first open, then cached and marked as generated.
-- Concepts generated from pasted requirements are assigned to an area by the model, with "Other" as the fallback, and are reviewed.
-
-Seed mapping from the checked tables:
-
-- **wc:** bytes vs characters, explicit charsets and decoding across chunks (Text and encodings); streaming in constant memory, stdin vs file, try-with-resources (Streams and I/O); the word-count state machine (Data formats and parsing); exit codes, formatted output, differential testing (Process and testing).
-- **Task Tracker:** immutable domain model, Repository, Command, dependency injection, SRP and DIP (Design and structure); `Instant` and JSON (Data formats and parsing); atomic writes, file locking, ID strategy (State and storage); exceptions and exit codes, fakes vs mocks (Process and testing).
-
-### Progress and completion (draft, to confirm)
-
-Status is derived from an append-only event log: step started, help used, answer graded, Think task passed, repo checked, step done, milestone closed. The agent never writes a status.
-
-| Level | Complete when |
-|---|---|
-| Concept | It moves new, then seen (the learner read the lesson), then applied (used in the build: the learner ticks it, or a repo check shows it), and explained (its explain-back passed) |
-| Step | The learner ticks its checkable outcome as met. Concept-only learners skip the build steps |
-| Milestone | Understood when all its concepts are explained. Built when all its steps are done |
-| Project | All milestones are Understood and the closing reflection is submitted. Built is a second badge, earned when every step is done |
-
-> Superseded by v0.6: the example and the gate and Think-task rules below describe the old model (keyed Think tasks and gate questions). Keep them for history only. The learning model in `CONTENT_FORMAT.md` (v3) is current.
-
-Example, `wc` milestone 1 (Bytes and lines, 3 steps, about 45 minutes). Each step has a Think task that decides completion and a Build task that needs a language and is optional. The learner checks the Build result on their own machine, and the app does not verify it:
-
-| Step | Think (decides completion) | Build (optional) | Estimate |
-|---|---|---|---|
-| 1. Count bytes in chunks | A 20,000-byte file and an 8,192-byte buffer: how many reads return data, and how many bytes does each return? (3 reads: 8,192, 8,192 and 3,616, then the end marker) | `-c` on `test.txt` prints 342190 | 15 min |
-| 2. Count lines | What does `a\nb`, with no trailing newline, report for lines, and why? (1, because lines are counted by newline bytes) | `-l` on `test.txt` prints 7145 | 15 min |
-| 3. Same code for stdin | Explain how one loop serves both a file and stdin | Piped `-l` prints 7145 | 15 min |
-
-Gate questions: the memory footprint on a 10 GB file and why; how one code path serves a file and stdin; what a read returns when fewer bytes are left than the buffer, and how the counter uses that. Each maps to one concept. They can be answered any time after the brief is read, and the milestone closes when its steps and its gate are both done. The expected values and questions come from the checked `ccwc` notes.
+steps:                    # the coding part, in the challenge's order; no language
+  - id: s1
+    title: ...
+    objective: ...        # what the program must do, in words
+    check: ...            # how you know it works, from the challenge, in our own words
+    concepts: [...]       # the concepts this step uses: any number, including none
+    optional: true        # only when the challenge marks the step optional
+```
 
 Rules:
+- Our own words only. Link the original. Never copy the challenge text.
+- No programming language and no code in our own text. Names of flags, protocols and formats are fine.
+- **Teach the deep concept, never trivia about the project's outputs.**
+- **Main concepts, with their parts in `covers`.** For wc, text encoding covers code points, surrogate pairs, grapheme clusters, the locale and invalid bytes. There's no fixed number of concepts, because the count depends on the problem.
+- Every concept is used by at least one step.
+- **Every resource link is opened and checked** before it's saved. Never guess a URL.
+- Facts in the notes are checked, for example against a reference implementation.
+- Check a map with `uv run --with pyyaml python content/check_maps.py content`. The checker validates the structure, rejects language names and code, and opens every link.
+- **Maps so far:** `wc` (beginner), `json-parser` (intermediate), `url-shortener` (beginner). More come after the app works.
 
-- **Gate questions:** each has a rubric of 2 to 4 required points. The grader returns which points are present, with a quote from the learner's answer. The app checks the quote is really in the answer. All three questions must be Met. A partial answer gets one follow-up.
-- **Time:** each step has an estimate, and the milestone's estimate is their sum. Time counts while the page is active, and idle gaps over 10 minutes are skipped. It drives "about N minutes left" and the offer of help when a step passes its estimate. It never completes anything.
-- **Logic first:** the app cannot run the learner's code, so it validates understanding instead. Think tasks come in four kinds: predict the output, trace a loop, spot the bug in a short snippet, and explain in words. Predict and trace answers are compared with a stored key in code. Explain answers use a rubric.
-- **Code is second and optional:** the learner writes it in their own editor, only if they chose a language. The app reads it through the repo link and reports which concepts it sees applied. This earns the Built badge and the "applied" status. It never blocks a step or milestone.
-- **Concept only:** with no language chosen, the Build tasks, the repo box and the language layer are hidden. The learner can still reach Understood on every milestone and on the project, and can add a language later.
-- **Agent limits:** criteria are stored data the agent cannot change. Only the app changes status, using fixed rules on the grader's structured result. The learner can retry, park a step with a button (shown as parked, not done), or dispute a grade (logged).
-- **Side lane:** questions inside the project's concepts are answered and kept in a side log with no effect on progress. Off-concept questions get a short answer or go to a Later list. A side topic joins the track only when the learner presses "Add to track", and becomes an optional Extra step that never counts toward completion.
+## 5. Language layer (one per project and language, kept in the database)
 
-What the steps train:
+```yaml
+project: wc
+language: java            # v1: java, python, node (JavaScript or TypeScript)
+concepts:
+  - concept: text-encoding
+    in_this_language: ... # plain words: how this language represents and handles the concept
+    study:                # the classes, interfaces, modules or functions to read about
+      - { name: ..., kind: class, why: ..., url: ... }
+    guides:               # 1 or 2 guides from the language's own docs
+      - { title: ..., url: ... }
+steps:
+  - step: s1
+    use:                  # what you'll likely reach for to build this step
+      - { name: ..., kind: ..., why: ..., url: ... }
+    packages:             # third-party packages for plumbing only, never the part the step teaches; often empty
+      - { name: ..., why: ..., url: ... }
+```
 
-| Phase | Question it answers | Where it shows up |
+Rules:
+- Links point to official docs or the package registry, and each one is opened before it's saved.
+- `kind` stays loose so it fits any language: class, interface, module, function or package. An empty list is allowed. A made-up entry isn't.
+- No code. Name the thing and say what it's for. To see how the code should flow, ask the mentor.
+- **Switching language keeps your progress.** Concepts are language-neutral, so anything you've explained stays explained. Only the language layer changes.
+
+## 6. Start to end
+
+1. **Open a project** from the landing page, as a guest with no sign-up. The chat opens.
+2. **First message.** The mentor gives the summary, the concepts in one line each, and the steps. It asks which language you're building in (Java, Python or Node.js).
+3. **Language.** Your answer is saved. If no language layer exists yet for this project and language, the language agent builds it ("Looking up the Java classes…") and keeps it.
+4. **Each step starts.** A step card appears in the chat with the step's objective and check, and the concepts it uses with their notes and links, plus what to study in your language. No question is asked at this point. You start learning and building.
+5. **Build and talk.** You learn from the links, write the code in your editor, and ask anything in the chat.
+6. **Step done.** You say it works, optionally pasting your output, and the step is marked done.
+7. **Explain.** After the **last required step that uses a concept**, the mentor asks you to explain it. The question is made on the spot from the concept, its parts and what you built, for example "a teammate on the C locale gets 342190 for -m. Why?". When your answer shows the main idea and the parts this project used, the concept is marked explained, with your sentence as the quote. If it misses a part, the mentor asks about that part. Tries are unlimited, and a hint is there if you ask.
+8. **Any time**, you can say "test me on text encoding", or offer an explanation unprompted. It's judged the same way.
+9. **Finish.** When every required step is done and every required concept is explained, the project is complete and you export your learning log (Markdown).
+
+Concepts used only by optional steps are optional too. They're asked about only if you do that step.
+
+## 7. The chat
+
+There is one text box and the agent's messages. Above the box, one line always says **what to do now**, worked out from your progress with no model call. For example: "Tell the mentor which language you're using", "Step 2 of 7: Count lines. Build it, ask anything, and say done when it works", or "Answer the mentor's question in your own words". The first message and each step card come straight from the map, so they appear instantly.
+
+A small intent check reads each message before the mentor does:
+
+| Intent | Example | What happens |
 |---|---|---|
-| Understand | What exactly is being asked? | Restate step |
-| Know what exists | Which concepts and tools apply, and what goes wrong? | Concept briefs |
-| Plan | Which approach, and why not the others? | Gate questions, hints |
-| Build | Write the code | Build task |
-| Verify | Does it behave correctly on edge cases? | Predict and trace tasks |
-| Debug | Why doesn't it work? | Spot-the-bug tasks, help levels |
-| Review | Can it be simpler or clearer? | Repo check |
-| Reflect | What did I learn, and where else does it apply? | Closing reflection |
+| **Help** | "How should the read loop flow?", "I'm stuck", "review this", "done, -c matches" | The mentor helps or reviews, in words |
+| **Explaining** | Your answer to the mentor's question, or an explanation you offer | The mentor judges it and, if you understood, marks the concept explained |
+| **Code** | "Show me the code for this part" | Code is allowed in this reply only (section 8) |
 
-## 8. Data (Postgres on Zerops)
+## 8. Help rule
 
-Shared curriculum: `challenge` (source, title, source link, summary in our own words), `milestone`, `step`, `task` (Think or Build; the Think kinds are predict, trace, spot the bug and explain; each has a stored key or rubric), `hint` (the static hint and example for a step), `question` (the gate questions, each with a rubric and the concept it checks), `concept` (with `area` and `kind`), `concept_edge` (the graph), `milestone_concept`, `resource`, `language_note`.
+1. **You write the code.** The mentor explains, asks and reviews, in words. It never edits your code.
+2. **Help on request, at any time.** A hint, an example or code, with no reason needed and no limit.
+3. **Code only when you ask for it.** It comes in parts of about 30 lines at most, each explained, followed by a one-line check that you can explain it.
+4. **The mentor offers, never imposes.** When you're stuck, it offers the next level of help. You choose.
+5. **Everything is logged.** Every hint, example and piece of code goes in the help log.
+6. **No dead ends.** Retries are unlimited, and "not sure" always gets a hint.
 
-Per learner: `learner`, `enrollment` (language and framework, both optional), `event` (the append-only log and the source of truth for progress, including every use of help), `answer` (text, grade, points met, quote), `step_state`, `milestone_state` and `concept_state` (caches kept in step with the log by the app), `evidence` (links a concept to an answer or a commit), `session_summary`, `message`, `side_item`, `repo_evaluation` (from commit, to commit, commit messages, findings), `llm_usage`.
+Why: the author spent a week stuck with a mentor that refused all code. Help that is refused doesn't make anyone learn faster.
+Enforcement: the app, not the mentor, decides whether code is allowed. Code is allowed in a turn only when the intent check says Code. A draft that contains code at any other time is removed, and the mentor is asked once to write it again in words.
 
-The graph is the edge table plus recursive queries. A graph database is revisited only if those queries become awkward. The full model, with diagrams, the SQL in `db/` and the passing tests, is in `DATA_MODEL.md`.
+## 9. The engine
 
-## 9. Export, architecture, tests
+- **Intent check:** one small structured call per learner message, returning Help, Explaining or Code.
+- **Mentor:** a tool loop with at most 4 model calls per turn.
+  - **Context every turn:** the project map, the language layer for your language, your progress, the open question, and the conversation, summarised once it gets long.
+  - **Tools** (each shows as one line in the chat):
+    - `set_language`: saves your language and builds the language layer if it's missing
+    - `ask_question(concept)`: records the open explain question
+    - `mark_step_done(step)`: when you say a step works
+    - `mark_explained(concept, quote)`: the app checks the quote really appears in your message, and so does the database
+  - **Append-only turns:** Opus 5.5 binds each thinking block to the exact prompt it was made with. So the system prompt is built once per turn and never changed, and tools report fresh progress in their results.
+  - **Method:** the "How to explain" section of `learning-java/CLAUDE.md`. Diagnose first, move one step forward per turn, ask at most one question, use parallel cases, and point to the right link. Short and warm, with no cheerleading.
+- **Language agent:** a tool loop with Linkup search. It fills the language layer (section 5) and opens every link before saving it.
+- **Replies outlive the page.** A mentor reply is saved as it's produced, so leaving and coming back shows it. That's the reason for one long-running server on Zerops.
+- **Limits:** a daily spend cap and a per-guest cap. Using more tokens is accepted in v1.
+- **Stack:** Next.js with TypeScript. The agent is a **LangGraph** graph (`@langchain/langgraph`) using LangChain's `ChatAnthropic`, which the user chose on 30 Oct instead of the raw Claude SDK. Postgres runs in **Docker** locally (`docker compose up -d`) and on Zerops in production. Linkup provides web search. The models are Haiku 5.5 at low effort for the mentor (Abid chose it on 30 Oct for speed; configurable), Opus 5.5 for the language agent, and Haiku 5.5 for the intent check. Refusal fallbacks are on for Opus, and `temperature` is never sent.
 
-- **Export:** a Markdown learning log (steps done, concepts with status and the learner's own words, repo evaluations, help log) and a JSON dump of every row that belongs to the learner.
-- **Architecture:** browser app, then an API server, then Postgres. The server calls an LLM through a small interface (Claude as the default provider) and calls the GitHub REST API with a read-only token held on the server, for public repos only.
-- **Tests:** database, workflow and content tests in `db/test` (43 passing), unit tests on the domain logic (the help rule, progress from the event log, key comparison, the check that a quote is in the answer, commit tracking), fixture-based tests for LLM output, and a hand-run script on `wc`. A README explains how to run it.
+## 10. Progress and what is tracked
 
-## 10. Build plan
-
-Status on 2026-10-29: nothing is built yet. The challenge page says submissions close Saturday 31 Oct, 11:59 pm IST. Another session noted Friday 30. Treat Friday night as the safe deadline. This is the two-day cut.
-
-| When | In the cut | Dropped for now |
+| What | Stored or worked out | When it changes |
 |---|---|---|
-| Thu 29 | Zerops project with Postgres, hello-world deployed. Landing list of all 134 projects from `INDEX.md`, overview pages and the Start box. `wc` and Task Tracker seeded with concepts, steps, Think tasks with keys, and gate questions (drafted for Abid to check). | Paste-any-requirements generation |
-| Fri 30 | Project home, Step page with Think tasks (keys checked in code, explain tasks graded by rubric), milestone gate, help levels under the help rule, evidence and memory, Markdown export. **Submit a working version Friday night.** | Email save, delete my data |
-| Sat 31 | If time allows: Build task, repo check with commit tracking, and the language layer for the seeded projects. Polish. Demo video, usage card, Flow clip. Update the submission if the form allows. | Graph view, command layer, router, voice listener |
+| Language | Stored | When you say it in the chat |
+| Step done (the code part) | Stored, with what you said or pasted | When you say the step works |
+| Concept explained (the learning part) | Stored, with your quote | When an explain answer is accepted |
+| Open question | Stored: which concept the mentor asked you to explain | When the mentor asks, and cleared when the concept is explained |
+| The chat | Stored: messages with their intent and tool lines | Every message |
+| Help log | Worked out from the chat: Help and Code messages, and code shown | – |
+| Where you are | Worked out: the first required step not done | – |
+| A step's status | Worked out: **Built** once it's done, **Understood** once all its concepts are explained | – |
+| Project complete | Worked out: every required step done and every required concept explained | – |
 
-Progress at the end of the first working session: the data model, the content format and the checker are done and tested (43 tests). The app itself is not started. The ordered next tasks are in `HANDOFF.md`.
+A panel beside the chat shows the steps and concepts with their ticks, the links, what to study in your language, and Export.
 
-The stack for the prototype is TypeScript end to end, because it is the only realistic choice for this deadline. A Spring Boot version can come later as the final build.
+**Not tracked in v1:** which links you opened, time spent, and design quality.
 
-Working rules: the main branch always runs, every part gets a short note on how it works, and the build is dictated by voice.
+## 11. Data model
 
-## 11. Risks
+| Table | Holds |
+|---|---|
+| `project` | slug (key), title, source URL, level, and the whole map as JSON, loaded from `content/` |
+| `language_layer` | project and language (key), status (building, ready or failed), the layer as JSON, updated time |
+| `learner` | the guest ID from the cookie, created time |
+| `enrollment` | learner and project (unique together), language (empty until set), open question (a concept, or empty), created time |
+| `message` | enrollment, role (learner, mentor or tool), intent (learner messages only), text, status (pending, done or failed), tool details, created time |
+| `step_done` | enrollment and step ID (key), evidence, the message it came from, time |
+| `concept_explained` | enrollment and concept ID (key), quote, the message it came from, time. The quote must appear in that message |
+| `usage` | learner, purpose, model, tokens in and out, cost, time |
+
+**Export:** a Markdown learning log with the steps done, the concepts explained in your own words, and the help used.
+
+## 12. Build order
+
+The old code is archived. The app is rewritten from scratch.
+
+1. **Maps:** done for wc, the JSON Parser and the URL Shortener.
+2. **The app's foundation:** a fresh Next.js app, the schema in section 11, and loading the maps.
+3. **The engine on wc:** the intent check, the mentor and its tools, and streamed replies that outlive the page.
+4. **The language layer:** the language agent with Linkup, for Java first, then Python and Node.js.
+5. **A working chat page with the progress panel and Export.** It should be plain but usable. The real UI design comes after the engine works.
+6. **Deploy to Zerops,** then use it on wc and improve.
+7. **The UI design pass,** built from `design/DESIGN_SYSTEM.md`, with the landing page as the reference.
+8. **More maps.**
+
+## 13. Goals for v1
+
+| # | Goal | Measured by |
+|---|---|---|
+| G1 | A judge opens a project and gets the mentor's first message within a minute, with no sign-up | Timed on the live link |
+| G2 | The intent check gets messages right | At least 9 in 10 on a test set of 30 sample messages |
+| G3 | Every explained concept has the learner's own words as evidence | The quote check |
+| G4 | The mentor never volunteers code | No code in replies to Help or Explaining messages on the test set |
+| G5 | Links point to real material | Every map and language-layer link opens |
+| G6 | One real result | Abid builds wc in Java with ThinkAloud and exports the log |
+
+## 14. Not in v1
+
+| Cut | Why |
+|---|---|
+| Stored questions, rubrics and a separate grader | The mentor asks on the spot and judges, with the quote check |
+| Our own long lessons | Short notes plus links to the best material, and the chat |
+| A "something to try" exercise per concept | The mentor can suggest one in the chat |
+| Design patterns and a refactor round | Later, as an optional last step where the mentor reviews the design in words |
+| Shortcut buttons, more message labels | One box and three intents |
+| Picking the language before the chat | The mentor asks in the chat |
+| Languages beyond Java, Python and Node.js | Add more once the three work |
+| Generating maps at runtime | Maps are made ahead of time and reviewed |
+| Support levels, milestones, timers, parking, disputes | No state the simple version needs |
+| Repo check, accounts, JSON export, roadmap.sh | Later |
+
+## 15. Hackathon
+
+| Item | Detail |
+|---|---|
+| Deadline | **Saturday 31 Oct 2026, 11:59 pm IST** |
+| Submit | A live link usable with no payment or login, a demo video of 2 minutes or less, the Wispr usage card, and a few lines on the problem, the user and how Wispr was used |
+| Judging | Real problem 30%, meaningful Wispr use 30%, works 25%, clear demo 15% |
+| Real result | The exported wc learning log (G6) |
+| Wispr | The product comes first and Wispr second. ThinkAloud is built by dictation, and learners dictate their explanations into the chat. In the product, Wispr is mentioned only on the landing page |
+| Credits | Projects come from Coding Challenges by John Crickett: https://codingchallenges.fyi/ and https://x.com/johncrickett. Link the original on every project. Permission was asked on X. Without it: keep our own content, link out, and drop the Coding Challenges branding |
+
+## 16. Risks
 
 | Risk | Response |
 |---|---|
-| Two days is very little | The cut above; submit early; never cut the Think tasks, the gate or the export |
-| LLM cost abuse by guests | Daily spend cap and per-guest limits |
-| Shared GitHub token | Read-only, server-side only, public repos only; its rate limit is shared by all users |
-| Generated curriculum is wrong | Seed from the checked `learning-java` files; mark generated content as unreviewed |
-| Hallucinated links | Curated list or HTTP 200 check only |
-| Wrong answer keys in Think tasks | Every predict and trace key carries a written derivation, and the importer lists them for a person to check. Until a project is marked reviewed it is labelled unreviewed, and a learner can dispute a grade |
-| Copying challenge text | The text on those sites belongs to their authors. Write our own summary, credit the source, link to the original on every overview page, and ask permission before reproducing any text |
-| Zerops and Postgres setup unknowns | Deploy first thing Thursday; fall back to another host if it blocks |
-| Judges without Wispr | Voice is only an input method, so everything works by typing |
-| Too rigid for newcomers | Support levels, a primer, an "I'm not sure" path and unlimited retries. The completion rules stay the same at every level |
-| Thin Wispr use in the product | The score then rests on the build process and a demo that shows dictation in use; see section 13 |
+| The concepts drift back into trivia about outputs | The rules in section 4, and review before use |
+| The language layer forced into one rigid shape | `kind` stays loose. A missing entry is allowed; a made-up one isn't |
+| Made-up APIs or links | Every link is opened before it's saved |
+| The mentor marks an explanation too easily | The quote check, and the mentor's method: a recited answer gets a follow-up |
+| The mentor volunteers code | Tool gating, and replies are regenerated |
+| Judges without Wispr | Typing works everywhere |
 
-## 12. Open decisions
+## 17. Open questions
 
-1. Confirm the help rule in section 5.
-2. Accept the two-day cut in section 10.
-3. Gate rule: all 3 gate questions must be Met.
-4. Extras rule: side topics stay in a side log and never count toward progress.
-5. Overview text: our own summary with a link to the original, not copied text.
-6. LLM provider for v1 (default Claude) and the daily spend cap.
-7. Product name.
-8. Gate shape (proposed): replace the three gate questions with one teach-back question per milestone. Its 3 to 4 points are each tagged with a concept, so each met point still marks its concept explained. In Guided mode it is split into its parts. This shortens the content by roughly 40% together with dropping step tasks that repeat it.
-9. Whether the three Java language notes may keep their code-like expressions. The no-code rule in section 5 says they should not.
-
-Needed from Abid to start: a Zerops project with Postgres, an LLM API key, and a read-only GitHub token.
-
-## 13. Challenge map
-
-The judging weights are unconfirmed.
-
-| Criterion | How the product earns it |
-|---|---|
-| Real problem in your work | Juniors buried in AI-generated code; the author is that user |
-| Wispr use | Built by voice: every prompt, note and message is dictated. In the product, Think answers, gate answers and the restate step are long text, which is where dictation helps most. There is no voice-specific code, so this score rests on the build process and a demo that shows dictation in use |
-| Works | Guest start, live link, a concept-only default that needs no setup, no payment |
-| Demo | Pick a project, read a concept's lesson, pick a language and see its generated tools, answer the explain-back by dictation, ask the mentor, tick a step, export |
+1. Build the 9 language layers (3 projects × 3 languages) before the demo, or on first use?
+2. Mentor model: keep Opus 5.5 (locked) or use Sonnet 5.5 to lower cost.
+3. The panel layout, so it fits the window beside the chat (UI step).
+4. What must be live by the deadline.

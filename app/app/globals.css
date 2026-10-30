@@ -5,8 +5,8 @@
   --accent: #8F4F00; --fill: #F5B95A; --on-fill: #2A1700; --wave: #C9801A; --soft: #FBE9CF;
   --hl: #FFE2A8; --hl-ink: #3D2600; --ok: #1F6B44; --ok-bg: #E1F1E8; --band: #15191D; --on-band: #EDEFF1; --on-band-muted: #A9B1BA;
   --seen: #2F6DB5; --applied: #7A4BC2;
-  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
-  --f-body: "Newsreader", Georgia, "Times New Roman", serif;
+  --f-display: "Bricolage Grotesque Variable", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Newsreader Variable", Georgia, "Times New Roman", serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
   --head-h: 64px;
@@ -153,3 +153,11 @@ mark.ev { background: var(--hl); color: var(--hl-ink); border-radius: 2px; paddi
 /* One-line footer (inner pages) */
 .foot { border-top: 1px solid var(--rule); padding-block: 20px 32px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
 .foot a { color: var(--ink); }
+
+/* Additions for the project chat (it gets its full design in the next pass). */
+.btn-small { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; transform: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+code { font-family: var(--f-mono); font-size: 0.86em; background: var(--soft); color: var(--ink); padding: 0.08em 0.32em; border-radius: 4px; }
+pre { font-family: var(--f-mono); font-size: 14px; line-height: 1.5; background: var(--band); color: var(--on-band); padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 0; }
+pre code { background: none; color: inherit; padding: 0; font-size: inherit; }

@@ -1,6 +1,6 @@
 "use client";
 
-// Search, the area menu, the learning paths and the empty state. Ported from design/catalogue.html.
+// Search, the level menu, the learning paths and the empty state. Ported from design/catalogue.html.
 import { useMemo, useRef, useState } from "react";
 import ProjectCard, { type CardProject } from "@/components/ProjectCard";
 
@@ -31,15 +31,15 @@ export default function CatalogueBrowser({ projects, paths, areas }: { projects:
         <div className="search" role="search">
           <label className="sr" htmlFor="q">Search projects</label>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-          <input type="search" id="q" ref={qRef} placeholder="Search by tool or idea, like sockets" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input type="search" id="q" ref={qRef} placeholder="Search by tool or idea, like encoding" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
           <button type="button" className="clear" aria-label="Clear search" hidden={!q} onClick={() => { setQ(""); qRef.current?.focus(); }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
         <div className="pick">
-          <label className="sr" htmlFor="area">Concept area</label>
+          <label className="sr" htmlFor="area">Level</label>
           <select id="area" value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="all">All areas ({total})</option>
+            <option value="all">All levels ({total})</option>
             {counts.map((a) => <option key={a.slug} value={a.slug}>{a.name} ({a.n})</option>)}
           </select>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
@@ -63,7 +63,7 @@ export default function CatalogueBrowser({ projects, paths, areas }: { projects:
       </div>
       <div className="empty" hidden={shown !== 0}>
         <h2>No project matches that yet</h2>
-        <p>Try a tool name like grep, or an idea like hashing. Coding Challenges has 109 challenges, and you can build any of them on your own.</p>
+        <p>Try a tool name like wc, or an idea like hashing. Coding Challenges has 109 challenges, and you can build any of them on your own.</p>
         <div className="row">
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setQ(""); setArea("all"); }}>Show all projects</button>
           <a className="btn btn-ghost btn-sm" href="https://codingchallenges.fyi/challenges/intro">Search Coding Challenges ↗</a>

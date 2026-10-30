@@ -5,15 +5,11 @@ import { FigureDefs } from "@/components/Figure";
 import HeroDemo from "@/components/landing/HeroDemo";
 import HowStory from "@/components/landing/HowStory";
 import WisprFlow from "@/components/landing/WisprFlow";
-import { FEATURED, projectCards, readyCount } from "@/lib/catalogue";
-import { currentLearnerId } from "@/lib/learner";
+import { FEATURED, catalog, projectCards } from "@/lib/catalog";
 import "./landing.css";
 
-export const dynamic = "force-dynamic";
-
 export default async function Landing() {
-  const learnerId = await currentLearnerId();
-  const [cards, ready] = await Promise.all([projectCards(learnerId, FEATURED), readyCount()]);
+  const cards = projectCards(await catalog());
   const featured = FEATURED.map((s) => cards.find((c) => c.slug === s)).filter((c) => !!c);
 
   return (
@@ -27,7 +23,7 @@ export default async function Landing() {
             <div>
               <p className="tagline">Learn the part AI can&apos;t fake for you</p>
               <h1 id="hero-title"><span>Build it yourself.</span><span><em>Explain it</em> out loud.</span></h1>
-              <p className="lede">Pick a coding challenge. ThinkAloud breaks it into the ideas behind it, asks you to explain each one in your own words, and checks that you understood. You write the code. The mentor helps only when you ask.</p>
+              <p className="lede">Pick a coding challenge and build it in your own editor and language. ThinkAloud shows you the concepts behind each step and the best places to learn them, then asks you to explain each one in your own words. The mentor helps whenever you ask.</p>
               <div className="cta">
                 <Link className="btn btn-primary" href="/projects">Browse projects</Link>
                 <a className="btn btn-ghost" href="#how">See how it works</a>
@@ -53,7 +49,7 @@ export default async function Landing() {
                 <p className="label kick">Why ThinkAloud</p>
                 <h2 className="h2" id="why-title">AI writes the code now. Understanding it is still your job.</h2>
               </div>
-              <p className="intro">Prompt, paste, run: it works until it doesn&apos;t, and then you&apos;re stuck with code you can&apos;t explain. The fundamentals are what let you drive the AI instead of following it.</p>
+              <p className="intro">Prompt, paste, run: it works until it doesn&apos;t, and then you&apos;re stuck with code you can&apos;t explain. The concepts underneath, and how your language really handles them, are what let you drive the AI instead of following it.</p>
             </div>
             <div className="why-grid">
               <div className="col-card muted">
@@ -67,9 +63,9 @@ export default async function Landing() {
               <div className="col-card">
                 <h3>With ThinkAloud</h3>
                 <ul>
-                  <li><span className="m">→</span>You write every line, in your own editor</li>
-                  <li><span className="m">→</span>You explain each idea in your own words before you move on</li>
-                  <li><span className="m">→</span>A check tells you when you&apos;re wrong, and the mentor helps you see why</li>
+                  <li><span className="m">→</span>You write every line, in your own editor and language</li>
+                  <li><span className="m">→</span>You learn each concept from the best sources, then explain it in your own words</li>
+                  <li><span className="m">→</span>The mentor tells you what&apos;s missing and where to read about it</li>
                 </ul>
               </div>
             </div>
@@ -89,10 +85,10 @@ export default async function Landing() {
                 <h3 className="fund-h">The part AI can&apos;t fake, and where you&apos;ll practise it</h3>
                 <p className="fine">Each one maps to projects you can start today.</p>
                 <ol className="fund-list">
-                  <li><span className="n">01</span><span className="what">How a request actually crosses the network</span><span className="where"><span className="chip">Web Server</span><span className="chip">Echo Server</span><span className="chip">curl</span></span></li>
-                  <li><span className="n">02</span><span className="what">What happens when traffic jumps tenfold</span><span className="where"><span className="chip">Rate Limiter</span><span className="chip">Redis Server</span></span></li>
-                  <li><span className="n">03</span><span className="what">What memory and disk are really doing</span><span className="where"><span className="chip">wc</span><span className="chip">Bitcask</span><span className="chip">Duplicate File Finder</span></span></li>
-                  <li><span className="n">04</span><span className="what">Saying &quot;I&apos;m not sure yet&quot; without getting stuck</span><span className="where"><span className="chip soft">Every step has a button for it</span></span></li>
+                  <li><span className="n">01</span><span className="what">How text really becomes bytes, emoji included</span><span className="where"><span className="chip">wc</span><span className="chip">JSON Parser</span></span></li>
+                  <li><span className="n">02</span><span className="what">What memory is doing when the file is bigger than RAM</span><span className="where"><span className="chip">wc</span></span></li>
+                  <li><span className="n">03</span><span className="what">How a request crosses the network, and what a status code promises</span><span className="where"><span className="chip">URL Shortener</span></span></li>
+                  <li><span className="n">04</span><span className="what">Saying &quot;I&apos;m not sure yet&quot; without getting stuck</span><span className="where"><span className="chip soft">Just say it in the chat</span></span></li>
                 </ol>
               </div>
             </div>
@@ -110,18 +106,18 @@ export default async function Landing() {
                 <p className="label kick">The mentor</p>
                 <h2 className="h2" id="mentor-title">Help when you ask for it. Never before.</h2>
               </div>
-              <p className="intro">The mentor is an AI agent. It reads your answers, the project&apos;s notes and what you&apos;ve already learned, then decides how to help: a question, a nudge, a small example. You choose how far it goes.</p>
+              <p className="intro">The mentor is an AI agent. It knows the project&apos;s steps and concepts, your progress, and what you&apos;ve said, then decides how to help: a question, a nudge, a link to read, a small example. You choose how far it goes.</p>
             </div>
             <div className="mentor-grid">
               <div>
                 <ol className="ladder" aria-label="Help, from least to most">
                   <li><b>Hint</b><span>a nudge in words</span></li>
                   <li><b>Similar case</b><span>not your code</span></li>
-                  <li><b>Ask the mentor</b><span>talk it through</span></li>
+                  <li><b>Talk it through</b><span>ask anything</span></li>
                   <li><b>Show me code</b><span>only when you ask</span></li>
                 </ol>
                 <div className="ladder-base"><span>least help</span><span>most help</span></div>
-                <p className="fine" style={{ marginTop: 12 }}>Anything beyond a hint is noted in your help log. You still explain the idea back yourself.</p>
+                <p className="fine" style={{ marginTop: 12 }}>Just ask in the chat. Anything beyond a hint is noted in your help log, and you still explain the idea back yourself.</p>
               </div>
               <div className="rules">
                 <div>
@@ -129,15 +125,15 @@ export default async function Landing() {
                   <ul>
                     <li>Explain with words, analogies and small cases</li>
                     <li>Give whatever level of help you ask for, without making you prove you tried</li>
-                    <li>Offer more help when you&apos;re stuck, and take no for an answer</li>
+                    <li>Point you to the right page to learn from, not rewrite it</li>
                   </ul>
                 </div>
                 <div>
                   <h3>It won&apos;t</h3>
                   <ul>
                     <li>Write your solution unless you ask for it</li>
-                    <li>Change your code. It can only read your repo</li>
-                    <li>Mark anything done. Only the checks can</li>
+                    <li>Change your code. It only sees what you paste</li>
+                    <li>Count a concept as explained unless your own words show it</li>
                   </ul>
                 </div>
               </div>
@@ -155,12 +151,12 @@ export default async function Landing() {
               <p className="label kick">Start with one</p>
               <h2 className="h2" id="projects-title">Real projects, not exercises.</h2>
             </div>
-            <p className="intro">Each one is a tool you&apos;d recognise, broken into milestones of 30 to 60 minutes. Work through the ideas only, or build it in the language you choose.</p>
+            <p className="intro">Each one is a tool you&apos;d recognise, built in steps of 30 to 60 minutes. Build it in Java, Python or Node.js: the concepts are the same in every language, and the mentor finds what to study in yours.</p>
           </div>
           <div className="proj-grid">
             {featured.map((p) => <ProjectCard key={p.slug} p={p} />)}
           </div>
-          <p className="fine proj-note">From <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett. {ready} projects are ready, with more being written.</p>
+          <p className="fine proj-note">From <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett. {cards.length} projects are ready, with more being written.</p>
         </section>
 
         <section className="band" id="faq" aria-labelledby="faq-title">
@@ -168,30 +164,30 @@ export default async function Landing() {
           <h2 className="h2" id="faq-title">Before you start</h2>
           <div className="faq-wrap">
             <div className="faq">
-              <details><summary>Do I need to know a programming language?</summary><p>No. You can work through the ideas only. Pick a language when you want to build it, and you can link a public GitHub repo for ThinkAloud to read.</p></details>
-              <details><summary>Will it write my code?</summary><p>Only if you ask, from More help, in short explained parts. It never changes your code.</p></details>
-              <details><summary>Who checks my answers?</summary><p>Answers that are a number or a short fact are checked against a stored key. Explanations are graded by AI against a fixed list of points, and every point it marks as covered quotes your own words. If a grade looks wrong, you can flag it.</p></details>
+              <details><summary>Do I need to know a programming language?</summary><p>Yes, the basics of one: Java, Python or Node.js. ThinkAloud is for going deeper, into the concepts underneath and how your language handles them.</p></details>
+              <details><summary>Will it write my code?</summary><p>Only if you ask, in short explained parts. It never changes your code.</p></details>
+              <details><summary>Who checks my explanations?</summary><p>The mentor, an AI agent. It marks a concept explained only when your own words show you understood it, and the sentence that shows it is kept as evidence. The app checks that sentence really is yours.</p></details>
               <details><summary>Do I need Wispr Flow?</summary><p>No. Everything works with typing. Flow makes long explanations quicker to give, and it has a free plan.</p></details>
-              <details><summary>What do I end up with?</summary><p>A learning log: every idea you&apos;ve explained, in your own words, with the help you used. Export it as Markdown or JSON and keep it, share it, or put it next to your project on GitHub.</p></details>
-              <details><summary>Is it free?</summary><p>Yes, and there&apos;s no sign-up. Your progress stays in your browser unless you choose to save it.</p></details>
+              <details><summary>What do I end up with?</summary><p>A learning log: every concept you&apos;ve explained, in your own words, with the links you learned from and the help you used. Export it as Markdown and keep it next to your project.</p></details>
+              <details><summary>Is it free?</summary><p>Yes, and there&apos;s no sign-up. Your progress is kept for your browser.</p></details>
             </div>
             <aside className="keep" aria-label="Example learning log">
               <div className="logcard">
                 <div className="logcard-head"><span>learning-log.md</span><span>exported today</span></div>
                 <div className="logcard-body">
                   <p className="h1">What I can explain</p>
-                  <p className="m">3 projects · 7 ideas · 2 hints used</p>
+                  <p className="m">2 projects · 4 concepts · 2 hints used</p>
                   <p className="h2x"><span className="dot" style={{ background: "var(--ok)" }} />Streaming in constant memory</p>
-                  <p className="m" style={{ margin: 0 }}>wc · milestone 1</p>
+                  <p className="m" style={{ margin: 0 }}>wc · step 2</p>
                   <blockquote>&quot;One buffer is reused for every chunk, so memory stays the same for any file.&quot;</blockquote>
-                  <p className="h2x"><span className="dot" style={{ background: "var(--ok)" }} />Token bucket</p>
-                  <p className="m" style={{ margin: 0 }}>Rate Limiter · milestone 1</p>
-                  <blockquote>&quot;A burst gets through, a flood doesn&apos;t, because tokens only drip back at a fixed rate.&quot;</blockquote>
-                  <p className="h2x"><span className="dot" style={{ background: "var(--muted)" }} />Path safety</p>
-                  <p className="m" style={{ margin: 0 }}>Web Server · not yet explained</p>
+                  <p className="h2x"><span className="dot" style={{ background: "var(--ok)" }} />Grammar and parsing</p>
+                  <p className="m" style={{ margin: 0 }}>JSON Parser · step 6</p>
+                  <blockquote>&quot;Each grammar rule becomes one routine, and nesting is just those routines calling each other.&quot;</blockquote>
+                  <p className="h2x"><span className="dot" style={{ background: "var(--muted)" }} />Idempotency</p>
+                  <p className="m" style={{ margin: 0 }}>URL Shortener · not yet explained</p>
                 </div>
               </div>
-              <p className="fine keep-cap">What you keep: your own words for every idea, ready to export.</p>
+              <p className="fine keep-cap">What you keep: your own words for every concept, ready to export.</p>
             </aside>
           </div>
         </section>
@@ -203,7 +199,7 @@ export default async function Landing() {
 
         <footer className="foot">
           <div>
-            <p>Projects come from <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett (<a href="https://x.com/johncrickett">@johncrickett</a>). ThinkAloud writes its own short briefs and links every project to its original challenge. Thank you, John.</p>
+            <p>Projects come from <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett (<a href="https://x.com/johncrickett">@johncrickett</a>). ThinkAloud writes its own short notes and links every project to its original challenge. Thank you, John.</p>
             <p>Quote from <a href="https://x.com/piyushgarg_dev/status/2115347356074045483">Piyush Garg on X</a>.</p>
           </div>
           <div>

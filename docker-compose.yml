@@ -1,0 +1,23 @@
+# Local Postgres for ThinkAloud. Start it with `docker compose up -d`.
+# The app connects with DATABASE_URL=postgres://thinkaloud:thinkaloud@localhost:5433/thinkaloud
+# Tests use the thinkaloud_test database, created on first start by db/init.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: thinkaloud
+      POSTGRES_PASSWORD: thinkaloud
+      POSTGRES_DB: thinkaloud
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thinkaloud -d thinkaloud"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

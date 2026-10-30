@@ -1,0 +1,452 @@
+<title>ThinkAloud content review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+:root{
+  /* Layout: one reading column, a sticky jump bar, projects one after another. Tokens from design/DESIGN_SYSTEM.md. */
+  --bg:#EDEFF1;--surface:#FFFFFF;--ink:#15191D;--muted:#525A63;--rule:#C5CBD1;--accent:#8F4F00;--fill:#F5B95A;
+  --soft:#FBE9CF;--ok:#1F6B44;--ok-bg:#E1F1E8;--hl:#FFE2A8;--hl-ink:#3D2600;
+  --f-display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;--f-body:"Newsreader",Georgia,serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171B;--surface:#1C2026;--ink:#E6E9EC;--muted:#9BA3AC;--rule:#343B44;--accent:#F2B25C;--fill:#E89A2C;--soft:#3A2A12;--ok:#6CD29C;--ok-bg:#173826;--hl:#5A3F0E;--hl-ink:#FFE9C2;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171B;--surface:#1C2026;--ink:#E6E9EC;--muted:#9BA3AC;--rule:#343B44;--accent:#F2B25C;--fill:#E89A2C;--soft:#3A2A12;--ok:#6CD29C;--ok-bg:#173826;--hl:#5A3F0E;--hl-ink:#FFE9C2;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:18px/1.6 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto;padding-block:40px 64px}
+h1,h2,h4{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:clamp(2.1rem,3.6vw,3rem);line-height:1.02;letter-spacing:-0.02em}
+h2{font-size:clamp(1.6rem,2.6vw,2.1rem);letter-spacing:-0.01em}
+h4{font-size:1.1rem;font-weight:600}
+.label{font:500 12px/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0}
+.label b{color:var(--accent);font-weight:500}
+.lede{font-size:19px;max-width:65ch;margin:.4em 0 0}
+.facts{font:13px/1.5 var(--f-mono);color:var(--muted);margin-top:12px}
+code,pre{font-family:var(--f-mono);font-size:.82em}
+pre{background:var(--surface);border:1px solid var(--rule);padding:8px 10px;overflow-x:auto;white-space:pre-wrap;margin:6px 0 0}
+a{color:var(--accent)}
+.jump{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1.5px solid var(--ink);display:flex;flex-wrap:wrap;gap:4px 18px;padding:10px 0;margin:28px 0 0;font:500 13px var(--f-mono)}
+.jump a{color:var(--ink);text-decoration:none}.jump a:hover,.jump a:focus-visible{text-decoration:underline;text-decoration-color:var(--fill);text-decoration-thickness:2px}
+.types{width:100%;border-collapse:collapse;font-size:16px}
+.types th,.types td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+.types th{font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.scroll{overflow-x:auto}
+.proj{border-top:1.5px solid var(--ink);margin-top:56px;padding-top:32px;display:grid;gap:28px}
+.proj-h{display:grid;gap:6px}
+.sec{display:grid;gap:12px;min-width:0}
+.rows{display:grid;grid-template-columns:150px 1fr;margin:0;border-top:1px solid var(--rule)}
+.rows dt,.rows dd{padding:10px 0;border-bottom:1px solid var(--rule);margin:0;min-width:0}
+.rows dt{font:500 12px/1.9 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.plain{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.muted{color:var(--muted)}
+.summary{max-width:68ch;margin:0;font-size:18px}
+.q{display:grid;grid-template-columns:150px 1fr;gap:0 16px;padding:12px 0;border-top:1px solid var(--rule)}
+.q.flagged{background:var(--soft)}
+.who{font:500 12px/1.6 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:grid;align-content:start}
+.qid{font:500 12px var(--f-mono);color:var(--accent);text-transform:none;letter-spacing:0}
+.turn{min-width:0}
+.prompt{margin:0;font-style:italic;font-size:18px}
+.points{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px;font-size:16px}
+.points li{padding-left:22px;position:relative}
+.points li::before{content:"";position:absolute;left:2px;top:.55em;width:10px;height:10px;border:1.5px solid var(--ok);border-radius:2px}
+.flag{margin:8px 0 0;font:13px/1.5 var(--f-mono);color:var(--hl-ink);background:var(--hl);padding:6px 8px}
+.step{border:1.5px solid var(--ink);background:var(--surface);padding:16px;display:grid;gap:8px;min-width:0}
+.step-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.step-h h4{flex:1 1 auto}
+.why{margin:0;font-size:16px;color:var(--muted)}
+.pill{font:500 12px var(--f-mono);padding:2px 8px;border-radius:99px;border:1px solid var(--rule)}
+.pill.auto{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.pill.partly{background:var(--soft);color:var(--accent);border-color:transparent}
+.checks{list-style:none;margin:4px 0 0;padding:10px 0 0;border-top:1px dashed var(--rule);display:grid;gap:8px;font-size:15px}
+.checks li{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+.cname{font:500 12px var(--f-mono);color:var(--muted)}
+.note{font:13px var(--f-mono);color:var(--muted)}
+s{color:var(--muted)}
+@media (max-width:640px){.rows,.q{grid-template-columns:1fr}.rows dt{padding-bottom:0;border-bottom:0}}
+</style>
+<div class="wrap">
+<header>
+  <p class="label">ThinkAloud · <b>review</b> · generated 2026-10-30</p>
+  <h1>Generated content for 3 project types</h1>
+  <p class="lede">Each project gets a profile, stage 0, concept questions per step and the checks the sandbox will run. Comment on anything that's off: the fix goes into the playbook, then every project is generated again.</p>
+  <p class="facts">wc · json-parser · url-shortener · Haiku 5.5 · every question passed the relevance check</p>
+</header>
+<nav class="jump" aria-label="Sections"><a href="#types">Types</a><a href="#wc">wc</a><a href="#json-parser">JSON parser</a><a href="#url-shortener">URL shortener</a></nav>
+<section class="proj" id="types">
+  <div class="proj-h"><p class="label">The 8 types · by what the learner learns</p><h2>Playbooks</h2>
+  <p class="lede">The type picks the playbook for concepts and questions. How the program runs picks the check.</p></div>
+  <div class="scroll"><table class="types"><thead><tr><th>Type</th><th>Teaches</th><th>Of the 21</th><th>Usual check</th></tr></thead><tbody><tr><td><b>Algorithms and data structures</b></td><td>Programs whose core is an algorithm or data structure with a cost and a correctness argument (sorting, diffing, compression, probabilistic sets, hashing).</td><td>sort, diff, Huffman, Bloom filter, duplicate files</td><td><code>cli</code> · property</td></tr><tr><td><b>Developer tools</b></td><td>Tools developers use to build, version or run software, that turn a folder of inputs into outputs (a static site generator, git, make, a shell).</td><td>static site generator</td><td><code>cli</code> · property</td></tr><tr><td><b>Interactive</b></td><td>Programs driven by a person in real time, such as games and editors (Pong, Tetris, a text editor).</td><td>none of the 21 (Pong, Tetris, editor)</td><td><code>interactive</code> · none</td></tr><tr><td><b>Language processing</b></td><td>Programs that read a language (a data format, expressions, a programming language, patterns) and decide validity, evaluate or transform it.</td><td>JSON Parser, calculator, Brainfuck, comment remover, grep</td><td><code>cli</code> · case-files</td></tr><tr><td><b>Network protocols</b></td><td>Programs that implement a wire protocol directly on sockets, as a server or a client (echo, HTTP by hand, Redis, DNS, curl).</td><td>echo, web server, Redis, curl, DNS resolver</td><td><code>tcp-server</code> · spec</td></tr><tr><td><b>Storage engines</b></td><td>Programs that store data durably on disk and must find it again fast and survive restarts and crashes (logs, indexes, compaction).</td><td>Bitcask</td><td><code>cli</code> · property</td></tr><tr><td><b>Streams and text</b></td><td>Programs that read data as a stream and count, select or transform it, Unix-filter style.</td><td>wc, cut</td><td><code>cli</code> · real-tool</td></tr><tr><td><b>Web services</b></td><td>Services that offer an HTTP API to clients and hold state behind it (a URL shortener, a rate limiter, a pastebin).</td><td>URL shortener, rate limiter</td><td><code>http-server</code> · spec</td></tr></tbody></table></div>
+</section>
+<article class="proj" id="wc">
+<header class="proj-h">
+  <p class="label">Project · <b>Streams and text</b></p>
+  <h2>Build your own wc</h2>
+  <p class="lede">The project teaches reading input as a stream in constant memory, counting in a single pass, and the text and encoding decisions behind byte, line, word and character counts, all through a Unix-filter command-line contract.</p>
+</header>
+<div class="sec"><p class="label">Profile</p>
+<dl class="rows">
+  <dt>Runs as</dt><dd>cli · checked by the <b>cli</b> runner</dd>
+  <dt>Contract</dt><dd><code>&lt;run&gt; [-c | -l | -w | -m] [file]; with no file, the data arrives on standard input</code><br>Command-line arguments: an optional option (-c, -l, -w or -m) and an optional file path. The simplest choice is a plain file path argument, with standard input used when no path is given. Piped input carries the same bytes as the file.<br>Standard output: the counts in wc's layout, followed by the file name when one is given. The exit code, which should be 0 on success.</dd>
+  <dt>Settings</dt><dd><span class="muted">none</span></dd>
+  <dt>Right answer</dt><dd>real-tool · compared with the real <code>wc</code></dd>
+  <dt>Test files</dt><dd><ul class="plain"><li><code>test.txt</code> <a href="https://www.dropbox.com/scl/fi/d4zs6aoq6hr3oew2b6a9v/test.txt?rlkey=20c9d257pxd5emjjzd1gcbn03&amp;dl=0">from the page</a> · The challenge's sample text file, used for every count and for the default output and piped input checks.</li><li><code>empty.txt</code> <span class="muted">we write it</span> · An empty file, where every count should be zero.<pre>(empty)</pre></li><li><code>no-final-newline.txt</code> <span class="muted">we write it</span> · A last line without a newline, to check how lines and words are counted at the end of input.<pre>one two
+three</pre></li><li><code>multibyte.txt</code> <span class="muted">we write it</span> · Accented letters and an emoji, to check byte and character counts under a UTF-8 locale.<pre>café 😀
+naïve
+</pre></li><li><code>crlf.txt</code> <span class="muted">we write it</span> · Windows line endings, to check that the byte count includes both bytes of each line break and the line count still counts newlines.<pre>one two
+three
+</pre></li></ul></dd>
+</dl></div>
+<div class="sec"><p class="label">Stage 0 · understand the problem</p>
+<p class="summary">You will build a command-line tool that counts the bytes, lines, words and characters in a text file, and that gives the same answers as the Unix wc tool. The input is either a file named on the command line or text piped in from another program, and the output is a set of counts printed to the terminal. The tool looks simple, but each count has a precise meaning: a line ends at a newline, a word is a run of non-whitespace, and a character depends on the text encoding and the locale. The hard part is getting those meanings exactly right while reading input that may be larger than the computer's memory, in one pass that can't be rewound.</p>
+<div class="q" id="p-what">
+  <div class="who"><span class="qid">p-what</span><span>what</span></div>
+  <div class="turn"><p class="prompt">A user runs the tool on a text file and also pipes text into it from another program. What does the tool take in, what does it give back, and what does a word mean here?</p>
+  <ul class="points"><li>It takes a file name or standard input, and gives back counts printed to the terminal</li><li>A word is a run of characters separated by whitespace, not a single space-separated piece</li><li>Lines are counted by newline characters, so the last line without a newline may not count</li></ul>
+  </div>
+</div><div class="q" id="p-why">
+  <div class="who"><span class="qid">p-why</span><span>why</span></div>
+  <div class="turn"><p class="prompt">Why would someone need a small tool that only counts lines, words and bytes, when editors and spreadsheets exist? Think about where it would show up in daily work.</p>
+  <ul class="points"><li>Quick checks on the size or shape of data without opening it in an editor</li><li>Used in scripts and pipelines, where one tool's output feeds the next</li><li>Small, single-purpose tools can be chained together to do bigger jobs</li></ul>
+  </div>
+</div><div class="q" id="p-how">
+  <div class="who"><span class="qid">p-how</span><span>how</span></div>
+  <div class="turn"><p class="prompt">A log file is far bigger than the computer's memory, so it can't be loaded whole. How would you approach counting its words without holding all of it at once?</p>
+  <ul class="points"><li>Read the input in fixed-size pieces and reuse the same space each time</li><li>Keep running totals and update them as each piece arrives</li><li>Remember whether the last character was whitespace, since a word can be split across two pieces</li></ul>
+  </div>
+</div>
+</div>
+<div class="sec"><p class="label">Steps · questions and checks</p><section class="step">
+  <div class="step-h"><span class="label">s0</span><h4>Set up</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">The sandbox builds the code, starts the program and compares the sample file's counts with wc.</p>
+  <div class="q" id="s0-q1">
+  <div class="who"><span class="qid">s0-q1</span><span>Asks about · Testing against a reference implementation</span></div>
+  <div class="turn"><p class="prompt">Your tool matches wc on the sample file, and a teammate says that proves it works. What's missing, and what inputs would you add?</p>
+  <ul class="points"><li>One file only tests the cases it happens to contain.</li><li>Add nasty inputs such as an empty file, no final newline, emoji, invalid bytes and CRLF line endings.</li><li>Run both tools on each input and compare, so you don't need to know the answer in advance.</li></ul>
+  </div>
+</div>
+  
+</section><section class="step">
+  <div class="step-h"><span class="label">s1</span><h4>Count bytes</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Byte counts are compared with wc on the sample and edge files.</p>
+  <div class="q" id="s1-q2">
+  <div class="who"><span class="qid">s1-q2</span><span>Asks about · Text encoding: from characters to bytes</span></div>
+  <div class="turn"><p class="prompt">A colleague's song title has accented letters, and the byte count reports more bytes than the letters they see. Is the count wrong, and why?</p>
+  <ul class="points"><li>The count is correct, because a byte count measures bytes, the unit the file is stored in.</li><li>In UTF-8, a letter outside plain ASCII takes two or more bytes.</li><li>Counting bytes works on raw data and never decodes it, so the encoding doesn't matter for this count.</li></ul>
+  </div>
+</div><div class="q" id="s1-q3">
+  <div class="who"><span class="qid">s1-q3</span><span>Asks about · Streaming in constant memory</span></div>
+  <div class="turn"><p class="prompt">Your -c reads a file in fixed-size chunks and adds the chunk size to the total on every read. A small file gives a total that's too big. Why, and what should it add?</p>
+  <ul class="points"><li>The last read usually returns fewer bytes than requested.</li><li>Add the number of bytes the read actually returned.</li><li>A read that returns nothing signals the end of input.</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">sample byte count</span><code>&lt;run&gt; -c test.txt</code> same as <code>wc -c test.txt</code>, compare numbers</li><li><span class="cname">multibyte input counts bytes, not characters</span><code>&lt;run&gt; -c multibyte.txt</code> same as <code>wc -c multibyte.txt</code>, compare numbers</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s2</span><h4>Count lines</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Line counts are compared with wc, including the file with no final newline.</p>
+  <div class="q" id="s2-q4">
+  <div class="who"><span class="qid">s2-q4</span><span>Asks about · What a line is, and line endings</span></div>
+  <div class="turn"><p class="prompt">Your -l counts newlines. A file's last line has no newline after it, so a teammate who splits the text into pieces gets one more line than you do. Why does your count differ, and which one matches wc?</p>
+  <ul class="points"><li>wc counts newline characters, one per line ending.</li><li>A last line with no newline after it isn't counted.</li><li>Splitting into pieces counts that trailing piece as a line, which wc doesn't do.</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">sample line count</span><code>&lt;run&gt; -l test.txt</code> same as <code>wc -l test.txt</code>, compare numbers</li><li><span class="cname">last line without newline is not counted</span><code>&lt;run&gt; -l no-final-newline.txt</code> same as <code>wc -l no-final-newline.txt</code>, compare numbers</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s3</span><h4>Count words</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Word counts are compared with wc on the sample and edge files.</p>
+  <div class="q" id="s3-q5">
+  <div class="who"><span class="qid">s3-q5</span><span>Asks about · Counting words with a state machine</span></div>
+  <div class="turn"><p class="prompt">A file has words separated by a tab, then two spaces, then a newline. A quick version counts each separator as a word break and reports the count. What's wrong, and what should it count?</p>
+  <ul class="points"><li>A run of whitespace is one break, not one per character.</li><li>A word starts when the machine moves from whitespace into a non-whitespace character.</li><li>The count is those transitions, not the separators.</li></ul>
+  </div>
+</div><div class="q" id="s3-q6">
+  <div class="who"><span class="qid">s3-q6</span><span>Asks about · Streaming in constant memory</span></div>
+  <div class="turn"><p class="prompt">Your word counter processes the file in chunks, and a word is split between the last byte of one chunk and the first byte of the next. If each chunk is counted on its own, what goes wrong, and what must carry over?</p>
+  <ul class="points"><li>The split word is counted twice or not at all.</li><li>The in-word or between-words state must survive from one chunk to the next.</li><li>That state lives across reads, not inside a single chunk.</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">sample word count</span><code>&lt;run&gt; -w test.txt</code> same as <code>wc -w test.txt</code>, compare numbers</li><li><span class="cname">CRLF line endings do not add words</span><code>&lt;run&gt; -w crlf.txt</code> same as <code>wc -w crlf.txt</code>, compare numbers</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s4</span><h4>Count characters</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">The sandbox pins C.UTF-8 and compares character counts with wc -m on accented and emoji input.</p>
+  <div class="q" id="s4-q7">
+  <div class="who"><span class="qid">s4-q7</span><span>Asks about · Text encoding: from characters to bytes</span></div>
+  <div class="turn"><p class="prompt">Your -m counts a family emoji as several characters, but a reader sees one symbol. Why does -m count that way, and what does wc treat as one character?</p>
+  <ul class="points"><li>A character here is a code point, and one emoji can be several joined code points.</li><li>One visible symbol can be several characters, which is a grapheme cluster.</li><li>wc counts code points under the current encoding, not what a reader sees.</li></ul>
+  </div>
+</div><div class="q" id="s4-q8">
+  <div class="who"><span class="qid">s4-q8</span><span>Asks about · Testing against a reference implementation</span></div>
+  <div class="turn"><p class="prompt">A teammate's -m count matches wc on their laptop, but the same test fails on the build server with the same file. What's the likely cause, and what should the test pin?</p>
+  <ul class="points"><li>The locale sets the encoding, so the same file gives different counts.</li><li>Pin the locale in the test, such as C.UTF-8, on both sides.</li><li>The reference tool's version and settings must also be fixed.</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">accented letters and emoji count as characters</span><code>&lt;run&gt; -m multibyte.txt</code> same as <code>wc -m multibyte.txt</code>, compare numbers</li><li><span class="cname">sample character count</span><code>&lt;run&gt; -m test.txt</code> same as <code>wc -m test.txt</code>, compare numbers</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s5</span><h4>Default output</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">The default output's three numbers and layout are compared with wc's output for the same file.</p>
+  <div class="q" id="s5-q9">
+  <div class="who"><span class="qid">s5-q9</span><span>Asks about · Streaming in constant memory</span></div>
+  <div class="turn"><p class="prompt">Default output needs lines, words and bytes from the same input. Your program reads the file once per count, and then a teammate pipes it in. What breaks, and how would you fix it?</p>
+  <ul class="points"><li>A pipe can only be read once, so later passes get nothing.</li><li>Update all the counts while reading each chunk, in one pass.</li><li>Keep one buffer and reuse it for every chunk.</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">default output matches wc on sample</span><code>&lt;run&gt; test.txt</code> same as <code>wc test.txt</code>, compare numbers</li><li><span class="cname">empty file gives zeros</span><code>&lt;run&gt; empty.txt</code> same as <code>wc empty.txt</code>, compare numbers</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s6</span><h4>Read from standard input</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">The sample file is piped in on standard input and the counts are compared with wc's.</p>
+  <div class="q" id="s6-q10">
+  <div class="who"><span class="qid">s6-q10</span><span>Asks about · The command-line contract: input, output, errors, exit codes</span></div>
+  <div class="turn"><p class="prompt">A script runs your tool on a file name that doesn't exist and checks the exit code. Your tool prints the error to standard output and returns 0. What goes wrong for the script, and what should the tool do?</p>
+  <ul class="points"><li>A zero exit code tells the script the run succeeded.</li><li>Errors belong on standard error so they don't mix with results.</li><li>Return a non-zero exit code on failure so scripts can react.</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">piped sample line count</span><code>test.txt → &lt;run&gt; -l</code> same as <code>test.txt → wc -l test.txt</code>, compare numbers</li><li><span class="cname">piped empty input gives zero bytes</span><code>empty.txt → &lt;run&gt; -c</code> same as <code>empty.txt → wc -c empty.txt</code>, compare numbers</li></ul>
+</section></div>
+<div class="sec"><p class="label">Replaced after the relevance check</p><ul class="plain"><li><span class="qid">s1-q2</span> <s>Your byte counter gets a file with one byte in the middle that isn't valid UTF-8. Why does the byte count stay right, and why would a character count have to make a decision?</s><br><span class="muted">Breaks the mixes-two-concepts rule and the off-step rule: the character decision on invalid bytes belongs to the -m step (s4), not the byte-count step s1.</span></li></ul></div>
+</article>
+<article class="proj" id="json-parser">
+<header class="proj-h">
+  <p class="label">Project · <b>Language processing</b></p>
+  <h2>Build your own JSON parser</h2>
+  <p class="lede">The project teaches lexing and grammar-driven parsing of JSON, including recursive descent, nesting, and checking input against a formal specification, while the program itself is a command-line validator that reports through its exit code.</p>
+</header>
+<div class="sec"><p class="label">Profile</p>
+<dl class="rows">
+  <dt>Runs as</dt><dd>cli · checked by the <b>case-files</b> runner</dd>
+  <dt>Contract</dt><dd><code>&lt;run&gt; &lt;file&gt;</code><br>The sandbox passes one file path as the only command-line argument. The page leaves the interface open, so a plain argument is the simplest choice.<br>The sandbox reads standard output for a short message and reads the exit code: 0 for valid, 1 for invalid.</dd>
+  <dt>Settings</dt><dd><span class="muted">none</span></dd>
+  <dt>Right answer</dt><dd>case-files</dd>
+  <dt>Test files</dt><dd><ul class="plain"><li><code>tests</code> <a href="https://www.dropbox.com/s/vthtr4897fkuhw8/tests.zip?dl=0">from the page</a> · The page's own valid and invalid files for steps 1 to 4, in one folder per step, each with its expected exit code.</li><li><code>test</code> <a href="http://www.json.org/JSON_checker/test.zip">from the page</a> · The public JSON_checker suite of pass and fail files for the full check in step 5.</li></ul></dd>
+</dl></div>
+<div class="sec"><p class="label">Stage 0 · understand the problem</p>
+<p class="summary">You will build a program that reads one file and decides whether it contains valid JSON, a text format for structured data that is widely used to send information between systems. It reports its verdict in two ways: a message a person can read, and a success or failure code that scripts and other tools can act on. The input is just text, so the program has to turn raw characters into meaningful pieces and then check how those pieces are arranged. What makes it harder than it looks is that 'looks right' is not the test: the format's written rules decide every case, including tricky ones like escaped characters, unusually written numbers and structures nested inside other structures. Read the format's definition before you write any code, because that definition is the only judge of what counts as valid.</p>
+<div class="q" id="p-what">
+  <div class="who"><span class="qid">p-what</span><span>what</span></div>
+  <div class="turn"><p class="prompt">The program is given one file and must answer whether it is valid. What does it take in and give back, and what decides whether the file counts as valid?</p>
+  <ul class="points"><li>the input is a single file of text</li><li>the output is a readable message plus a success or failure code</li><li>valid means the text matches the format's grammar, not that it looks roughly right</li></ul>
+  </div>
+</div><div class="q" id="p-why">
+  <div class="who"><span class="qid">p-why</span><span>why</span></div>
+  <div class="turn"><p class="prompt">Where would someone use a program like this, and why would a team want one before the data is used? Think about data that comes from users or other systems.</p>
+  <ul class="points"><li>data from users or other systems can't be trusted to be well formed</li><li>configuration files and API payloads are common places this check runs</li><li>checking early gives a clear error instead of a crash or wrong result later</li><li>a machine-readable result lets scripts and pipelines stop automatically</li></ul>
+  </div>
+</div><div class="q" id="p-how">
+  <div class="who"><span class="qid">p-how</span><span>how</span></div>
+  <div class="turn"><p class="prompt">Before writing any code, how would you split the job of deciding whether a file is valid? Describe the first idea in plain words.</p>
+  <ul class="points"><li>first group raw characters into meaningful pieces such as brackets, strings and numbers</li><li>then check the order of those pieces against the format's rules</li><li>begin with the simplest version that handles a small valid input and widen it from there</li></ul>
+  </div>
+</div>
+</div>
+<div class="sec"><p class="label">Steps · questions and checks</p><section class="step">
+  <div class="step-h"><span class="label">s0</span><h4>Set up</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">The sandbox builds the code and starts the program, which shows the set-up works and the exit code can be read.</p>
+  <div class="q" id="s0-q1">
+  <div class="who"><span class="qid">s0-q1</span><span>Asks about · Conformance test suites</span></div>
+  <div class="turn"><p class="prompt">Your program accepts every file in the valid folder, so you call it done. What could still be wrong, and what would the invalid files catch that the valid ones can't?</p>
+  <ul class="points"><li>a program can accept everything and still be wrong</li><li>invalid files check that the program rejects what it must</li><li>running the whole set every time catches a change that breaks an older case</li></ul>
+  </div>
+</div>
+  
+</section><section class="step">
+  <div class="step-h"><span class="label">s1</span><h4>An empty object</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Running every file in the step 1 folder checks the exit code for each valid and invalid input.</p>
+  <div class="q" id="s1-q2">
+  <div class="who"><span class="qid">s1-q2</span><span>Asks about · Grammar and parsing</span></div>
+  <div class="turn"><p class="prompt">A teammate wants the parser to skip spaces and newlines itself, reading raw characters. Why is it better to turn the file into tokens first?</p>
+  <ul class="points"><li>the parser only sees meaningful tokens</li><li>whitespace is handled in one place</li><li>the grammar stays about structure, not characters</li><li>the lexer can reject an unknown character early</li></ul>
+  </div>
+</div><div class="q" id="s1-q3">
+  <div class="who"><span class="qid">s1-q3</span><span>Asks about · Exit codes as a program's answer</span></div>
+  <div class="turn"><p class="prompt">Your checker prints 'invalid' for a broken file, but the build script that runs it keeps going and deploys. What did the checker get wrong, and what must it do instead?</p>
+  <ul class="points"><li>tools read the exit code, not the printed text</li><li>invalid input must exit with a non-zero code and valid input with 0</li><li>the message is for people, the code is for tools</li><li>the code must be set on every invalid path</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">every file in <code>tests/step1</code></span><code>&lt;run&gt; FILE</code> names starting <code>valid</code> exit 0, <code>invalid</code> exit 1</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s2</span><h4>String keys and values</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Running every file in the step 2 folder checks the exit code for string keys and values.</p>
+  <div class="q" id="s2-q4">
+  <div class="who"><span class="qid">s2-q4</span><span>Asks about · Strings: escapes and Unicode</span></div>
+  <div class="turn"><p class="prompt">A string value holds a raw tab character between its quotes, and your scanner accepts it. Why is that wrong, and what must the scanner track while it reads the string?</p>
+  <ul class="points"><li>JSON forbids unescaped control characters inside a string</li><li>the scanner must know it is inside a string</li><li>a tab must be written as an escape sequence</li><li>a line-by-line pattern cannot tell string content from the rest</li></ul>
+  </div>
+</div><div class="q" id="s2-q5">
+  <div class="who"><span class="qid">s2-q5</span><span>Asks about · Grammar and parsing</span></div>
+  <div class="turn"><p class="prompt">Your parser accepts an object with a comma after its last pair. Why does the grammar reject it, and what should the parser expect right after a comma?</p>
+  <ul class="points"><li>a comma separates pairs, so another pair must follow</li><li>after a comma the parser expects a key string</li><li>skipping commas the grammar doesn't allow accepts forbidden forms</li><li>examples can look fine when the grammar says no</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">every file in <code>tests/step2</code></span><code>&lt;run&gt; FILE</code> names starting <code>valid</code> exit 0, <code>invalid</code> exit 1</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s3</span><h4>Numbers, booleans and null</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Running every file in the step 3 folder checks the exit code for strings, numbers, booleans and null.</p>
+  <div class="q" id="s3-q6">
+  <div class="who"><span class="qid">s3-q6</span><span>Asks about · Numbers: grammar and precision</span></div>
+  <div class="turn"><p class="prompt">Your number reader accepts a value written with a leading zero, such as 0123. The grammar forbids it. Why does a general-purpose number reader get this wrong, and what rule must yours follow?</p>
+  <ul class="points"><li>the grammar allows a lone 0, or a first digit from 1 to 9</li><li>general number readers accept forms JSON forbids, such as leading zeros, plus signs or trailing dots</li><li>the rule comes from the grammar, not from the reader's habits</li></ul>
+  </div>
+</div><div class="q" id="s3-q7">
+  <div class="who"><span class="qid">s3-q7</span><span>Asks about · Grammar and parsing</span></div>
+  <div class="turn"><p class="prompt">Your lexer meets the letters t, r, u, e, x in a value position and reads true followed by a stray x. Why is that wrong, and how should the lexer read a run of letters?</p>
+  <ul class="points"><li>the lexer reads the whole run of letters before deciding</li><li>truex is one unknown word, not a keyword plus junk</li><li>a keyword must match exactly</li><li>splitting the word early accepts input the grammar rejects</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">every file in <code>tests/step3</code></span><code>&lt;run&gt; FILE</code> names starting <code>valid</code> exit 0, <code>invalid</code> exit 1</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s4</span><h4>Nested objects and arrays</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Running every file in the step 4 folder checks the exit code for nested objects and arrays.</p>
+  <div class="q" id="s4-q8">
+  <div class="who"><span class="qid">s4-q8</span><span>Asks about · Grammar and parsing</span></div>
+  <div class="turn"><p class="prompt">Your parser handles ordinary nested files well, but a file with a hundred thousand open brackets in a row crashes it. Why does nesting cause this, and what would you change?</p>
+  <ul class="points"><li>each nesting level adds a call to the call stack</li><li>deep input uses up the stack and the program crashes</li><li>set a depth limit and fail with a clear message, or track nesting yourself</li><li>recursion matches the grammar's shape but needs a bound</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">every file in <code>tests/step4</code></span><code>&lt;run&gt; FILE</code> names starting <code>valid</code> exit 0, <code>invalid</code> exit 1</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s5</span><h4>Your own tests and the full suite</h4>
+  <span class="pill partly">partly</span></div>
+  <p class="why">The sandbox checks the exit codes on the suite's files and that a message is printed. The quality of the messages and the explanations of disagreements are reviewed by hand.</p>
+  <div class="q" id="s5-q9">
+  <div class="who"><span class="qid">s5-q9</span><span>Asks about · Error reporting: where and why input is invalid</span></div>
+  <div class="turn"><p class="prompt">A user's file is missing a comma on line 3, but your message points at the closing brace on line 40. What's wrong with that message, and what should it say?</p>
+  <ul class="points"><li>the parser reported where it gave up, not where the problem started</li><li>a good message says what was expected and what was found</li><li>it gives a line and column for the first problem</li><li>it stops at the first error rather than guessing further</li></ul>
+  </div>
+</div><div class="q" id="s5-q10">
+  <div class="who"><span class="qid">s5-q10</span><span>Asks about · Conformance test suites</span></div>
+  <div class="turn"><p class="prompt">Your parser accepts a file holding only one string, but an older test list says to reject it. Which do you trust, and how would you decide?</p>
+  <ul class="points"><li>a suite can be older than the current specification</li><li>check what the current specification says about top-level values</li><li>explain any disagreement rather than blindly obeying or ignoring the suite</li><li>the specification settles the question, the suite is a guide</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">every file in <code>test</code></span><code>&lt;run&gt; FILE</code> names starting <code>pass</code> exit 0, <code>fail</code> exit 1<br><span class="muted">Either answer allowed for <code>fail1.json</code>, <code>fail18.json</code>: the current spec (checked with an independent parser) disagrees with this suite.</span></li></ul>
+</section></div>
+
+</article>
+<article class="proj" id="url-shortener">
+<header class="proj-h">
+  <p class="label">Project · <b>Web services</b></p>
+  <h2>Build your own URL shortener</h2>
+  <p class="lede">The project teaches designing an HTTP API that holds state: choosing methods and status codes, validating requests, redirecting, and keeping links safe across restarts and repeated requests, all of which are served over HTTP.</p>
+</header>
+<div class="sec"><p class="label">Profile</p>
+<dl class="rows">
+  <dt>Runs as</dt><dd>http-server · checked by the <b>http</b> runner</dd>
+  <dt>Contract</dt><dd><code>&lt;run&gt; starts the service and keeps it running. It must listen on the port given in the PORT variable, and the sandbox sends HTTP requests to it once it is up.</code><br>HTTP requests to localhost on the PORT port. The page leaves the routes open, so the sandbox uses the simplest shape its own example suggests: POST / with a JSON body holding the url field to create a link, GET /&lt;key&gt; to follow a link, and DELETE /&lt;key&gt; to delete one.<br>HTTP status codes, headers and bodies. The sandbox reads the status, the Location header on redirects (it never follows them), and the JSON fields key, long_url and short_url on create. Error bodies carry a message naming the problem.</dd>
+  <dt>Settings</dt><dd><code>PORT</code> The port the service must listen on, on localhost.<br><code>BASE_URL</code> The address the service must put at the start of short_url, set to http://localhost plus PORT, so the sandbox can check the short link it returns.</dd>
+  <dt>Right answer</dt><dd>spec</dd>
+  <dt>Test files</dt><dd><ul class="plain"><li class="muted">None: the checks send their own requests.</li></ul></dd>
+</dl></div>
+<div class="sec"><p class="label">Stage 0 · understand the problem</p>
+<p class="summary">You build a small web service, like the link shorteners people use to share long web addresses. A client sends in a long address and gets back a short code and the short address that contains it. Anyone who opens the short address should be sent on to the original page. The hard part is that each short code must always point to exactly one long address, the same long address should keep getting the same short link, and deleting a link has to really remove it. Because anyone on the internet can submit anything, the service also has to decide which input it accepts.</p>
+<div class="q" id="p-what">
+  <div class="who"><span class="qid">p-what</span><span>what</span></div>
+  <div class="turn"><p class="prompt">A client posts a long address to the service, opens a short one, and later asks to delete it. What does each of those requests promise the client, and what does the client get back?</p>
+  <ul class="points"><li>posting a long address returns a short code, the long address and the short address, and posting it again returns the same link</li><li>opening a short address sends the visitor on to the original address</li><li>deleting removes the link, and asking to delete an unknown link still gets a clear answer</li></ul>
+  </div>
+</div><div class="q" id="p-why">
+  <div class="who"><span class="qid">p-why</span><span>why</span></div>
+  <div class="turn"><p class="prompt">Who calls this service, and what would those callers lose if it went down or started giving different answers for the same link?</p>
+  <ul class="points"><li>other programs, scripts and people clicking links rely on it</li><li>a short link shared in a post or printed somewhere has to keep working for as long as people expect</li><li>a changed or missing answer breaks everyone who stored or repeated the short address</li></ul>
+  </div>
+</div><div class="q" id="p-how">
+  <div class="who"><span class="qid">p-how</span><span>how</span></div>
+  <div class="turn"><p class="prompt">The service may restart at any time, and more than one copy of it may run at once. Where would you keep the short codes and their long addresses so they are not lost, and why?</p>
+  <ul class="points"><li>keep them outside the running program, in a database or file, so a restart does not wipe them</li><li>a memory-only store works for a quick try but loses every link on restart</li><li>copies running side by side must all see the same data, so the store has to be shared</li><li>the store must find a link by its code quickly</li></ul>
+  </div>
+</div>
+</div>
+<div class="sec"><p class="label">Steps · questions and checks</p><section class="step">
+  <div class="step-h"><span class="label">s0</span><h4>Set up</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">The sandbox builds the code, starts the program and checks it answers a request.</p>
+  
+  
+</section><section class="step">
+  <div class="step-h"><span class="label">s1</span><h4>Create a short link</h4>
+  <span class="pill partly">partly</span></div>
+  <p class="why">Checks the success response with its three fields, the repeat call returning the same key and the 400 for a missing url field. The bonus collision handling is not tested.</p>
+  <div class="q" id="s1-q1">
+  <div class="who"><span class="qid">s1-q1</span><span>Asks about · Short keys: hashing, base 62 and collisions</span></div>
+  <div class="turn"><p class="prompt">Your service already holds many links, and a new long URL gets a short key that belongs to a different URL. Why can a clash happen this early even with a good hash, and what should the service do before saving?</p>
+  <ul class="points"><li>clashes come far sooner than the total number of possible keys suggests</li><li>check whether the key already maps to a different URL before saving</li><li>on a clash, derive a new key, for example by adding a value to the input and hashing again</li><li>a counter avoids clashes but makes codes sequential and guessable</li></ul>
+  </div>
+</div><div class="q" id="s1-q2">
+  <div class="who"><span class="qid">s1-q2</span><span>Asks about · URLs: structure, validation and abuse</span></div>
+  <div class="turn"><p class="prompt">A user submits a link that uses an unusual scheme, or points at an address on your own private network. If you store it as sent, what risk does it create for visitors and for your domain, and what should you check first?</p>
+  <ul class="points"><li>parse the URL and check its parts rather than storing the raw text</li><li>accept only schemes you are willing to send people to, such as http and https</li><li>short links hide the real target, so accepting anything lets your domain be used for phishing or hidden redirects</li><li>reject bad input with a clear 400 response rather than storing it</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">create a short link</span><code>POST / {&quot;url&quot;: &quot;https://www.example.com&quot;}</code> status 200 or 201 · fields <code>key</code>, <code>long_url</code>, <code>short_url</code> · <code>long_url</code> = <code>https://www.example.com</code></li><li><span class="cname">repeat call returns the same key and short link</span><code>POST / {&quot;url&quot;: &quot;https://www.example.com&quot;}</code> status 200 or 201 · fields <code>key</code>, <code>long_url</code>, <code>short_url</code> · <code>key</code> = <code>{key}</code> · <code>short_url</code> = <code>{base_url}/{key}</code></li><li><span class="cname">missing url field gets 400 naming the field</span><code>POST / {&quot;wrong key&quot;: &quot;https://www.example.com&quot;}</code> status 400 · body has <code>url</code></li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s2</span><h4>Redirect</h4>
+  <span class="pill auto">auto</span></div>
+  <p class="why">Checks the 302, the Location header and the 404 for an unknown key without following redirects.</p>
+  <div class="q" id="s2-q3">
+  <div class="who"><span class="qid">s2-q3</span><span>Asks about · Redirects: permanent, temporary and cached</span></div>
+  <div class="turn"><p class="prompt">Later, the owner of a short link wants it to point somewhere new, and browsers have already visited it. Why would a permanent redirect cause trouble here, and which code should you send instead?</p>
+  <ul class="points"><li>301 lets browsers remember the redirect and skip your server on later visits</li><li>a remembered target keeps sending people to the old address after you change it</li><li>a temporary code such as 302 makes every visit come back to you, so you can change or count</li><li>the Location header carries the target in both cases</li></ul>
+  </div>
+</div><div class="q" id="s2-q4">
+  <div class="who"><span class="qid">s2-q4</span><span>Asks about · HTTP: methods, status codes and headers</span></div>
+  <div class="turn"><p class="prompt">A visitor opens a key that was deleted, and your service replies 200 with the text URL not found in the body. Why is that a problem for a monitoring tool or a link checker, and what should the status be?</p>
+  <ul class="points"><li>the status code is what machines read, so 200 says the request succeeded</li><li>clients, caches and monitors judge the outcome from the code, not the body</li><li>a missing resource should return 404 Not Found, with the message kept as a short body</li><li>the status code and the body have separate jobs</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">create a link to redirect</span><code>POST / {&quot;url&quot;: &quot;https://www.example.com&quot;}</code> status 200 or 201 · fields <code>key</code></li><li><span class="cname">known key redirects with 302 and a Location header</span><code>GET /{key}</code> status 302 · Location has <code>https://www.example.com</code></li><li><span class="cname">unknown key gets 404</span><code>GET /unknown1</code> status 404</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s3</span><h4>Delete a short link</h4>
+  <span class="pill partly">partly</span></div>
+  <p class="why">Checks the delete, the 404 afterwards and a repeat delete through the API. It cannot look inside storage to confirm the pair is gone.</p>
+  <div class="q" id="s3-q5">
+  <div class="who"><span class="qid">s3-q5</span><span>Asks about · Idempotency: requests that are safe to repeat</span></div>
+  <div class="turn"><p class="prompt">A client's DELETE times out, so it sends the same DELETE again, and the link is already gone. What should the second call return, and why is it safe to retry?</p>
+  <ul class="points"><li>the state after one call and after two calls must match: the link is gone</li><li>the client can't tell whether the first call worked, so retrying is its safe option</li><li>a success response on the retry means the client doesn't treat it as an error</li><li>a 404 on the retry would look like a failure to a client that never saw the first call succeed</li></ul>
+  </div>
+</div><div class="q" id="s3-q6">
+  <div class="who"><span class="qid">s3-q6</span><span>Asks about · Persistence and races in storage</span></div>
+  <div class="turn"><p class="prompt">The service restarts right after a link is deleted. Why must the link stay gone, and what must the delete do for that to hold?</p>
+  <ul class="points"><li>data held only in memory vanishes on restart, so the delete must reach the durable store</li><li>a delete that only changes an in-memory copy brings the link back after a restart</li><li>the store is the source of truth, so the delete should be saved there before the service answers</li></ul>
+  </div>
+</div>
+  <ul class="checks"><li><span class="cname">create a link to delete</span><code>POST / {&quot;url&quot;: &quot;https://www.example.com&quot;}</code> status 200 or 201 · fields <code>key</code></li><li><span class="cname">delete removes an existing link</span><code>DELETE /{key}</code> status 200 or 204</li><li><span class="cname">deleted key now returns 404</span><code>GET /{key}</code> status 404</li><li><span class="cname">deleting again still succeeds</span><code>DELETE /{key}</code> status 200 or 204</li></ul>
+</section><section class="step">
+  <div class="step-h"><span class="label">s4 · optional</span><h4>Web form</h4>
+  <span class="pill manual">manual</span></div>
+  <p class="why">Needs a browser to fill the form and see the link, so the sandbox cannot run it.</p>
+  <div class="q" id="s4-q7">
+  <div class="who"><span class="qid">s4-q7</span><span>Asks about · The API contract: request shape, validation and errors</span></div>
+  <div class="turn"><p class="prompt">The web form and a command-line client both read the key from the response, and someone renames that field. What breaks for them, and why is a field name part of the contract?</p>
+  <ul class="points"><li>clients parse exact field names, so a rename breaks them without any server error</li><li>the response shape is a promise that clients depend on</li><li>a safer change adds the new field and keeps the old one until clients move, or versions the API</li><li>changes to requests and responses should be checked against the clients that use them</li></ul>
+  </div>
+</div><div class="q" id="s4-q8">
+  <div class="who"><span class="qid">s4-q8</span><span>Asks about · Cross-origin requests from a browser</span></div>
+  <div class="turn"><p class="prompt">The form is served on one port and calls the API on another, and the browser blocks the response with a CORS error. Why does the browser block it, and what is the wrong fix?</p>
+  <ul class="points"><li>the same-origin policy stops a page from reading responses from another origin</li><li>the API must opt in with CORS headers that name the allowed origin</li><li>allowing every origin just to silence the error opens the API to any site</li><li>some requests are preceded by a preflight request asking permission</li></ul>
+  </div>
+</div>
+  
+</section><section class="step">
+  <div class="step-h"><span class="label">s5 · optional</span><h4>Build, test and deploy pipeline</h4>
+  <span class="pill manual">manual</span></div>
+  <p class="why">Checks a pipeline and deployment, which the sandbox cannot run from the code alone.</p>
+  <div class="q" id="s5-q9">
+  <div class="who"><span class="qid">s5-q9</span><span>Asks about · Automated build, test and deploy</span></div>
+  <div class="turn"><p class="prompt">A change breaks a test, but the pipeline still deploys it to production. What's wrong, and what should stop the deploy?</p>
+  <ul class="points"><li>deploy should run only after the build and tests pass</li><li>a failing test is the signal that should block the release</li><li>users get the broken version otherwise</li><li>the gate belongs in the pipeline's rules, not in someone's memory</li></ul>
+  </div>
+</div>
+  
+</section></div>
+
+</article>
+</div>

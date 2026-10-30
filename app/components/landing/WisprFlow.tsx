@@ -27,6 +27,8 @@ export default function WisprFlow() {
   const [os, setOs] = useState<OS | null>(null);
   const demoRef = useRef<HTMLDivElement>(null);
 
+  // Read after hydration on purpose: the OS is only known in the browser.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOs(detectOS()); }, []);
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function WisprFlow() {
         <div className="flow-body">
           <div className="flow-left">
             <ul className="modes">
-              <li id="mode-hold"><h3>Hold to talk</h3><p>Hold the shortcut, explain, let go. The text lands in the answer box.</p><span className="keys"><Keys os={os} /></span></li>
+              <li id="mode-hold"><h3>Hold to talk</h3><p>Hold the shortcut, explain, let go. The text lands in the chat box.</p><span className="keys"><Keys os={os} /></span></li>
               <li id="mode-free"><h3>Hands-free</h3><p>Double-tap the shortcut and Flow keeps listening until you tap it again.</p><span className="keys"><Keys os={os} dbl /></span></li>
             </ul>
             <div className="os">
@@ -109,7 +111,7 @@ export default function WisprFlow() {
               <span className="bigwave">{Array.from({ length: 26 }, (_, i) => <i key={i} />)}</span>
               <span className="mode-badge">Idle</span>
             </div>
-            <div className="field"><span className="lbl">Your answer · Rate Limiter, step 1</span><span><span className="ph">A rate limiter is like a bucket of tokens.</span> <span className="ph">Each request takes one,</span> <span className="ph">and tokens drip back in at a fixed rate,</span> <span className="ph">so a short burst gets through but a flood is turned away.</span></span></div>
+            <div className="field"><span className="lbl">Your answer · URL Shortener, step 2</span><span><span className="ph">A 302 is a temporary redirect,</span> <span className="ph">so the browser asks my server every time.</span> <span className="ph">With a 301 it would remember the target,</span> <span className="ph">and I could never change or delete the link.</span></span></div>
             <p className="mic-cap">Hands-free: double-tap, talk, tap once to stop</p>
           </div>
         </div>

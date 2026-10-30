@@ -28,8 +28,7 @@ const LANDING: Item[] = [
   { href: "#projects", t: "Projects", d: "From Coding Challenges by John Crickett" },
 ];
 const INNER: Item[] = [
-  { href: "/projects", t: "Projects", d: "21 ready to build and explain", key: "projects" },
-  { href: "/learning", t: "Your learning", d: "What you've explained, in your words", key: "learning" },
+  { href: "/projects", t: "Projects", d: "Ready to build and explain", key: "projects" },
 ];
 
 /** Applies a theme choice to <html> and remembers it. "system" follows the OS. */
@@ -57,6 +56,8 @@ export default function Header({ variant, current, readyCount }: { variant: "lan
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ta-theme") as Theme | null;
+      // Read after hydration on purpose: the saved theme only exists in the browser.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved && ORDER.includes(saved)) setTheme(saved);
     } catch {}
   }, []);
@@ -142,7 +143,7 @@ export default function Header({ variant, current, readyCount }: { variant: "lan
           <div className="sheet-foot">
             {variant === "landing"
               ? <Link className="btn btn-primary" href="/projects">Browse projects</Link>
-              : <Link className="btn btn-ghost" href="/learning#export">Export learning log</Link>}
+              : <Link className="btn btn-ghost" href="/projects">Browse projects</Link>}
             <div className="sheet-row">
               <span className="fine">Theme</span>
               <div className="seg" role="group" aria-label="Theme">

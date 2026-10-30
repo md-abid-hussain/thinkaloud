@@ -1,137 +1,92 @@
-# Handoff for the next session
+# Handoff: make ThinkAloud general, then add the sandbox review (30 Oct 2026, evening)
 
-Written 2026-10-29 (Thursday), at the end of the first working session. Read this file first, then `PRODUCT_BRIEF.md`.
+Read this first, then `PRODUCT_BRIEF.md` (v1.2; parts are now superseded by section 2 here), `design/DESIGN_SYSTEM.md` and `app/README.md`.
+Deadline: **Saturday 31 Oct 2026, 11:59 pm IST** (No Hands challenge, Builders track). The user is Abid.
 
-## 1. What this is
+## 1. The lesson that must not repeat
 
-**ThinkAloud (working name)** is a hosted web app for people learning to code. A learner picks one of 134 projects (Coding Challenges and roadmap.sh), and the app maps it to concepts, teaches and checks the ideas, and optionally reads their public GitHub repo. It is guest-first, needs no sign-up, and never suggests code. Language and framework are optional.
+Every time something was designed on one project (wc) and then applied to the others, it broke: trivia instead of concepts, JUnit and `ProcessBuilder` in the Java notes, long plumbing lists. Abid's words: building around one problem is what made it a mess; he needs **a general tool that works for any project**.
 
-It is being built for the **No Hands challenge** (WeMakeDevs x Wispr Flow), Builders track, solo, India only.
+So:
+- **Never design on one project.** Every generator, prompt, check and screen is built and tested on **three different kinds of project at once**: wc (a CLI text tool), the JSON Parser (a parser) and the URL Shortener (an HTTP service).
+- **Classify the project first,** then use the playbook for its type (section 3). Never apply one project's shape to another.
+- **Concept-first, minimal:** only what's needed to understand the concepts and solve the problem. No plumbing, no tooling, no extras, no features nobody asked for.
+- **Fix the approach, not the output.** When a result is wrong, fix the principle, the playbook, the example or the relevance check, then regenerate everything. Don't patch one output.
+- Every generated item gets a relevance check ("is this central to the concept or the step?") before it's saved, as well as the link check.
 
-| Fact | Detail |
-|---|---|
-| Deadline | The page says submissions close **Saturday 31 Oct, 11:59 pm IST**. Another session noted Friday 30. Plan to submit a working version **Friday night** and update if the form allows |
-| Submit | A live link judges can use without paying or asking for access, a demo video of 2 minutes or less, the Wispr usage card (desktop app, Insights), and a few lines on the problem, the user and how Wispr was used. An earlier session's notes also mention a short clip of Flow in use (unverified) |
-| Judging | Four questions: real problem in your work, meaningful Wispr use, works, clear demo. Weights **unconfirmed**; an earlier session's notes give 30, 30, 25 and 15 (from the launch blog, which was not read) |
-| Prizes | Best Builders project ₹1,00,000, top of the words-dictated leaderboard ₹1,00,000, and 10 random draws of $100. Whether the daily draws only pick from projects already submitted is **not confirmed**, so submitting early may add chances |
-| Wispr | It types at the cursor. There is **no voice API** (an older plan assumed one and was wrong). "Press enter" is an experimental feature on paid plans |
+## 2. What Abid wants built (his design, 30 Oct evening)
 
-## 2. Where everything is
+Everything runs on **Haiku 5.5**. The concepts stay as they are.
 
-Root: `C:\Users\abid1\Documents\no-hands`
+| Stage | Learner | What's checked | Made once, kept for everyone |
+|---|---|---|---|
+| **0. Understand the problem** | Reads the summary, then answers about 3 questions (what, why, how) taken from the challenge page | The mentor points out gaps and records progress. Soft: nothing is blocked, but the learner must show they read and understood it | The summary and the questions |
+| **1. Setup** | Creates the repo and gives the **GitHub link** | The sandbox clones, builds and runs it. **Tests are optional** | The setup check |
+| **2…n. Each step** | Learns the step's concepts, answers a small set of concept questions, pushes code and asks for a review | **Done when the explanation is accepted and the code works.** Design isn't judged | The concept questions and the step's check |
 
-| File | What it is |
-|---|---|
-| `PRODUCT_BRIEF.md` | The product, v0.4. Source of truth for features, pages, completion rules, build plan, risks and open decisions |
-| `DATA_MODEL.md` | The Postgres model with two ERDs, design decisions, write recipes, and section 8 with planned changes |
-| `VALIDATION.md` | Review by four engineering skills: findings, decision records, test gaps, cache preview |
-| `CONTENT_FORMAT.md` | The YAML content format (v0.4 shape: primer, teach-back, figure, proofs), the checker, and a prompt for generating projects |
-| `content/concepts.yaml` | The shared concept catalogue (90 concepts, every one used by a project) |
-| `content/projects/coding-challenges/*.yaml` | The 21 ready projects. `challenge-wc.yaml` and `challenge-ssg.yaml` are the worked examples |
-| `content/proofs/<slug>.mjs` | One script per project that proves every predict and trace key; the checker runs them |
-| `content/REVIEW_SHEET.md` | Generated: all 135 keys with prompt, derivation, proof source and output, and a box to tick |
-| `db/schema.sql` | 26 tables, 5 views, triggers and `export_learner()` |
-| `db/seed_reference.sql`, `seed_challenges.sql`, `seed_content.sql` | Areas and event types; all 134 projects as listed; the 21 ready projects (generated by the checker) |
-| `db/seed_wc_sample.sql` | Test fixture only: `wc` milestone 1 closed by one teach-back |
-| `db/scripts/import-index.mjs` | Builds `seed_challenges.sql` from `learning-java/INDEX.md` |
-| `db/scripts/import-content.mjs` | Validates content files, runs the proofs and loads them into a fresh database. `--project` checks a subset |
-| `db/scripts/review-sheet.mjs` | Writes `content/REVIEW_SHEET.md` |
-| `db/support/recipes.mjs`, `helpers.mjs` | The write recipes as code (the seed of the app's data layer), and test helpers |
-| `db/test/*.test.mjs` | 46 tests |
+**Review loop:**
+1. The learner commits and asks for a review. The sandbox (**Daytona**; check whether LangChain or LangGraph's sandbox integration fits before writing our own) builds the code and runs the step's check.
+2. A **reviewer sub-agent** (its own small context, so the mentor's stays small) reads **only the diff since the last approved review**, plus the results, and returns pass or fail with the problems in words.
+3. On a fail, the mentor holds back. The learner fixes and resubmits. The build always runs on the full code.
 
-Run from `db/`:
+## 3. Generalising: project types and playbooks
 
-```
-npm install
-npm test                                              46 tests, about 10 seconds
-node scripts/import-content.mjs --check               validate content, run the proofs, load into a fresh database
-node scripts/import-content.mjs --check --verify-links --sql seed_content.sql
-node scripts/review-sheet.mjs                         rewrite content/REVIEW_SHEET.md
-```
+**Confirmed by Abid on 30 Oct (night), after reading all 21 challenge pages** (notes: `challenges-21-structure.md` in the shared session notes). This replaces the interface-based table below, which repeated the wc mistake: wc, cut, sort, grep, diff, duplicate files and the SSG all run as CLIs but teach five different things.
 
-Other places that matter:
+- **Two fields, not one.** `learns` (what the learner learns) picks the playbook: concepts, stage-0 and step questions. `runs_as` (cli, http-server, tcp-server, udp-server, client, interactive) picks the sandbox check. An optional `also` holds a second type (Redis: protocols + storage; rate limiter: web service + algorithms).
+- **8 types by learning:** streams and text (wc, cut) · language processing (JSON Parser, calculator, Brainfuck, comment remover, grep) · algorithms and data structures (sort, diff, Huffman, Bloom, duplicate files) · storage engines (Bitcask) · network protocols (echo, web server, Redis, curl, DNS) · web services (URL shortener, rate limiter) · developer tools (SSG) · interactive (none of the 21).
+- **Profile:** `learns`, `also`, `runs_as`, `contract` (what the sandbox calls, shown at setup; `settings` such as PORT the learner must make configurable), `fixtures` (our own test data; the pages' data is on Dropbox or missing), `oracle` (real-tool, page-values, case-files, property, spec, stub, none), per-step `auto | partly | manual`, then `stage0` (summary + about 3 questions).
+- **Scope to the deadline:** playbooks for all 8 types; sandbox runners for the 3 test types; builds for Java, Python and Node.js; the build and run commands are detected and the learner confirms them. Language notes stay, regenerated with the type playbook.
 
-- `C:\Users\abid1\Documents\learning2026\learning-java`: the earlier Claude-session workflow (`ccwc`, `task-tracker`). `INDEX.md` is the source of the 134 projects. `ccwc` and `task-tracker` have checked concept tables, briefs and links to reuse.
-- `C:\Users\abid1\Documents\learning2026\skillgraph`: an older, separate design with about 1,500 lines of TypeScript backend. **Do not import it blindly.** Its PRD makes "never output code" a permanent filtered rule and its plan assumed a Wispr voice API.
-- `C:\Users\abid1\.claude\plans\shimmying-baking-bonbon.md`: that older plan.
+The original proposal, kept for reference:
 
-## 3. State
+1. **Profile the project.** An agent reads the challenge page and fills a structured profile: its **type**, its **interface** (CLI arguments and standard input, HTTP endpoints, a TCP or UDP protocol, a library API), the sample inputs and expected outputs the page gives, and which steps can be checked automatically.
+2. **Use the playbook for the type.** Each type has its own prompt guidance for concepts, stage-0 questions, step questions and checks, and its own check kinds:
 
-**Done and tested:** the data model with the v0.4 changes (primer, figure kind, support level, teach-back), the seeds, grading integrity enforced by the database, the write recipes, the content format and checker, and **21 ready projects** (wc, cut, grep, JSON parser, Huffman, Bloom filter, echo server, web server, URL shortener, rate limiter, sort, diff, code comment remover, calculator, Brainfuck, duplicate files, curl, DNS resolver, Redis, Bitcask, static site generator). They hold 62 milestones, 210 steps, 62 teach-backs and 135 answer keys, each key proven by a script. All 46 tests pass on PGlite (a real Postgres engine in WebAssembly), and all 95 links return 200. Nothing has run on Zerops.
+| Type | Examples | How a step is checked in the sandbox |
+|---|---|---|
+| CLI tool over text and files | wc, cut, grep, sort, diff, head, uniq, tr, xxd, comment remover | Run with arguments or standard input on sample files; compare standard output and exit code |
+| Parser or interpreter | JSON Parser, calculator, Brainfuck, Lisp, Forth, YAML, jq | Run on test-case files; compare the exit code, value or output |
+| HTTP service or API | URL Shortener, rate limiter, web server, pastebin, load balancer, proxy | Start it, send HTTP requests; compare status, headers and body |
+| Network server (TCP or UDP) | Echo, Redis, Memcached, DNS forwarder, NATS, SMTP | Start it, send protocol messages; compare replies |
+| Network client | curl, DNS resolver, Redis CLI, whois, NTP | Run it against a small stub server inside the sandbox |
+| Algorithm or storage | Huffman, Bloom filter, Bitcask, duplicate files | Property checks: a round trip equals the input, false positives stay under a bound, data survives a restart |
+| Interactive or graphical | Pong, Tetris, chess, text editor | No automatic check: the learner explains, and the mentor reviews the diff |
 
-**Content status:** every project is `generated`. None is reviewed until the user works through `content/REVIEW_SHEET.md`.
+3. **Build recipes are per language, not per project.** Recognise Maven or Gradle for Java, a `pyproject` for Python, `package.json` for Node.js, build, then run the check.
+4. **Generate for one project of three different types together.** Abid reviews all three, then the rest are batched.
 
-**Not started:** the app (server, pages, model calls, GitHub read, deploy), the demo video, the submission.
+## 4. Suggested order for the next session
 
-## 4. Decisions
+1. Confirm section 3 with Abid: the type list, the profile fields, the check kinds.
+2. Write the profile schema and the playbooks. Generate profiles, stage-0 questions, step questions and checks for wc, the JSON Parser and the URL Shortener **together**, and have Abid review them.
+3. Sandbox and reviewer: a Daytona key is needed from Abid (`DAYTONA_API_KEY`). Run checks by kind, read diffs from the GitHub compare API (public repos first), and add the reviewer sub-agent on Haiku 5.5.
+4. Redesign the learn page from the design system. Abid said the current UI "still looks awful". It should be one place to talk to the agent, with the task and progress visible, plus a review status.
+5. Deploy to Zerops.
 
-**Made by the user:**
+**Deadline call needed from Abid:** all of this in about a day is a lot. One way: steps 1 to 3 for the three projects in Java, then the UI. He decides.
 
-- Audience: juniors and newcomers learning by building projects. The problem is AI handing over code, not the mentoring workflow.
-- Guest-first. Browse everything without signing up. Start asks for optional name, email, language, framework and (v0.4) support level.
-- The landing page lists all 134 projects. Each overview is its own route, with a link to the original at the bottom.
-- Language and framework are optional. With none, the learner works concept-only and can still reach Understood.
-- The app cannot run the learner's code. Understanding is checked first, code second and optional.
-- Postgres on Zerops, including the graph as an edge table. Public repos only, read with the user's own token.
-- No command layer. Input is plain typing or Wispr Flow into ordinary text boxes. The Decisions API is deferred.
-- Beginner-friendly and assistive, but the app never suggests code. Support levels at Start (v0.4).
+## 5. What exists now (30 Oct, evening; all uncommitted since `c156584`; the old work is in `../no-hands-archive/v0-2026-10-30`, tag `v0-archive`)
 
-**Recommended, not yet confirmed by the user** (brief section 12):
+Steps 1 to 4 of section 4 are built. Waiting on Abid: his review of the playbooks and the three generated layers (https://claude.ai/artifact/TVT8sJBCyYDtxnnLVLtczB). Not done: the Zerops deploy, and generating the other 18 projects.
 
-1. The help rule (section 5 of the brief).
-2. The two-day cut (section 10).
-3. ~~All 3 gate questions must be Met~~ Replaced by decision 8.
-4. Extras stay in a side log and never count toward progress.
-5. Overview text is our own summary plus a link, not copied text.
-6. LLM provider (default Claude) and the daily spend cap.
-7. Product name.
-8. **Gate shape: accepted 2026-10-29.** One teach-back per milestone, 3 to 4 points each tagged with a concept. A met point marks its concept explained even when the answer is partial. Implemented.
-9. **Java language notes: no code, accepted 2026-10-29.** The three notes now name API names and link the docs. The checker enforces it.
-10. **Figure block: accepted 2026-10-29.** Optional `figure: { kind: ... }` per project, stored as `challenge.figure_kind`. All 21 projects have one.
+- **Content:**
+  - `content/{wc,json-parser,url-shortener}.yaml`: the reviewed maps (concepts and steps).
+  - `content/playbooks/`: `_rules.md` plus one playbook per type.
+  - `content/generated/<slug>.yaml`: profile, stage 0, step questions, checks; drafts until Abid approves. Made by `npm run generate`. Every check passed on a reference solution (`npm run validate-checks`); the JSON Parser's last step records the two JSON_checker files the current spec disagrees with.
+- **Sandbox:** `app/sandbox/Dockerfile` (one image for Java, Python and Node.js), the Daytona snapshot `thinkaloud-sandbox-1`, and `app/sandbox/runner.py` (detect, then the cli, case-files and http runners). The diff since the last approved review comes from `git diff` in the sandbox, not the GitHub API. Sample repos (public, approved by Abid): `md-abid-hussain/thinkaloud-test-{wc,json-parser,url-shortener}`.
+- **Reviewer:** a Haiku 5.5 sub-agent (`app/lib/review/reviewer.ts`). It never passes a failed check, never asks for later steps, and never fails a step for work outside the repo. Reviews take about 40 to 60 seconds, mostly sandbox start and Maven.
+- **App** (`app/`, Next.js 16.4.3, Postgres in Docker on port 5433):
+  - **Flow:** stage 0 (soft), then setup with the GitHub link (the setup review detects the build and run commands, and the learner confirms), then each step. A step is done when its review passed and its questions are answered.
+  - **Mentor tools:** `set_language`, `ask_question`, `mark_answered`, `link_repo`, `set_build`, `request_review`. The app opens a question even when the mentor forgets the tool.
+  - **Learn page:** redesigned (Abid chose "chat + progress rail"): a transcript with cards (welcome, stage 0, setup, step, review, complete), a Now strip with the review status, and a progress rail; Chat and Progress tabs below 1000px. Checked at 1440 and 390, light and dark.
+  - **Language notes:** the research agent now follows the type playbook; `npm run build-layers` rebuilds all 9.
+- **Checked end to end through the app on Daytona:** setup and step 2 reviews for all three projects (Java with Maven, Python, Node.js).
+- **Checks:** 37 tests. `npm test`, `npm run typecheck` and `npm run lint` pass.
+- **Local quirk:** from Abid's machine, some IPv4 connects (Dropbox, codingchallenges.fyi, Daytona's file upload) time out. Scripts set `ipv6first`; the Daytona backend uploads files through a command instead of the SDK's upload.
+- **Model rules** (from the claude-api skill): no `temperature`; set effort explicitly; no forced tool choice on Opus 5.5; **keep turns append-only**, because thinking blocks are bound to the exact prompt (a re-rendered system prompt caused a 400).
+- **Don't test in the browser pane with Abid's cookie.** His chat shares it. Use the API with a fresh guest cookie.
 
-**Other open points** (VALIDATION.md): freeze generated curricula or add versions; a parked step blocks Understood (kept for v1); message retention; normalise pasted repo URLs in the app.
+## 6. How Abid works
 
-## 5. Next tasks, in order
-
-> Update 2026-10-29, later: the user rejected the v1 content as tool trivia. Content v2 is concept-first (CONTENT_FORMAT.md, top section). `wc` is rewritten as the worked example (`format: 2`, 5 concept milestones, 15 concept lessons in `concepts.yaml`, preview in `content/previews/challenge-wc.md`) and awaits the user's approval. The other 20 projects are still format 1. Schema change: `concept.lesson`.
->
-> Update 2026-10-29: steps 1 (decisions 8 and 9), 2 (v0.4) and most of 3 (content) below are done. Task Tracker was not written (v1 is Coding Challenges only). What remains for content is the user's key review in `content/REVIEW_SHEET.md`, then setting reviewed projects to `reviewed`.
->
-> Key matchers rewritten for dictated answers (`db/support/matching.mjs`, rules in `CONTENT_FORMAT.md`): number words, decimals, restated question numbers ignored, working with a conclusion accepted, order checked for numbers_all, hedges and number sprays rejected, spacing ignored in text keys. `npm test` checks all 135 keys against natural answers and guesses (52 tests).
-
-1. **Ask the user** to confirm or change decisions 1 to 9 above. They are quick yes or no answers. Start with 8.
-2. **Implement v0.4** (small):
-   - `schema.sql`: `enrollment.support_level`, `challenge.primer`. `seed_reference.sql`: event type `support_level_set`.
-   - `import-content.mjs`: require the primer, reject code fences and backticks in hints and examples, and check language notes for code.
-   - Update the SSG example: add a primer, reword code-like hints (milestone 1 step 3's example has a code-like line), and trim the Java notes to API names plus links.
-   - If decision 8 is accepted: tag rubric points with concepts, make `question.concept_id` nullable, add a trigger for tagged concepts, relax the count rule to 1 to 3, update the recipes, and shorten the example (drop explain-type step tasks that repeat the teach-back, make the example hint optional).
-   - Tests for each. Keep all tests green.
-3. **Content:** convert the `wc` sample to YAML, write Task Tracker from `learning-java/task-tracker` (checked material exists), and review the SSG keys. That is the three reviewed projects. Then generate about 10 more with the prompt in `CONTENT_FORMAT.md` and check each with the importer. The user checks every answer key by hand.
-4. **Build the app** in TypeScript. Order: scaffold, then a Zerops hello-world with Postgres **first** (hosting is the biggest unknown), then guest start and the landing list, overview pages, project home and steps (reuse `recipes.mjs`), the grader and tutor behind a small model interface with a daily spend cap, export, and the optional repo check. The brief's section 10 has the day plan.
-5. **Remaining cache work** only if the language layer is generated at runtime: `generation_run` with a partial unique index on running jobs, plus the link recheck schedule.
-6. **Submission:** demo video of 2 minutes or less, the usage card, a short Flow clip, and a few lines on the problem. Dictate the README.
-
-**What the user must provide:** a Zerops project with Postgres, an LLM API key, a read-only GitHub token, and their review of the answer keys.
-
-## 6. Working with this user
-
-- They want to **understand and do it properly, not vibe-code**, but the deadline is tight. Build fast, keep tests and short notes, and explain afterwards.
-- They like short, structured answers, decisions as clear options with a recommendation, and **confirmation before a decision is changed**. They like wireframes and diagrams for anything visual.
-- They told you which skills or tools you would use before you used them.
-- They are frustrated by rigid refusals. Never refuse help, never ration it, and never make them prove an attempt first. This is the history behind the help rule.
-- They dictate with Wispr Flow, so messages contain transcription errors. Seen so far: "cloud" is Claude, "tax" is stack, "kit" is gate, "CCDC" and "WC" are ccwc or Coding Challenges, "roadmap.hs" is roadmap.sh, "OpenAPI" is OpenAI, "Cricket" is Crickett, "SDK software development" is SDLC. Read generously and confirm when unsure.
-- Dates: today is Thursday 29 Oct 2026.
-
-## 7. Pitfalls found
-
-- PL/pgSQL: an `IF` condition that contains `CASE ... THEN` is cut at the first `THEN`. Compute into a variable first.
-- YAML: compact `{ id: p1, point: text }` breaks when the text has a comma. Use block lists with quoted text.
-- A generated column (`concept_state.status`) cannot be inserted into. Set the timestamps.
-- Deleting from `event` needs `set local app.allow_event_delete = 'on'` inside the transaction. This is also how "delete my data" works.
-- PGlite prints very large error output. Pipe through `cut -c1-200 | head` when running tests.
-- Docker Desktop was not running on this machine, so there is no local Postgres container. Tests use PGlite.
-- Link checks can fail once on a network hiccup. The checker retries three times.
-
-## 8. A start for the next session
-
-> Read `HANDOFF.md` and `PRODUCT_BRIEF.md` in `C:\Users\abid1\Documents\no-hands`, run `npm test` in `db/`, then ask me to confirm decisions 1 to 9 from section 4 of the handoff. After that, implement v0.4 (section 5, step 2).
+He dictates with Wispr Flow, so read generously. He wants structured answers, options with a recommendation, to be told which tools and skills you'll use, screenshots at real breakpoints, and no assumptions about scope. Confirm the approach before building, then build it properly. He never wants help refused.

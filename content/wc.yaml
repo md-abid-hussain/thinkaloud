@@ -1,0 +1,234 @@
+project:
+  slug: wc
+  title: Build your own wc
+  source_url: https://codingchallenges.fyi/challenges/challenge-wc
+  level: beginner
+  summary: >-
+    A command-line program that counts the bytes, lines, words and characters in a file, or in
+    whatever is piped into it, and matches the Unix wc tool. It is small to write, but getting
+    every count right forces you to understand how text is really stored and how a program reads
+    input it can't hold all at once.
+
+concepts:
+  - id: text-encoding
+    name: "Text encoding: from characters to bytes"
+    covers:
+      - code points and UTF-8
+      - code units and surrogate pairs
+      - grapheme clusters
+      - the locale
+      - invalid bytes
+    explanation: |-
+      A file holds bytes, not letters. Each character is given a number, its Unicode code point,
+      and an encoding such as UTF-8 turns that number into one to four bytes. So "how many
+      characters?" depends on what you count. Some platforms keep text in memory as 16-bit
+      units, where an emoji takes two units (a surrogate pair). What a person sees as one symbol
+      can be several code points (a grapheme cluster). Which encoding a program assumes comes
+      from the locale, and real files can contain bytes that aren't valid in that encoding at
+      all.
+
+      Real example: "café" is 4 characters but 5 bytes in UTF-8, and the family emoji 👨‍👩‍👧‍👦 is
+      one symbol but 7 code points, 11 UTF-16 units and 25 UTF-8 bytes.
+
+      Common mistake: treating bytes and characters as the same thing. That's only true for
+      plain ASCII text.
+    why_here: >-
+      wc counts bytes with one option and characters with another, and the sample file contains
+      non-ASCII text, so the two differ (342190 and 339292). The character count depends on the
+      locale, and has to count code points the way wc does.
+    origin: step
+    resources:
+      - title: "The Absolute Minimum Every Software Developer Must Know About Unicode in 2023 (Nikita Prokopov)"
+        url: https://tonsky.me/blog/unicode/
+      - title: "Unicode FAQ: UTF-8, UTF-16, UTF-32 and BOM"
+        url: https://www.unicode.org/faq/utf_bom.html
+      - title: "GNU coreutils manual: wc invocation"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/wc-invocation.html
+
+  - id: streaming-constant-memory
+    name: Streaming in constant memory
+    covers:
+      - short reads and end of input
+      - one pass for all the counts
+      - state across chunk boundaries
+      - what goes wrong if you load everything
+    explanation: |-
+      Loading the whole file into memory works for the sample file and fails for a 10 GB log on
+      a machine with 8 GB of RAM. Streaming means reading a fixed-size chunk, updating the counts
+      and reusing the same buffer, so memory stays the same for any input size. A read may return
+      fewer bytes than you asked for, and the end of input is a separate signal. A pipe can only
+      be read once, so every count has to be updated in the same pass. And a chunk can end in the
+      middle of a character or a word, so some state has to be carried into the next chunk.
+
+      Real example: a bug that only shows on big files, because small files fit in one chunk.
+      Shrinking the chunk to a few bytes in a test exposes it straight away.
+
+      Common mistake: adding the buffer size instead of the number of bytes the read actually
+      returned.
+    why_here: >-
+      Every count must work on files of any size and on piped input, without loading everything.
+    origin: beyond
+    resources:
+      - title: "read(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/read.2.html
+      - title: "pipe(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/pipe.7.html
+
+  - id: word-state-machine
+    name: Counting words with a state machine
+    covers:
+      - the two states and their transitions
+      - what counts as whitespace
+    explanation: |-
+      A word is a run of characters that aren't whitespace, so counting words means counting the
+      moments you move from whitespace into a word. That's a machine with two states, "inside a
+      word" and "between words". What counts as whitespace is a decision: space, tab and newline
+      always do, and Unicode has more, such as the no-break space, which tools and locales treat
+      differently.
+
+      Real example: two words separated by two spaces and a tab are still 2 words.
+
+      Common mistake: splitting on single spaces, which miscounts runs of spaces, tabs and line
+      breaks.
+    why_here: >-
+      The word count is this machine, and its state has to survive from one chunk to the next.
+    origin: step
+    resources:
+      - title: "Finite-state machine (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Finite-state_machine
+      - title: "Whitespace character (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Whitespace_character
+
+  - id: lines-and-line-endings
+    name: What a line is, and line endings
+    covers:
+      - counting newlines, not lines
+      - line feed versus carriage return and line feed
+    explanation: |-
+      wc counts newline characters, because on Unix a line is text that ends in a newline. A last
+      line with no newline after it isn't counted. Windows ends lines with two bytes, carriage
+      return then line feed, and Unix with line feed alone, so the same text has different byte
+      counts on the two.
+
+      Real example: version control tools warn "no newline at end of file".
+
+      Common mistake: splitting the text into lines and counting the pieces, which gives a
+      different answer depending on whether the file ends with a newline.
+    why_here: >-
+      The line count is a newline count, and the line endings in the file affect the byte count.
+    origin: step
+    resources:
+      - title: "Newline (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Newline
+      - title: "POSIX base definitions: Definitions (see Line)"
+        url: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html
+
+  - id: process-contract
+    name: "The command-line contract: input, output, errors, exit codes"
+    covers:
+      - standard input, output and error
+      - exit codes
+    explanation: |-
+      Unix tools are small programs joined by pipes, and that works because they all follow the
+      same contract. Read from a named file or, if none is given, from standard input. Write
+      results to standard output and errors to standard error, so errors don't flow into the next
+      program as data. Return 0 for success and anything else for failure, so scripts can react.
+
+      Real example: in a pipeline that filters a log and then counts its lines, the counting
+      program never knows its input came from another program.
+
+      Common mistake: printing errors to standard output, or returning 0 after a failure.
+    why_here: >-
+      The last step reads standard input when no file is named, and a missing file should give an
+      error on standard error and a non-zero exit code.
+    origin: step
+    resources:
+      - title: "stdin(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/stdin.3.html
+      - title: "Bash manual: Exit Status"
+        url: https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+      - title: "The Art of Unix Programming: Basics of the Unix Philosophy"
+        url: http://www.catb.org/~esr/writings/taoup/html/ch01s06.html
+
+  - id: differential-testing
+    name: Testing against a reference implementation
+    covers:
+      - pinning the reference's version and locale
+      - choosing nasty inputs
+    explanation: |-
+      When a trusted implementation exists, run it and yours on the same inputs and compare. You
+      don't need to know the answer in advance, so you can test many inputs, including the nasty
+      ones: an empty file, no trailing newline, emoji, invalid bytes, a huge file. The reference
+      has to be pinned, because versions and settings of the same tool disagree. An older wc
+      build counts an emoji as 2 characters.
+
+      Real example: compilers and databases are routinely tested against another implementation.
+
+      Common mistake: comparing against a reference running with different settings, then
+      "fixing" correct code to match it.
+    why_here: >-
+      Every check is "matches wc", and the character count only matches under the same locale.
+    origin: step
+    resources:
+      - title: "Differential testing (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Differential_testing
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project, download the challenge's sample text file, and make sure the real wc
+      is available to compare against.
+    check: >-
+      The real wc reports 342190 bytes, 7145 lines and 58164 words for the sample file.
+    concepts: [differential-testing]
+
+  - id: s1
+    title: Count bytes
+    objective: >-
+      With -c and a file name, print the number of bytes in the file, followed by the file name.
+    check: >-
+      The byte count for the sample file is 342190, the same as wc.
+    concepts: [text-encoding, streaming-constant-memory]
+
+  - id: s2
+    title: Count lines
+    objective: >-
+      With -l, print the number of lines in the file.
+    check: >-
+      The line count for the sample file is 7145, the same as wc.
+    concepts: [lines-and-line-endings]
+
+  - id: s3
+    title: Count words
+    objective: >-
+      With -w, print the number of words in the file.
+    check: >-
+      The word count for the sample file is 58164, the same as wc.
+    concepts: [word-state-machine, streaming-constant-memory]
+
+  - id: s4
+    title: Count characters
+    objective: >-
+      With -m, print the number of characters in the file, according to the current locale.
+    check: >-
+      Under a UTF-8 locale, the character count for the sample file is 339292, the same as wc
+      under the same locale.
+    concepts: [text-encoding, streaming-constant-memory, differential-testing]
+
+  - id: s5
+    title: Default output
+    objective: >-
+      With no option, print lines, words and bytes together (the same as -l, -w and -c), in that
+      order, followed by the file name.
+    check: >-
+      The sample file gives 7145, 58164 and 342190, laid out like wc's output.
+    concepts: [streaming-constant-memory]
+
+  - id: s6
+    title: Read from standard input
+    objective: >-
+      When no file name is given, read from standard input instead.
+    check: >-
+      Piping the sample file into the program with -l gives 7145.
+    concepts: [process-contract, streaming-constant-memory]

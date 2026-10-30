@@ -48,12 +48,15 @@ export function researchModel(): ChatAnthropic {
   });
 }
 
-/** Haiku 5.5 at high effort: generation runs once per project, so quality matters more than speed. */
+/**
+ * Haiku 5.5 at high effort: generation runs once per project, so quality matters more than speed. Checks for a binary
+ * protocol (hex replies) plus thinking can pass 32K output tokens; Haiku 5.5 allows 128K.
+ */
 export function generateModel(): ChatAnthropic {
   return new ChatAnthropic({
     model: MODELS.generate,
     apiKey: env.anthropicKey,
-    maxTokens: 32000,
+    maxTokens: 64000,
     streaming: true,
     outputConfig: { effort: "high" },
   });

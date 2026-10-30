@@ -92,6 +92,24 @@ export async function readGenerated(slug: string, map: ProjectMap, dir: string =
   return generated;
 }
 
+/**
+ * The live maps plus the ones still in content/staging/<slug>/<slug>.yaml, which the app doesn't load. The generator,
+ * the review page and the check tools use this, so a project can pass its gate before it goes live.
+ */
+export async function readMapsWithStaging(dir: string = env.contentDir): Promise<ProjectMap[]> {
+  const live = await readMaps(dir);
+  const stagingDir = path.join(dir, "staging");
+  const staged: ProjectMap[] = [];
+  for (const slug of await readdir(stagingDir).catch(() => [] as string[])) {
+    const raw = await readFile(path.join(stagingDir, slug, `${slug}.yaml`), "utf8").catch(() => null);
+    if (!raw) continue;
+    const result = ProjectMapSchema.safeParse(parse(raw));
+    if (!result.success) throw new Error(`staging/${slug}: ${z.prettifyError(result.error)}`);
+    if (!live.some((m) => m.project.slug === slug)) staged.push(result.data);
+  }
+  return [...live, ...staged];
+}
+
 /** Upserts the maps (and their generated layers) into the project table, so the database always matches content/. */
 export async function loadMaps(maps: ProjectMap[], db: Db = pool(), dir: string = env.contentDir): Promise<void> {
   for (const map of maps) {

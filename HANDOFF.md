@@ -68,13 +68,37 @@ The original proposal, kept for reference:
 
 ## 5. What exists now (30 Oct, evening; all uncommitted since `c156584`; the old work is in `../no-hands-archive/v0-2026-10-30`, tag `v0-archive`)
 
-Steps 1 to 4 of section 4 are built. Waiting on Abid: his review of the playbooks and the three generated layers (https://claude.ai/artifact/TVT8sJBCyYDtxnnLVLtczB). Not done: the Zerops deploy, and generating the other 18 projects.
+Steps 1 to 4 of section 4 are built, and all 21 projects are live (31 Oct, early). Waiting on Abid: his review of the playbooks and the generated layers (https://claude.ai/artifact/TVT8sJBCyYDtxnnLVLtczB). Not done: the Zerops deploy.
 
 - **Content:**
-  - `content/{wc,json-parser,url-shortener}.yaml`: the reviewed maps (concepts and steps).
+  - `content/<slug>.yaml`: the maps (concepts and steps) for all 21. A new map waits in `content/staging/<slug>/` (the app doesn't load it) until it passes the gate below.
   - `content/playbooks/`: `_rules.md` plus one playbook per type.
-  - `content/generated/<slug>.yaml`: profile, stage 0, step questions, checks; drafts until Abid approves. Made by `npm run generate`. Every check passed on a reference solution (`npm run validate-checks`); the JSON Parser's last step records the two JSON_checker files the current spec disagrees with.
-- **Sandbox:** `app/sandbox/Dockerfile` (one image for Java, Python and Node.js), the Daytona snapshot `thinkaloud-sandbox-1`, and `app/sandbox/runner.py` (detect, then the cli, case-files and http runners). The diff since the last approved review comes from `git diff` in the sandbox, not the GitHub API. Sample repos (public, approved by Abid): `md-abid-hussain/thinkaloud-test-{wc,json-parser,url-shortener}`.
+  - `content/generated/<slug>.yaml`: profile, stage 0, step questions, checks; drafts until Abid approves. Made by `npm run generate`. The JSON Parser's last step records the two JSON_checker files the current spec disagrees with.
+  - `content/reference/<slug>/main.py`: plain Python reference solutions (wc and cut use the real tools; wc, the JSON Parser and the URL Shortener also have test repos).
+  - **The gate for a project:**
+    1. Its map passes `content/check_maps.py`.
+    2. `npm run generate` finishes with no flagged question.
+    3. `npm run validate-checks -- <slug> --dir ../content/reference/<slug> --run "python3 main.py" --local` passes every checked step.
+    4. A wrong program fails every step after setup. The control was `cat` for most projects, a single-client server for the concurrency steps, and an echo server for Redis.
+    5. All 21 were revalidated on the final harness.
+  - **Weak checks for Abid to look at:**
+    - **Rate limiter s3:** the fixed-window burst can straddle a window boundary, about a 1 to 2% flake.
+    - **Static site generator s4:** the escaped-title check relies on CommonMark's backslash escapes, and the leftover-placeholder check assumes `{{ }}`.
+    - **Brainfuck:** checks only the Hello! programs.
+    - **DNS resolver:** one check for the walk from the root and one for the alias; there is no case for a name server without glue or for an alias loop.
+- **Sandbox:** `app/sandbox/Dockerfile` (one image for Java, Python and Node.js), the Daytona snapshot `thinkaloud-sandbox-2`, and `app/sandbox/runner.py`. The runner picks build and run commands (`detect`), then runs one of these check runners:
+  - **cli, case-files:** run the program on test files and compare output or exit codes.
+  - **script:** bash property checks. `<run>` works from any folder, `{tmp}` is a fresh folder per step, and PORT is set.
+  - **http:** with start arguments, per-step settings, slow idle clients and waits.
+  - **socket:** exact bytes to TCP or UDP servers, split messages, several clients with the last one talking first, and restarts.
+  - **client:** a stub server records the request and answers with a list of replies. `{req:A:B}` copies request bytes, so one stub can play a root server, a TLD server and an answer.
+  - **Settings:** each has a `test_value`, which may point at test data as `{fixture:NAME}`.
+  - **Diffs and test repos:** the diff since the last approved review comes from `git diff` in the sandbox, not the GitHub API. Sample repos (public, approved by Abid): `md-abid-hussain/thinkaloud-test-{wc,json-parser,url-shortener}`.
+  - **Where reviews run:**
+    - **The app:** always Daytona, unless `SANDBOX=docker` is set (local development only). There is no fallback to Docker.
+    - **Content gates:** `npm run validate-checks -- … --local` uses local Docker on purpose.
+    - **Recording:** each review logs `review N (step): starting a daytona sandbox` and stores `result.sandbox`.
+    - **For Zerops:** set `DAYTONA_API_KEY` and `DAYTONA_API_URL`, and leave `SANDBOX` unset. The Daytona organisation needs the snapshot `thinkaloud-sandbox-2`. `GET /api/health` should show `"sandbox":{"backend":"daytona","daytonaKey":true}`.
 - **Reviewer:** a Haiku 5.5 sub-agent (`app/lib/review/reviewer.ts`). It never passes a failed check, never asks for later steps, and never fails a step for work outside the repo. Reviews take about 40 to 60 seconds, mostly sandbox start and Maven.
 - **App** (`app/`, Next.js 16.4.3, Postgres in Docker on port 5433):
   - **Flow:** stage 0 (soft), then setup with the GitHub link (the setup review detects the build and run commands, and the learner confirms), then each step. A step is done when its review passed and its questions are answered.
@@ -82,7 +106,7 @@ Steps 1 to 4 of section 4 are built. Waiting on Abid: his review of the playbook
   - **Learn page:** redesigned (Abid chose "chat + progress rail"): a transcript with cards (welcome, stage 0, setup, step, review, complete), a Now strip with the review status, and a progress rail; Chat and Progress tabs below 1000px. Checked at 1440 and 390, light and dark.
   - **Language notes:** the research agent now follows the type playbook; `npm run build-layers` rebuilds all 9.
 - **Checked end to end through the app on Daytona:** setup and step 2 reviews for all three projects (Java with Maven, Python, Node.js).
-- **Checks:** 37 tests. `npm test`, `npm run typecheck` and `npm run lint` pass.
+- **Checks:** 39 tests. `npm test`, `npm run typecheck` and `npm run lint` pass.
 - **Local quirk:** from Abid's machine, some IPv4 connects (Dropbox, codingchallenges.fyi, Daytona's file upload) time out. Scripts set `ipv6first`; the Daytona backend uploads files through a command instead of the SDK's upload.
 - **Model rules** (from the claude-api skill): no `temperature`; set effort explicitly; no forced tool choice on Opus 5.5; **keep turns append-only**, because thinking blocks are bound to the exact prompt (a re-rendered system prompt caused a 400).
 - **Don't test in the browser pane with Abid's cookie.** His chat shares it. Use the API with a fresh guest cookie.

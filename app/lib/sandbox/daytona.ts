@@ -3,7 +3,7 @@ import { env } from "../env";
 import { sh, type Sandbox } from "./sandbox";
 
 /** The snapshot built from app/sandbox/Dockerfile by `npm run sandbox:snapshot`. Bump it when the Dockerfile changes. */
-export const SANDBOX_SNAPSHOT = "thinkaloud-sandbox-1";
+export const SANDBOX_SNAPSHOT = "thinkaloud-sandbox-2";
 
 /** The SDK refuses an endpoint it only finds in .env.local, so both values are passed explicitly. */
 export function daytonaClient(): Daytona {

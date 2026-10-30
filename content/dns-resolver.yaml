@@ -1,0 +1,412 @@
+project:
+  slug: dns-resolver
+  title: Build your own DNS resolver
+  source_url: https://codingchallenges.fyi/challenges/challenge-dns-resolver
+  level: intermediate
+  summary: >-
+    A command-line tool that turns a host name into an IP address by building DNS messages byte
+    by byte, sending them over UDP and decoding the binary replies, and that ends by walking the
+    name tree itself, from a root server down to the server that owns the answer. Building it
+    teaches how a binary protocol is laid out, how a request and its reply find each other with
+    no connection between them, and how the internet's naming system is split across many
+    servers that each know only who to ask next.
+
+concepts:
+  - id: dns-message-format
+    name: "The DNS message: header, flags and sections"
+    covers:
+      - one format for queries and responses
+      - the fixed 12-byte header
+      - the transaction ID
+      - the flags and the response code
+      - the four section counts
+      - the question echoed in the response
+    explanation: |-
+      Every DNS message, question or answer, has the same shape: a fixed 12-byte header, then
+      four sections. The header holds an ID chosen by the client, 16 bits of flags, and four
+      counts saying how many entries the question, answer, authority and additional sections
+      hold. The flags say whether the message is a query or a response (QR), whether recursion
+      is desired and available (RD and RA), whether the answer comes from a server that owns the
+      name (AA) and whether the message was cut short (TC). The last 4 bits are the response
+      code, such as "no error" or "no such name". A query normally carries one question: a name,
+      a type such as A for an IPv4 address, and a class, which is almost always IN, for the
+      internet. The response repeats the question and then fills the other sections. Nothing in
+      the bytes marks where one section ends and the next begins, so the counts are the only
+      map, and a reader that gets one count wrong reads every later byte as the wrong field.
+
+      Real example: dig prints these fields for every lookup. Its header line lists the flags it
+      saw, such as qr rd ra, followed by the four counts, which makes it a handy reference to
+      compare your own parsed header with.
+
+      Common mistake: expecting the answers to start right after the header, and forgetting the
+      question the server echoes first, or never checking the QR flag, so that your own query
+      reflected back would pass as an answer.
+    why_here: >-
+      Step 1 writes a header and a question by hand, and step 3 reads all four sections back from
+      the server's reply.
+    origin: step
+    resources:
+      - title: "RFC 1035, section 4.1: Message format"
+        url: https://www.rfc-editor.org/rfc/rfc1035.html#section-4.1
+      - title: "Implement DNS in a weekend (Julia Evans), part 1: Build a DNS query"
+        url: https://implement-dns.wizardzines.com/book/part_1
+
+  - id: byte-order-bit-fields
+    name: Byte order and bit fields
+    covers:
+      - big-endian network byte order
+      - how a processor stores numbers in memory
+      - packing small fields into one number
+      - shifts and masks
+      - bit numbering in RFC diagrams
+      - reading a hex dump
+    explanation: |-
+      A 16-bit number takes two bytes, and both sides must agree which byte comes first. Network
+      protocols send the most significant byte first, called big-endian or network byte order, so
+      an ID of 22 goes out as the bytes 00 16. Most processors today keep numbers the other way
+      round in memory, so copying a number's memory straight into a packet sends its bytes
+      reversed. Several small fields can also share one number. The DNS flags pack eight fields
+      of 1 to 4 bits each into 16 bits, so you build them by shifting each value to its position
+      and combining the results with OR, and read them back by shifting and keeping only the
+      wanted bits with an AND mask. RFC diagrams number bits from the left, so their bit 0 is the
+      most significant bit, the opposite of how bits are usually counted when shifting.
+
+      Real example: the recursion desired flag is bit 7 in the RFC's diagram, counted from the
+      left, which is bit 8 counted from the right. A query that sets only that flag therefore
+      carries the bytes 01 00 straight after its ID.
+
+      Common mistake: writing numbers in the processor's own byte order, which looks right while
+      every value is 0 and breaks on the first real ID, or counting bit positions from the right
+      while reading a diagram that counts from the left.
+    why_here: >-
+      Step 1 builds the header from 16-bit numbers and packed flags, and its check compares your
+      bytes with a hex sample, where a swapped pair of bytes shows up at once.
+    origin: step
+    resources:
+      - title: "Endianness (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Endianness
+      - title: "Beej's Guide to Network Programming: Byte Order"
+        url: https://beej.us/guide/bgnet/html/#byte-order
+      - title: "Mask (computing) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Mask_(computing)
+
+  - id: domain-names-on-the-wire
+    name: "Domain names on the wire: labels and compression pointers"
+    covers:
+      - length-prefixed labels
+      - the empty root label
+      - limits on label and name length
+      - compression pointers and their offsets
+      - where reading continues after a pointer
+      - pointer loops and offsets out of range
+      - names compared without case
+    explanation: |-
+      A domain name is not sent as text with dots. Each label, the part between two dots, goes
+      out as one length byte followed by that many bytes, and a zero byte ends the name, because
+      the empty label stands for the root of the tree. So dns.google.com is sent as 3 dns 6
+      google 3 com 0. A label is at most 63 bytes long, so the top two bits of a length byte are
+      always 0, and DNS uses that spare room: a byte whose top two bits are both 1 starts a
+      pointer, and the remaining 14 bits of it and the next byte give an offset from the start of
+      the message where the rest of the name is written. Responses use pointers so they don't
+      repeat names, and a name can be a few labels followed by a pointer whose target ends in
+      another pointer. Reading a name therefore means following pointers while remembering where
+      the name started, because the record continues right after the pointer, not after its
+      target. Names are compared without regard to upper or lower case.
+
+      Real example: the answers in a typical response don't spell the queried name out again.
+      Each holds just the two bytes c0 0c, a pointer to offset 12, where the question's name
+      starts right after the 12-byte header. In 2021 researchers disclosed a set of flaws called
+      NAME:WRECK in the DNS code of several network stacks used in millions of devices, and the
+      research centred on how those stacks parsed compressed names.
+
+      Common mistake: following pointers with no limit, so a reply whose pointer points at
+      itself hangs the program, or trusting an offset that lies beyond the end of the message.
+    why_here: >-
+      Step 1 encodes the query's name as labels, and step 3 must decode names in the reply that
+      are partly or wholly pointers.
+    origin: step
+    resources:
+      - title: "RFC 1035, section 4.1.4: Message compression"
+        url: https://www.rfc-editor.org/rfc/rfc1035.html#section-4.1.4
+      - title: "Implement DNS in a weekend (Julia Evans), part 2: Parse the response"
+        url: https://implement-dns.wizardzines.com/book/part_2
+      - title: "RFC 4343: Domain Name System case insensitivity clarification"
+        url: https://www.rfc-editor.org/rfc/rfc4343.html
+
+  - id: udp-request-response
+    name: "UDP exchanges: matching, timeouts and truncation"
+    covers:
+      - datagrams versus a stream
+      - no connection and no delivery guarantee
+      - timeouts and retries
+      - matching a reply by ID, address and port
+      - forged replies and random IDs and ports
+      - the size limit, the TC flag and falling back to TCP
+    explanation: |-
+      DNS normally runs over UDP, where each message is one datagram: it arrives whole or not at
+      all, with no connection to set up and nothing that resends a lost packet. That makes a
+      lookup a single round trip, but it leaves the hard parts to the program. A lost query or
+      reply means waiting forever, unless the program sets a timeout and retries, perhaps with
+      another server. A reply can come from anyone able to send a packet to your port, so a
+      client accepts it only if it comes from the server it asked, arrives on the port it sent
+      from, and carries the same ID and the same question. Size is limited too. Classic DNS
+      allows 512 bytes over UDP, and a server with more to say sends a shortened reply with the
+      TC flag set, so the client asks again over TCP. On TCP each message starts with a 2-byte
+      length, because a stream has no message boundaries of its own. Most resolvers now announce
+      a larger UDP size through an extension called EDNS, commonly 1232 bytes, small enough that
+      packets aren't split into fragments on the way.
+
+      Real example: in 2008 Dan Kaminsky showed that an attacker could race a real server with a
+      flood of forged replies, guessing the 16-bit ID, and quickly poison a busy resolver's cache.
+      The fix shipped almost everywhere was to pick a random source port for every query as
+      well, so a forger has to guess both.
+
+      Common mistake: sending the query and then waiting on the socket with no timeout, so one
+      dropped packet freezes the program, or using a fixed ID and never comparing it on the way
+      back.
+    why_here: >-
+      Step 2 sends the query in one datagram and checks that the reply carries your ID, and step 4
+      sends many queries to servers that may never answer.
+    origin: step
+    resources:
+      - title: "RFC 5452: Measures for making DNS more resilient against forged answers"
+        url: https://www.rfc-editor.org/rfc/rfc5452.html
+      - title: "RFC 7766: DNS transport over TCP"
+        url: https://www.rfc-editor.org/rfc/rfc7766.html
+      - title: "DNS Flag Day 2020: message size and fragmentation"
+        url: https://www.dnsflagday.net/2020/
+
+  - id: resource-records
+    name: "Resource records: type, class, TTL and data"
+    covers:
+      - the shared record layout
+      - record types such as A, AAAA, NS and CNAME
+      - the data length and skipping unknown types
+      - the TTL and caching
+      - aliases and CNAME chains
+      - no such name versus no data
+    explanation: |-
+      Every entry in the answer, authority and additional sections has the same layout: a name, a
+      type, a class, a TTL and a length, followed by that many bytes of data. The type decides
+      how to read the data. An A record holds a 4-byte IPv4 address, an AAAA record a 16-byte IPv6
+      address, an NS record the name of a name server, and a CNAME record the canonical name that
+      an alias stands for. Because the length comes before the data, a reader can skip a type it
+      doesn't understand and still land on the next record. The TTL says how many seconds a record
+      may be kept in a cache, which is why a change to DNS takes a while to be seen everywhere.
+      Two kinds of empty result mean different things: the response code for "no such name",
+      often shown as NXDOMAIN, says the name doesn't exist at all, while a normal response with no
+      answers says the name exists but has no records of that type. A CNAME means "ask again for
+      this other name", and a name that has a CNAME may have no other records.
+
+      Real example: many sites point their www name at a host name of a content delivery network
+      with a CNAME. A resolver follows that alias to the network's own servers, which hand out
+      different addresses in different parts of the world. A bare domain such as example.com
+      can't be a CNAME, because it must also hold its zone's own NS records.
+
+      Common mistake: assuming every answer is an A record and reading 4 bytes of data, which
+      garbles the rest of the parse as soon as a CNAME comes first, or reading the names inside
+      NS and CNAME data without following compression pointers, which they use too.
+    why_here: >-
+      Step 3 reads the answer records with their types and TTLs, and the optional last step
+      follows CNAME records to the address behind an alias.
+    origin: step
+    resources:
+      - title: "RFC 1035, section 3.2: Resource record definitions"
+        url: https://www.rfc-editor.org/rfc/rfc1035.html#section-3.2
+      - title: "RFC 2181: Clarifications to the DNS specification"
+        url: https://www.rfc-editor.org/rfc/rfc2181.html
+      - title: "List of DNS record types (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/List_of_DNS_record_types
+
+  - id: dns-hierarchy
+    name: "The DNS hierarchy: root, top-level and authoritative servers"
+    covers:
+      - the name space as a tree
+      - zones and delegation
+      - root servers and anycast
+      - top-level domain servers
+      - authoritative servers and the AA flag
+      - root hints as the starting point
+    explanation: |-
+      DNS names form a tree that is read from right to left: the root, then a top-level domain
+      such as com, then google, then dns. No server holds the whole tree. It is cut into zones,
+      each served by its own name servers, and a parent zone delegates a child by listing the
+      child's name servers. The root zone lists the servers for every top-level domain, the com
+      servers list the servers for every name registered under com, and google's own servers hold
+      the actual records for dns.google.com. Those last servers are authoritative for the name:
+      their answer is the source of truth, and they mark it with the AA flag. Any lookup can start
+      at the root, so a resolver ships with a short fixed list of root server addresses, called
+      root hints. There are 13 root server names, lettered a to m, but each is served by many
+      machines through anycast, where one address is announced from many places and each packet
+      goes to the nearest one.
+
+      Real example: the 13 root server names are run by 12 independent organisations from more
+      than two thousand instances around the world, so the same root address reached from
+      London and from Tokyo lands on different machines.
+
+      Common mistake: thinking that a root server knows where every name is, or that a top-level
+      domain server holds your records. Each level only knows which servers to ask next.
+    why_here: >-
+      Step 4 starts at a root server instead of a public resolver and walks down the tree one zone
+      at a time.
+    origin: step
+    resources:
+      - title: "RFC 1034: Domain names, concepts and facilities"
+        url: https://www.rfc-editor.org/rfc/rfc1034.html
+      - title: "Root Server Technical Operations Association"
+        url: https://root-servers.org/
+      - title: "Root Servers (IANA)"
+        url: https://www.iana.org/domains/root/servers
+
+  - id: recursive-vs-iterative
+    name: Recursive and iterative resolution
+    covers:
+      - stub resolvers, recursive resolvers and authoritative servers
+      - the RD and RA flags
+      - iterative queries and following referrals yourself
+      - caching along the way
+      - where your own resolver sits
+    explanation: |-
+      There are two ways to ask a DNS server. In a recursive query, with the RD flag set, the
+      client asks for the final answer, and the server does all the work and returns either the
+      address or an error. Public resolvers and the resolver run by your internet provider work
+      this way, and set the RA flag to show that they offer recursion. In an iterative query the
+      server answers only from what it holds itself: the records, if it is authoritative for the
+      name, or otherwise a referral to servers closer to the answer. Root, top-level and
+      authoritative servers answer only iteratively, because doing every client's work would
+      overwhelm them. So a normal lookup has three roles. A stub resolver in your operating
+      system asks one recursive resolver, and that resolver asks the hierarchy iteratively,
+      keeping each answer and each referral in its cache for its TTL, so the next lookup in the
+      same zone skips the root. A resolver that walks from the root is that recursive resolver,
+      only without the cache.
+
+      Real example: dig with its trace option stops relying on a recursive resolver and asks the
+      root, a top-level domain server and an authoritative server itself, printing each referral
+      on the way, which is the same walk the last required step builds.
+
+      Common mistake: expecting a root server to return the address, and treating its referral,
+      a response with no answers and no error, as a failure.
+    why_here: >-
+      Steps 1 to 3 let a public resolver do the recursion for you, and step 4 clears the RD flag
+      and does that work in your own program.
+    origin: step
+    resources:
+      - title: "RFC 1034, section 4.3.1: Queries and responses"
+        url: https://www.rfc-editor.org/rfc/rfc1034.html#section-4.3.1
+      - title: "RFC 9499: DNS terminology"
+        url: https://www.rfc-editor.org/rfc/rfc9499.html
+      - title: "Implement DNS in a weekend (Julia Evans), part 3: Implement our resolver"
+        url: https://implement-dns.wizardzines.com/book/part_3
+
+  - id: referrals-and-glue
+    name: Referrals and glue records
+    covers:
+      - what a referral looks like
+      - the authority and additional sections
+      - glue and the chicken-and-egg problem
+      - name servers without glue
+      - trusting only in-bailiwick records
+      - limits on loops and depth
+    explanation: |-
+      A referral is a response with no answer and no error. Its authority section holds NS
+      records naming the servers for a zone closer to your name, and its additional section may
+      hold their addresses. Those addresses are called glue, and sometimes they are the only way
+      forward. The servers for google.com are named ns1.google.com and so on, so finding the
+      address of ns1.google.com would first need the servers for google.com. Only the parent zone
+      can break that circle, by handing out the address along with the referral. When a name
+      server's name lies in a different zone there may be no glue at all, and the resolver must
+      start a separate lookup for that server's address, then come back to the original
+      question. A careful resolver uses an additional record only if its name falls inside the
+      zone the referring server is responsible for, called in bailiwick, because accepting
+      anything else lets one server plant false addresses for names it doesn't control. And since
+      referrals can loop or chain without end, it caps how many steps one lookup may take.
+
+      Real example: a com server asked about dns.google.com replies with a referral naming four
+      google.com name servers, with an IPv4 and an IPv6 address for each as glue, so the next
+      query can go straight to one of them.
+
+      Common mistake: using the first address in the additional section without checking that it
+      belongs to one of the listed name servers, or treating a referral without glue as a dead
+      end instead of looking up the name server's address first.
+    why_here: >-
+      Step 4 has to read each referral, use its glue when it is there, and resolve a name server
+      on its own when it isn't.
+    origin: step
+    resources:
+      - title: "RFC 9471: DNS glue requirements in referral responses"
+        url: https://www.rfc-editor.org/rfc/rfc9471.html
+      - title: "An Illustrated Guide to the Kaminsky DNS Vulnerability (Steve Friedl)"
+        url: http://unixwiz.net/techtips/iguide-kaminsky-dns-vuln.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project in a language you're comfortable using for network programming, and
+      keep a tool such as dig and a hex dump tool at hand to compare your bytes and answers with.
+    check: >-
+      Your program runs, and dig answers a lookup for a well-known name on your machine.
+    concepts: []
+
+  - id: s1
+    title: Build the query
+    objective: >-
+      Build a DNS query for a host name as raw bytes: a header with a random ID, only the
+      recursion desired flag set, a question count of 1 and the other counts at 0, then a
+      question holding the name as length-prefixed labels, type A and class IN. Let the ID be
+      fixed for testing.
+    check: >-
+      With the ID set to the one the challenge's sample uses, your bytes for dns.google.com match
+      its hex exactly.
+    concepts: [dns-message-format, byte-order-bit-fields, domain-names-on-the-wire]
+
+  - id: s2
+    title: Send it over UDP
+    objective: >-
+      Send the query in one UDP datagram to port 53 of a public recursive resolver, wait for the
+      reply with a timeout, and print its bytes in hex. The server's address and port can be set
+      from outside, with the public resolver as the default, so a test can point the program at
+      a local server.
+    check: >-
+      A reply arrives, its first two bytes equal the ID you sent, and its layout looks like the
+      challenge's sample response.
+    concepts: [udp-request-response]
+
+  - id: s3
+    title: Parse the response
+    objective: >-
+      Decode the reply: the header and its flags, the question, and every record in the answer,
+      authority and additional sections, following compression pointers to rebuild each name with
+      dots. Confirm that the QR flag marks it as a response and that the ID is yours.
+    check: >-
+      For dns.google.com the parsed reply has your ID, one question, two answers and empty
+      authority and additional sections. Each answer has the queried name, type A, class IN, a
+      TTL above zero and one of the two addresses of Google's public resolver.
+    concepts: [dns-message-format, domain-names-on-the-wire, resource-records]
+
+  - id: s4
+    title: Resolve from the root
+    objective: >-
+      Clear the recursion desired flag and resolve the name yourself. Start at a root server,
+      and for each response either return the address from an A record or follow the referral:
+      pick a listed name server, use its glue address if there is one, otherwise resolve that
+      server's own name first, then ask it. Print each server you query. The starting root
+      server's address, and the port used for every query, can be set from outside, with a real
+      root server and port 53 as the defaults, so a sandbox can run the whole walk against local
+      servers.
+    check: >-
+      Resolving dns.google.com prints a root server, then a com server, then one of google.com's
+      own servers, and ends with an address that step 3 also returned. A name whose name servers
+      come without glue resolves too.
+    concepts: [dns-hierarchy, recursive-vs-iterative, referrals-and-glue]
+
+  - id: s5
+    title: Follow CNAME records
+    objective: >-
+      When the answer for a name is a CNAME, resolve the canonical name it points to, and keep
+      going until you reach an address, with a limit so a loop of aliases can't run forever.
+    check: >-
+      A name that is an alias resolves to the address of its canonical name, and the output shows
+      each name in the chain.
+    concepts: [resource-records]
+    optional: true

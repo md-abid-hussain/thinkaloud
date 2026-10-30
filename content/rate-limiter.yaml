@@ -1,0 +1,392 @@
+project:
+  slug: rate-limiter
+  title: Build your own rate limiter
+  source_url: https://codingchallenges.fyi/challenges/challenge-rate-limiter
+  level: intermediate
+  summary: >-
+    A small HTTP service with one open endpoint and one protected endpoint that limits how often
+    each client may call it, built with four algorithms in turn and then shared across several
+    servers. Building it teaches what each algorithm trades between bursts, accuracy and memory,
+    how a service tells a client to slow down, why measuring time is harder than it looks, and why
+    counters shared between servers need atomic updates.
+
+concepts:
+  - id: why-limit-and-who
+    name: Why services limit rates, and who counts as one client
+    covers:
+      - protecting capacity and sharing it fairly
+      - floods, scraping and password guessing
+      - keying a limit by IP address, API key or account
+      - many users behind one address
+      - proxies and the X-Forwarded-For header
+      - one entry per client, and forgetting idle ones
+    explanation: |-
+      A service has a fixed amount of capacity, and without limits one client can use all of it,
+      by accident (a retry loop with no pause) or on purpose (a flood, a scraper, a script
+      guessing passwords). A rate limiter caps how many requests each client may make over time,
+      so a heavy user slows down alone instead of slowing down everyone. The hard part is deciding
+      who one client is. An API key or a signed-in account is the most reliable identity. Without
+      one, the IP address is the usual key, and it is imperfect: a whole office or mobile network
+      can share one public address, and one attacker can spread requests over many addresses.
+      Behind a load balancer or reverse proxy, every request seems to come from the proxy, so the
+      original address travels in the X-Forwarded-For header. Any client can write that header
+      too, so only the entries added by your own proxies can be trusted. Each identity also costs
+      memory, so entries for clients that have gone quiet must be forgotten.
+
+      Real example: a sign-in page limited by IP address slows a password-guessing script to a
+      few attempts a minute, while a public API usually limits each API key, so a customer's
+      quota follows them from any network.
+
+      Common mistake: taking the first address in X-Forwarded-For as the client. The client wrote
+      it, so an attacker changes it on every request and never reaches the limit.
+    why_here: >-
+      Step 2 gives every IP address its own bucket, and every later algorithm keeps its state per
+      client in the same way.
+    origin: step
+    resources:
+      - title: "OWASP API Security Top 10: API4:2023 Unrestricted Resource Consumption"
+        url: https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/
+      - title: "The perils of the \"real\" client IP (Adam Pritchard)"
+        url: https://adam-p.ca/blog/2022/03/x-forwarded-for/
+      - title: "X-Forwarded-For header (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For
+
+  - id: token-bucket
+    name: "The token bucket: capacity, refill and bursts"
+    covers:
+      - capacity as the largest burst
+      - refill rate as the long-run average
+      - computing the refill from elapsed time
+      - keeping fractions of a token
+    explanation: |-
+      Picture a bucket that holds up to a fixed number of tokens and gains new ones at a steady
+      rate. Each request takes one token. With none left, the request is rejected, and tokens that
+      arrive while the bucket is full are thrown away. Two numbers describe it completely. The
+      capacity is the largest burst a client can send at once after being quiet, and the refill
+      rate is the average it can keep up over time. Over any stretch of time, a client gets at
+      most the capacity plus the refill rate times the length of that stretch. The bucket needs
+      no timer. It stores its token count and when it was last updated, and when a request
+      arrives it first adds the tokens earned since then, up to the capacity, and only then
+      decides.
+
+      Real example: Stripe limits each user's request rate with a token bucket, so an
+      integration can send a short burst when it starts work while its average stays capped.
+
+      Common mistake: adding only whole tokens but still moving the last-update time to now. A
+      client that calls every 0.9 seconds against a refill of one token a second earns nothing
+      each time, and stays locked out for good.
+    why_here: >-
+      Step 2 builds one bucket per IP address with a set capacity and refill rate, and expects a
+      burst to pass and most of what follows to be rejected.
+    origin: step
+    resources:
+      - title: "Token bucket (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Token_bucket
+      - title: "Scaling your API with rate limiters (Stripe)"
+        url: https://stripe.com/blog/rate-limiters
+
+  - id: fixed-window
+    name: Fixed windows and the burst at the boundary
+    covers:
+      - windows that start on the clock
+      - one counter per client per window
+      - the burst across a window boundary
+      - every client resetting at the same moment
+      - letting old counters expire
+    explanation: |-
+      A fixed window counter cuts time into windows of equal length that start on the clock, such
+      as each whole minute, and keeps one counter per client for the current window. Each request
+      adds one. Once the counter passes the limit, the rest of the window is rejected, and when
+      the next window starts the count begins again at zero. It is cheap: one number per client,
+      updated with a single increment. The weakness is the boundary. A client can use its whole
+      allowance in the last second of one window and all of it again in the first second of the
+      next, which is twice the limit in two seconds. And because every client's window resets at
+      the same moment, clients that were waiting tend to come back together, so traffic spikes at
+      the start of each window.
+
+      Real example: with a limit of 100 a minute, a script that sends 100 requests at 11:59:59
+      and 100 more at 12:00:00 is never rejected.
+
+      Common mistake: believing the limit holds over any minute. It only holds over the clock's
+      minutes, so the real worst case is twice the limit.
+    why_here: >-
+      Step 3 counts requests in windows that start on the clock, and its expected pattern, a run
+      of successes just after each window starts and then rejections, comes straight from that
+      reset.
+    origin: step
+    resources:
+      - title: "An alternative approach to rate limiting (Figma)"
+        url: https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
+      - title: "Redis INCR: Pattern, rate limiter"
+        url: https://redis.io/docs/latest/commands/incr/#pattern-rate-limiter
+
+  - id: sliding-window-log
+    name: "The sliding window log: exact, at a memory cost"
+    covers:
+      - a timestamp for each request
+      - dropping entries older than the window
+      - memory that grows with the limit and the number of clients
+      - whether rejected requests count
+    explanation: |-
+      The sliding window log keeps, for each client, the time of every recent request. When a
+      request arrives, entries older than one window length are dropped, and the request is
+      allowed only if the entries left, plus this one, stay within the limit. The window moves
+      with every request, so there is no boundary to exploit: over any stretch one window long,
+      the limit holds exactly. The price is memory. The log can hold a full limit's worth of
+      timestamps for every active client, so a generous limit times many clients adds up to a lot
+      of storage, and every check has to prune and count. There is also a policy choice: whether
+      rejected requests go into the log. If they do, a client that keeps hammering stays blocked
+      until it stops.
+
+      Real example: Figma worked out that a log for 10,000 users with a daily limit of 500
+      requests could hold up to five million timestamps, about ten times the memory of the
+      counters it chose instead.
+
+      Common mistake: never removing the log of a client that has gone quiet, so memory grows
+      with every client ever seen.
+    why_here: >-
+      Step 4 keeps a log of timestamps per client and leaves the tests to you, so you decide how
+      pruning, the limit and memory should behave.
+    origin: step
+    resources:
+      - title: "An alternative approach to rate limiting (Figma)"
+        url: https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
+      - title: "Redis sorted sets"
+        url: https://redis.io/docs/latest/develop/data-types/sorted-sets/
+
+  - id: sliding-window-counter
+    name: "The sliding window counter: a weighted estimate"
+    covers:
+      - counts for the current and previous windows
+      - weighting the previous count by how much of it still overlaps
+      - the assumption that requests were spread evenly
+      - how far the estimate can be off
+    explanation: |-
+      The sliding window counter keeps the fixed window's cheap counts, one for the current
+      window and one for the window before, and uses them to estimate how many requests fell in
+      the last full window length. It assumes the previous window's requests were spread evenly.
+      If the current window is a quarter of the way through, three quarters of the previous
+      window still lie inside the sliding window, so the estimate is the current count plus three
+      quarters of the previous count. The request is allowed if that estimate, with this request,
+      stays within the limit. For two numbers per client, the boundary burst is smoothed away. It
+      is an approximation: when the previous window's requests were bunched at its start or its
+      end, the estimate is a little too high or too low.
+
+      Real example: Cloudflare measured this estimate over 400 million requests and found that
+      only 0.003 percent of them were wrongly allowed or limited.
+
+      Common mistake: weighting the previous count by the part of the current window that has
+      passed instead of the part that remains. Old traffic then counts least just after the
+      boundary, where it matters most, and the boundary burst comes back.
+    why_here: >-
+      Step 5 builds this estimate and asks for a test of the calculation, and step 6 shares it
+      between servers because it needs only two numbers per client.
+    origin: step
+    resources:
+      - title: "How we built rate limiting capable of scaling to millions of domains (Cloudflare)"
+        url: https://blog.cloudflare.com/counting-things-a-lot-of-different-things/
+      - title: "An alternative approach to rate limiting (Figma)"
+        url: https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
+
+  - id: http-429
+    name: "Saying no: 429 and Retry-After"
+    covers:
+      - 429 Too Many Requests
+      - the Retry-After header
+      - telling clients their remaining quota
+      - backing off with jitter
+      - 429 versus 503
+    explanation: |-
+      When a client is over its limit, the service answers 429 Too Many Requests. It is a 4xx
+      code because the client sent too much, not because the server failed. A good rejection also
+      says when to try again: the Retry-After header gives a number of seconds or a date. Many
+      APIs also report the limit and how much of it is left on every response, and an IETF draft
+      proposes standard header fields for that. A well-behaved client waits as told instead of
+      retrying at once, and adds a little randomness to the wait so that thousands of clients
+      don't all come back in the same instant. A 503 means something else: the whole service is
+      overloaded, not that this one client is over its share.
+
+      Real example: GitHub's API reports the remaining requests and the reset time in response
+      headers, so a careful client slows down before it is ever refused.
+
+      Common mistake: rejecting with a 500, or with a 200 and an error in the body, or sending
+      429 with no hint of when to retry, so clients guess and retry in a tight loop that makes
+      the overload worse.
+    why_here: >-
+      Step 2 rejects requests that find the bucket empty with 429, and every later algorithm
+      rejects in the same way, so clients need to know what it means and when to come back.
+    origin: step
+    resources:
+      - title: "RFC 6585, section 4: 429 Too Many Requests"
+        url: https://www.rfc-editor.org/rfc/rfc6585.html#section-4
+      - title: "Retry-After header (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Retry-After
+      - title: "RateLimit header fields for HTTP (IETF draft)"
+        url: https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
+
+  - id: time-and-clocks
+    name: "Time and clocks: wall time, elapsed time and skew"
+    covers:
+      - the wall clock versus a monotonic clock
+      - refills and log ages as elapsed time
+      - window boundaries from the time of day
+      - clocks that disagree between servers
+      - a clock and window length that tests can control
+    explanation: |-
+      A program can read two kinds of time. The wall clock gives the time of day, and it can jump:
+      the system corrects it from the network, someone changes it, or a leap second is added. A
+      monotonic clock only counts forward from an arbitrary starting point, so it is the right
+      tool for measuring how long something took, but its value means nothing on another
+      machine. A rate limiter needs both. Refills and the age of log entries are durations and
+      belong on the monotonic clock, while fixed windows start on the wall clock's whole minutes.
+      With several servers, each wall clock is slightly off from the others, so two servers can
+      disagree about which window a request falls in unless they all take the time from one
+      place, such as the shared store. And because every answer depends on the time, a test is
+      only reliable when it can set the current time and use a short window instead of waiting a
+      real minute.
+
+      Real example: on 1 January 2017 a leap second made the wall clock seem to step backwards,
+      a duration measured in Cloudflare's DNS service came out negative, and code that never
+      expected a negative number failed for some lookups.
+
+      Common mistake: measuring elapsed time with the wall clock. When it steps back, a duration
+      turns negative and a bucket loses tokens, and when it jumps forward every bucket refills at
+      once.
+    why_here: >-
+      Step 3 starts windows on the clock, step 5 asks for a test of a calculation that depends on
+      the current time, and in step 6 several servers with their own clocks must agree on one
+      window.
+    origin: step
+    resources:
+      - title: "clock_gettime(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/clock_gettime.2.html
+      - title: "How and why the leap second affected Cloudflare DNS (Cloudflare)"
+        url: https://blog.cloudflare.com/how-and-why-the-leap-second-affected-cloudflare-dns/
+      - title: "Clock synchronization (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Clock_synchronization
+
+  - id: shared-state
+    name: Shared state across servers, and atomic updates
+    covers:
+      - why each server's own memory isn't enough
+      - a shared store and the network trip it adds
+      - lost updates when two servers read, change and write
+      - atomic increments, transactions and scripts run inside the store
+      - keys that expire on their own
+      - what to do when the store is down
+    explanation: |-
+      With one server, the limiter's counts live in its memory. Run two servers behind a load
+      balancer and each one counts only the requests that reached it, so a client gets about
+      twice the limit, and more with every server added. The fix is a shared store, such as
+      Redis, that every server reads and updates. Now each check costs a network round trip, and
+      two servers can handle the same client's requests at the same moment. If each one reads the
+      count, adds one and writes it back, both can read the same value, one update is lost, and
+      extra requests get through. The read and the update must happen as one atomic step inside
+      the store: an atomic increment, a transaction, or a small script the store runs on its own.
+      Counts should expire by themselves so the store doesn't fill with idle clients, and you
+      have to decide in advance what happens when the store can't be reached: let every request
+      through, or reject them all.
+
+      Real example: Figma found that its first limiter, a token bucket kept in Redis, could be
+      too lenient, because two servers could read the same token count before either wrote it
+      back.
+
+      Common mistake: testing with one client that sends requests one after another, which never
+      shows the race. It only appears when several servers handle the same client at once.
+    why_here: >-
+      Step 6 runs two or more servers that must enforce one limit together by sharing the
+      sliding window counter through a store.
+    origin: step
+    resources:
+      - title: "Redis INCR: Pattern, rate limiter"
+        url: https://redis.io/docs/latest/commands/incr/#pattern-rate-limiter
+      - title: "Redis transactions"
+        url: https://redis.io/docs/latest/develop/using-commands/transactions/
+      - title: "Race condition (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Race_condition
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project for a small web service that you can run locally, and have a way to send
+      it single requests and fast bursts of requests, such as curl and a load-testing tool.
+    check: >-
+      The service starts and answers a request.
+    concepts: []
+
+  - id: s1
+    title: Two endpoints
+    objective: >-
+      Serve two endpoints that answer GET with any text: /limited, which later steps protect, and
+      /unlimited, which stays open. Listen on the port given in the PORT environment variable,
+      and use 8080 when it isn't set.
+    check: >-
+      A GET to /limited and a GET to /unlimited each return 200 with a body.
+    concepts: []
+
+  - id: s2
+    title: Token bucket
+    objective: >-
+      Protect /limited with a token bucket for each client IP address, holding at most 10 tokens
+      and refilled at 1 token a second, with tokens beyond the capacity thrown away. A request
+      that finds its bucket empty gets 429, and /unlimited is never limited. Make the capacity
+      and the refill rate settable, for example through environment variables, so a test can use
+      small values.
+    check: >-
+      A fast burst of requests from one client gets roughly the first 10 through and 429 for the
+      rest. After a short wait a new request succeeds again, and /unlimited answers 200
+      throughout.
+    concepts: [token-bucket, why-limit-and-who, http-429]
+
+  - id: s3
+    title: Fixed window counter
+    objective: >-
+      Replace the bucket with a fixed window counter: windows of a set length that start on the
+      clock, so a 60-second window starts on each whole minute, a count per client for the
+      current window, and 429 once the count passes the threshold. Make the window length and
+      the threshold settable, so a test can use a window of a few seconds.
+    check: >-
+      Under steady load from one client, each window begins with a run of successes up to the
+      threshold, followed by 429 until the next window starts.
+    concepts: [fixed-window, time-and-clocks]
+
+  - id: s4
+    title: Sliding window log
+    objective: >-
+      Use a sliding window log instead: for each client, keep the time of each request, drop
+      entries older than one window, and answer 429 when this request would take the count past
+      the threshold. The window length and threshold stay settable. The tests are yours to
+      design.
+    check: >-
+      Within one window, requests up to the threshold succeed and the next one gets 429. As soon
+      as the oldest request is more than a window old, a new one succeeds, with no reset at fixed
+      times.
+    concepts: [sliding-window-log]
+
+  - id: s5
+    title: Sliding window counter
+    objective: >-
+      Use a sliding window counter: keep counts for the current and previous fixed windows,
+      estimate the requests in the last window length as the current count plus the previous
+      count weighted by the part of the previous window that still overlaps it, and answer 429
+      when this request would take the estimate past the threshold. Write a test for the
+      calculation itself.
+    check: >-
+      A test with chosen counts and a chosen position in the current window gets the expected
+      estimate without waiting on the real clock. Over HTTP, a burst past the threshold gets 429,
+      and requests are let through again gradually as the window slides, not all at once at a
+      window boundary.
+    concepts: [sliding-window-counter, time-and-clocks]
+
+  - id: s6
+    title: Distributed rate limiting
+    objective: >-
+      Run two or more instances of the service on different ports that share the sliding window
+      counter's state through a store such as Redis, so together they enforce one limit per
+      client. Each instance takes its port from PORT and the store's address from its settings,
+      for example an environment variable.
+    check: >-
+      With a short window, using up a client's whole limit quickly through one instance makes
+      that client's next request to another instance get 429.
+    concepts: [shared-state, time-and-clocks]

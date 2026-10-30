@@ -50,6 +50,21 @@ export async function prepare(box: Sandbox, repoUrl: string, sha?: string | null
   return clone.output.trim().split("\n").at(-1)!;
 }
 
+/**
+ * Puts local files (a reference solution, or nothing when the reference is a real tool) where a clone would go, as one
+ * commit, so the same build, check and diff steps run on them. Used by validate-checks, never for learners.
+ */
+export async function prepareLocal(box: Sandbox, files: { path: string; content: string | Buffer }[]): Promise<string> {
+  const runner = await readFile(path.resolve(process.cwd(), "sandbox", "runner.py"), "utf8");
+  await box.upload([{ path: RUNNER, content: runner }, ...files.map((f) => ({ path: `${REPO}/${f.path}`, content: f.content }))]);
+  const init = await box.exec(
+    `mkdir -p ${REPO} && cd ${REPO} && git init -q && git add -A && git -c user.email=ref@thinkaloud -c user.name=reference commit -q --allow-empty -m reference && git rev-parse HEAD`,
+    { timeoutSec: 60 },
+  );
+  if (init.exitCode !== 0) throw new Error(`couldn't set up the reference: ${tail(init.output, 600)}`);
+  return init.output.trim().split("\n").at(-1)!;
+}
+
 export async function detectBuild(box: Sandbox): Promise<BuildPlan> {
   const result = await box.exec(`python3 ${RUNNER} detect ${REPO}`, { timeoutSec: 60 });
   return parseMark<BuildPlan>(result.output);
@@ -83,7 +98,10 @@ export async function runCheck(box: Sandbox, generated: Generated, stepId: strin
     fixtures: check || stepId === "s0" ? generated.profile.fixtures : [],
     fixtures_dir: "/work/fixtures",
     check,
-    env: Object.fromEntries(generated.profile.contract.settings.map((s) => [s.name, ""]).filter(([name]) => name !== "PORT" && name !== "BASE_URL")),
+    // A setting without a test value stays unset, so the program uses its own default.
+    env: Object.fromEntries(
+      generated.profile.contract.settings.flatMap((s) => (s.test_value != null && s.name !== "PORT" && s.name !== "BASE_URL" ? [[s.name, s.test_value]] : [])),
+    ),
     allowed_mismatches: (check && "dir" in check ? check.allowed_mismatches : undefined) ?? [],
   };
   await box.upload([{ path: "/work/spec.json", content: JSON.stringify(spec) }]);

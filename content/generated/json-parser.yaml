@@ -25,10 +25,59 @@ profile:
       content: null
       purpose: The page's own valid and invalid files for steps 1 to 4, in one folder per step, each with its expected exit
         code.
+      files:
+        - tests/step4/valid2.json
+        - tests/step4/invalid.json
+        - tests/step4/valid.json
+        - tests/step3/invalid.json
+        - tests/step3/valid.json
+        - tests/step2/valid2.json
+        - tests/step2/invalid.json
+        - tests/step2/valid.json
+        - tests/step2/invalid2.json
+        - tests/step1/invalid.json
+        - tests/step1/valid.json
     - name: test
       source: http://www.json.org/JSON_checker/test.zip
       content: null
       purpose: The public JSON_checker suite of pass and fail files for the full check in step 5.
+      files:
+        - test/fail1.json
+        - test/fail10.json
+        - test/fail11.json
+        - test/fail12.json
+        - test/fail13.json
+        - test/fail14.json
+        - test/fail15.json
+        - test/fail16.json
+        - test/fail17.json
+        - test/fail18.json
+        - test/fail19.json
+        - test/fail2.json
+        - test/fail20.json
+        - test/fail21.json
+        - test/fail22.json
+        - test/fail23.json
+        - test/fail24.json
+        - test/fail25.json
+        - test/fail26.json
+        - test/fail27.json
+        - test/fail28.json
+        - test/fail29.json
+        - test/fail3.json
+        - test/fail30.json
+        - test/fail31.json
+        - test/fail32.json
+        - test/fail33.json
+        - test/fail4.json
+        - test/fail5.json
+        - test/fail6.json
+        - test/fail7.json
+        - test/fail8.json
+        - test/fail9.json
+        - test/pass1.json
+        - test/pass2.json
+        - test/pass3.json
   steps:
     - step: s0
       check: auto

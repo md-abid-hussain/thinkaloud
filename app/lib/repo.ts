@@ -53,6 +53,8 @@ export type ReviewResult = {
   check: CheckResult;
   diffStat: string;
   plan: { language: string | null; build: string | null; run: string | null; notes: string[] } | null;
+  /** Which backend ran it: daytona, or docker in local development. */
+  sandbox?: string;
 };
 
 export type Review = {

@@ -6,9 +6,9 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parse } from "yaml";
-import { readMaps, type ProjectMap } from "../lib/content";
+import { readMapsWithStaging, type ProjectMap } from "../lib/content";
 import { env } from "../lib/env";
-import type { Generated } from "../lib/gen/schema";
+import type { CaseFilesChecks, ClientChecks, CliChecks, Generated, HttpChecks, ScriptChecks, SocketChecks } from "../lib/gen/schema";
 import { readPlaybooks } from "../lib/gen/sources";
 
 const esc = (s: unknown) =>
@@ -25,7 +25,60 @@ const PROJECTS_BY_TYPE: Record<string, string> = {
   interactive: "none of the 21 (Pong, Tetris, editor)",
 };
 
-function cliCheck(c: Extract<Generated["checks"][number], { cases: unknown }>): string {
+type CliCheck = CliChecks[number];
+type CaseFilesCheck = CaseFilesChecks[number];
+type ScriptCheck = ScriptChecks[number];
+type HttpCheck = HttpChecks[number];
+type SocketCheck = SocketChecks[number];
+type ClientCheck = ClientChecks[number];
+
+const fixtureNames = (s: string) => s.replace(/\{fixture:([^}]+)\}/g, "$1");
+
+/** How a server is started for a step: its arguments, its own settings, and whether it restarts. */
+function serverNotes(c: { start_args?: string[]; env?: { name: string; value: string }[] }): string {
+  const notes = [
+    ...(c.start_args?.length ? [`Started as <code>&lt;run&gt; ${esc(c.start_args.map(fixtureNames).join(" "))}</code>.`] : []),
+    ...(c.env?.length ? [`With ${c.env.map((e) => `<code>${esc(e.name)}=${esc(e.value)}</code>`).join(", ")}.`] : []),
+  ];
+  return notes.length ? `<li class="note">${notes.join(" ")}</li>` : "";
+}
+
+function socketCheck(c: SocketCheck): string {
+  return (
+    serverNotes(c) +
+    c.conversations
+      .map((v) => {
+        const how = [
+          v.transport.toUpperCase(),
+          ...(v.clients > 1 ? [`${v.clients} clients at once`] : []),
+          ...(v.restart_before ? ["after a restart"] : []),
+        ].join(", ");
+        const lines = v.messages
+          .map((m) => `${m.wait_ms ? `wait ${m.wait_ms} ms, ` : ""}send <code>${esc(JSON.stringify(m.send))}</code>${m.split ? " in two parts" : ""}${m.expect ? ` → ${m.compare === "exact" ? "" : "contains "}<code>${esc(JSON.stringify(m.expect))}</code>` : ""}`)
+          .join("<br>");
+        return `<li><span class="cname">${esc(v.name)}</span><span class="muted">${esc(how)}</span><br>${lines}</li>`;
+      })
+      .join("")
+  );
+}
+
+function clientCheck(c: ClientCheck): string {
+  return c.commands
+    .map((k) => {
+      const expects = [
+        ...(k.expect_exit !== null ? [`exit ${k.expect_exit}`] : []),
+        ...k.received_contains.map((t) => `sends <code>${esc(JSON.stringify(t))}</code>`),
+        ...k.received_hex_contains.map((t) => `sends bytes <code>${esc(t)}</code>`),
+        ...k.stdout_contains.map((t) => `prints <code>${esc(t)}</code>`),
+        ...k.output_contains.map((t) => `shows <code>${esc(t)}</code>`),
+      ];
+      const replies = k.replies.map((r) => (k.reply_hex ? `hex <code>${esc(r)}</code>` : `<code>${esc(JSON.stringify(r))}</code>`)).join(", then ");
+      return `<li><span class="cname">${esc(k.name)}</span><code>${esc(fixtureNames(k.run))}</code> ${expects.join(" · ")}<br><span class="muted">The ${esc(k.transport.toUpperCase())} stub replies ${replies}</span></li>`;
+    })
+    .join("");
+}
+
+function cliCheck(c: CliCheck): string {
   return c.cases
     .map((k) => {
       const cmd = (args: string[]) => args.map((a) => a.replace(/\{fixture:([^}]+)\}/g, "$1")).join(" ");
@@ -38,16 +91,32 @@ function cliCheck(c: Extract<Generated["checks"][number], { cases: unknown }>): 
     .join("");
 }
 
-function caseFilesCheck(c: Extract<Generated["checks"][number], { dir: string }>): string {
+function caseFilesCheck(c: CaseFilesCheck): string {
   const allowed = (c as { allowed_mismatches?: string[] }).allowed_mismatches ?? [];
   return `<li><span class="cname">every file in <code>${esc(c.dir)}</code></span><code>&lt;run&gt; FILE</code> names starting <code>${esc(c.valid_prefix)}</code> exit ${c.valid_exit}, <code>${esc(c.invalid_prefix)}</code> exit ${c.invalid_exit}${
     allowed.length ? `<br><span class="muted">Either answer allowed for ${allowed.map((a) => `<code>${esc(a)}</code>`).join(", ")}: the current spec (checked with an independent parser) disagrees with this suite.</span>` : ""
   }</li>`;
 }
 
-function httpCheck(c: Extract<Generated["checks"][number], { requests: unknown }>): string {
+function scriptCheck(c: ScriptCheck): string {
+  return c.commands
+    .map((k) => {
+      const expects = [
+        ...(k.expect_exit !== null ? [`exit ${k.expect_exit}`] : []),
+        ...k.stdout_contains.map((t) => `prints <code>${esc(t)}</code>`),
+        ...k.stdout_not_contains.map((t) => `never prints <code>${esc(t)}</code>`),
+      ];
+      const cmd = k.run.replace(/\{fixture:([^}]+)\}/g, "$1");
+      return `<li><span class="cname">${esc(k.name)}</span><code>${k.stdin ? `${esc(k.stdin)} → ` : ""}${esc(cmd)}</code> ${expects.join(" · ")}</li>`;
+    })
+    .join("");
+}
+
+function httpCheck(c: HttpCheck): string {
   return (
+    serverNotes(c) +
     (c.restart_before ? `<li class="note">The service restarts first.</li>` : "") +
+    (c.idle_clients ? `<li class="note">${c.idle_clients} slow clients stay connected, half a request each, while these run.</li>` : "") +
     c.requests
       .map((r) => {
         const expects = [
@@ -57,7 +126,7 @@ function httpCheck(c: Extract<Generated["checks"][number], { requests: unknown }
           ...r.expect_json_equals.map((e) => `<code>${esc(e.field)}</code> = <code>${esc(e.value)}</code>`),
           ...(r.expect_body_contains ? [`body has <code>${esc(r.expect_body_contains)}</code>`] : []),
         ];
-        return `<li><span class="cname">${esc(r.name)}</span><code>${esc(r.method)} ${esc(r.path)}${r.json_body ? ` ${esc(r.json_body)}` : ""}</code> ${expects.join(" · ")}</li>`;
+        return `<li><span class="cname">${esc(r.name)}</span>${r.wait_ms ? `<span class="muted">after ${r.wait_ms} ms</span> ` : ""}<code>${esc(r.method)} ${esc(r.path)}${r.json_body ? ` ${esc(r.json_body)}` : ""}</code> ${expects.join(" · ")}</li>`;
       })
       .join("")
   );
@@ -83,7 +152,19 @@ function project(map: ProjectMap, g: Generated, typeNames: Map<string, string>):
       const check = checksByStep.get(s.id);
       const checkHtml = !check
         ? ""
-        : `<ul class="checks">${"cases" in check ? cliCheck(check) : "dir" in check ? caseFilesCheck(check) : httpCheck(check)}</ul>`;
+        : `<ul class="checks">${
+            g.runner === "cli"
+              ? cliCheck(check as CliCheck)
+              : g.runner === "case-files"
+                ? caseFilesCheck(check as CaseFilesCheck)
+                : g.runner === "script"
+                  ? scriptCheck(check as ScriptCheck)
+                  : g.runner === "socket"
+                    ? socketCheck(check as SocketCheck)
+                    : g.runner === "client"
+                      ? clientCheck(check as ClientCheck)
+                      : httpCheck(check as HttpCheck)
+          }</ul>`;
       return `<section class="step">
   <div class="step-h"><span class="label">${esc(s.id)}${s.optional ? " · optional" : ""}</span><h4>${esc(s.title)}</h4>
   <span class="pill ${esc(prof?.check)}">${esc(prof?.check ?? "-")}</span></div>
@@ -113,7 +194,7 @@ function project(map: ProjectMap, g: Generated, typeNames: Map<string, string>):
 <dl class="rows">
   <dt>Runs as</dt><dd>${esc(p.runs_as)} · checked by the <b>${esc(g.runner)}</b> runner</dd>
   <dt>Contract</dt><dd><code>${esc(p.contract.run)}</code><br>${esc(p.contract.input)}<br>${esc(p.contract.output)}</dd>
-  <dt>Settings</dt><dd>${p.contract.settings.length ? p.contract.settings.map((s) => `<code>${esc(s.name)}</code> ${esc(s.purpose)}`).join("<br>") : `<span class="muted">none</span>`}</dd>
+  <dt>Settings</dt><dd>${p.contract.settings.length ? p.contract.settings.map((s) => `<code>${esc(s.name)}</code> ${esc(s.purpose)}${s.test_value != null ? ` <span class="muted">(checks use <code>${esc(s.test_value)}</code>)</span>` : ""}`).join("<br>") : `<span class="muted">none</span>`}</dd>
   <dt>Right answer</dt><dd>${esc(p.oracle)}${p.reference_tool ? ` · compared with the real <code>${esc(p.reference_tool)}</code>` : ""}</dd>
   <dt>Test files</dt><dd><ul class="plain">${fixtures}</ul></dd>
 </dl></div>
@@ -197,7 +278,7 @@ s{color:var(--muted)}
 
 async function main() {
   const slugs = process.argv.slice(2);
-  const maps = await readMaps(env.contentDir);
+  const maps = await readMapsWithStaging(env.contentDir);
   const { playbooks } = await readPlaybooks(env.contentDir);
   const typeNames = new Map([...playbooks.values()].map((p) => [p.id as string, p.name]));
   const gens: Generated[] = [];

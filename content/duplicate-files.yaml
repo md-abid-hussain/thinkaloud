@@ -1,0 +1,418 @@
+project:
+  slug: duplicate-files
+  title: Build your own duplicate file finder
+  source_url: https://codingchallenges.fyi/challenges/challenge-duplicate-files
+  level: intermediate
+  summary: >-
+    A command-line tool that walks a directory tree, finds files whose contents are identical,
+    and offers to delete the extra copies. Building it teaches how to narrow a huge set of
+    candidates with checks that grow from cheap to costly, what a content hash can and can't
+    prove, how to walk a real file system full of links and errors, and how to delete files
+    without ever losing the only copy.
+
+concepts:
+  - id: staged-filtering
+    name: Narrowing candidates from cheap checks to costly ones
+    covers:
+      - a cheap necessary test before a costly sufficient one
+      - size comes from metadata, without opening the file
+      - only groups of two or more go on to the next stage
+      - a hash of the first block as an extra stage
+      - empty files, which are all identical
+      - cost measured in bytes read from disk
+    explanation: |-
+      Two files are duplicates only if every test of sameness passes, so a duplicate finder can
+      run its tests in order of cost and drop a file the moment one fails. Size is almost free:
+      the file system already stores it, so no file is opened. A file whose size no other file
+      shares can't have a duplicate and leaves right there. Only files that share a size get
+      hashed, and only files that share a hash get compared byte by byte. Each early stage is a
+      necessary condition that clears most of the field, and only the last one, the full
+      compare, is sufficient on its own. The real cost of the program is the number of bytes it
+      reads, so the order of the stages decides whether a scan takes seconds or hours. One edge
+      case falls out of the first stage: every empty file has the same size and the same
+      content, so they form one large group of genuine duplicates that is rarely worth
+      reporting.
+
+      Real example: fdupes adds a stage between size and the full hash. It first hashes only
+      the first few kilobytes of each candidate, because two large files of the same size, such
+      as two videos, usually differ near the start, and that spares it reading both to the end.
+
+      Common mistake: hashing every file in the tree before looking at sizes. The answer is
+      right, but the tool reads every byte of a photo library to find a handful of copies that
+      the size check alone would have narrowed to a few dozen candidates.
+    why_here: >-
+      Steps 2, 3 and 4 are exactly these stages, and the page's test files are made so that size
+      alone can't decide: many random files of one size share a group until the hash splits
+      them. The minimum size in step 5 is one more cheap filter in front of them all.
+    origin: step
+    resources:
+      - title: "fdupes (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Fdupes
+      - title: "rmlint Developer's Guide: Optimizations"
+        url: https://rmlint.readthedocs.io/en/latest/developers.html#optimizations
+
+  - id: content-hashing
+    name: Content hashes and collisions
+    covers:
+      - a short, fixed-size fingerprint of any input
+      - equal files always give equal hashes, but not the reverse
+      - the pigeonhole principle
+      - accidental collisions and the birthday bound
+      - collisions made on purpose, as for MD5 and SHA-1
+      - when cryptographic strength matters and when it doesn't
+    explanation: |-
+      A hash function turns input of any length into a short value of fixed size, such as the
+      128 bits of MD5. The same bytes always give the same hash, so different hashes prove that
+      two files differ. The reverse doesn't hold. There are far more possible files than
+      possible hashes, so some different files must share one. By chance this is extremely
+      rare: the birthday bound says collisions only become likely after about the square root
+      of the number of possible hash values, which for 128 bits means billions of billions of
+      files. Collisions made on purpose are another matter. Since 2004 anyone can make two
+      different files with the same MD5, and in 2017 the same was shown for SHA-1. Whether that
+      matters depends on what happens after the hash. If a byte-by-byte compare confirms every
+      match, the hash only needs to be fast and spread files evenly, and even a
+      non-cryptographic hash such as xxHash does the job. If the hash is the final word, an
+      attacker can plant a file that looks like a copy of another, so it needs a hash with no
+      known collisions, such as SHA-256.
+
+      Real example: the backup tool restic stores every piece of content under its SHA-256 hash
+      and never compares bytes, so identical data is kept once. It depends on collision
+      resistance in a way that a duplicate finder with a final compare doesn't.
+
+      Common mistake: treating equal hashes as proof and deleting a file on that alone, or the
+      reverse, paying for a slow cryptographic hash for safety when a full compare follows
+      anyway.
+    why_here: >-
+      Step 3 replaces sizes with MD5 hashes and can only call the result probable duplicates,
+      and step 4 exists because a matching hash is strong evidence but not proof.
+    origin: step
+    resources:
+      - title: "RFC 6151: Updated Security Considerations for the MD5 Message-Digest and HMAC-MD5 Algorithms"
+        url: https://www.rfc-editor.org/rfc/rfc6151.html
+      - title: "Google Online Security Blog: Announcing the first SHA1 collision"
+        url: https://security.googleblog.com/2017/02/announcing-first-sha1-collision.html
+      - title: "Birthday attack (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Birthday_attack
+
+  - id: grouping-by-key
+    name: Grouping records by a key with a hash map
+    covers:
+      - one pass instead of comparing every pair
+      - a map from each key to a list of records
+      - keeping only groups with more than one member
+      - refining groups with a finer key, such as size and then hash
+      - memory of one entry per file
+      - groups come out in no fixed order
+    explanation: |-
+      Finding equal items by comparing each one with every other takes a number of comparisons
+      that grows with the square of the count. A thousand files make about half a million
+      pairs, and a million files make about half a trillion. Grouping avoids that. Choose a key
+      that equal items must share, such as the size, and keep a map from each key to the list
+      of items with that key. One pass, with one quick lookup per item, files everything into
+      its group, and any group with two or more members holds the candidates. The next stage
+      groups again inside each group with a finer key, so in effect the key becomes size and
+      hash together. The map holds one entry per file, which is fine for millions of paths but
+      worth knowing. A hash map keeps no useful order, so sort the groups before printing if
+      you want the same output on every run.
+
+      Real example: finding repeated customers in a mailing list by grouping on the email
+      address, lower-cased first so the same address typed in different case lands in the same
+      group.
+
+      Common mistake: a double loop that compares every file with every other one. It finishes
+      instantly on a test folder and never finishes on a home directory.
+    why_here: >-
+      Step 2 groups files by size and step 3 by hash, and each report is simply the groups that
+      have more than one member.
+    origin: step
+    resources:
+      - title: "Hash table (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Hash_table
+      - title: "Algorithms, Lecture 5: Hash Tables (Jeff Erickson)"
+        url: https://jeffe.cs.illinois.edu/teaching/algorithms/notes/05-hashing.pdf
+
+  - id: directory-traversal
+    name: Walking a directory tree that isn't quite a tree
+    covers:
+      - depth-first walk with recursion or an explicit stack
+      - regular files, directories, links and special files
+      - symbolic links and cycles
+      - remembering visited directories by device and inode
+      - unreadable entries, reported without stopping the walk
+      - paths relative to the starting directory
+    explanation: |-
+      A directory holds entries, and each entry is a regular file, another directory, a
+      symbolic link, or something special such as a device or a named pipe. Walking the tree
+      means listing a directory, collecting its files and going into its subdirectories, either
+      by recursion or with an explicit stack of directories still to visit, which copes with
+      very deep trees. Symbolic links turn the tree into a graph. A link to a parent directory,
+      followed blindly, gives an endless loop, and a link to a file shows up as a duplicate of
+      its own target. The safe default is not to follow links at all. A walker that does follow
+      them remembers each directory it has entered by its device and inode numbers, which stay
+      the same however the directory was reached, and skips any it has already seen. Real trees
+      also hold directories you aren't allowed to read and files that vanish mid-walk. Each of
+      those is reported on standard error, and the walk carries on. Special files are skipped,
+      because reading a device or a named pipe can return endless data or wait forever.
+
+      Real example: find with -L follows symbolic links and reports a loop when a link leads
+      back to a directory it is already inside, and the fts routines that many Unix tools use
+      to walk trees flag such a directory as a cycle instead of entering it.
+
+      Common mistake: following every link and then hanging on a loop, or stopping the whole
+      scan at the first permission denied error.
+    why_here: >-
+      Step 1 lists every file under the given directory at any depth, and the optional going
+      further step asks you to handle symbolic links.
+    origin: step
+    resources:
+      - title: "fts(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/fts.3.html
+      - title: "symlink(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/symlink.7.html
+      - title: "POSIX: find, find files"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/find.html
+
+  - id: chunked-reading
+    name: Reading large files in fixed-size chunks
+    covers:
+      - constant memory for a file of any size
+      - feeding a hash one chunk at a time
+      - comparing two files chunk by chunk and stopping at the first difference
+      - short reads
+      - chunk size against the number of reads
+      - seek thrash on spinning disks
+    explanation: |-
+      A file can be far bigger than memory, so a careful program never loads one whole. It
+      reads a buffer of fixed size, from a few kilobytes up to a megabyte or so, uses it, and
+      reuses the same buffer for the next read. Hash functions are built for this. MD5 and the
+      SHA family keep a small internal state and absorb their input block by block, so feeding
+      a file in chunks gives exactly the hash of the whole file. Comparing two files works the
+      same way: read a chunk from each, compare them, and stop at the first difference, which
+      for most different files comes early. A read can return fewer bytes than were asked for
+      even before the end of the file, so the loop must use the count it actually got. Chunk
+      size is a trade-off: tiny chunks mean a great many system calls, and huge ones waste
+      memory. On a spinning disk, switching between two files after every small chunk makes the
+      head jump back and forth, so a compare benefits from larger chunks.
+
+      Real example: sha256sum hashes a disk image of many gigabytes in a small, fixed amount of
+      memory, and cmp reports where two large files first differ without reading the rest.
+
+      Common mistake: reading each file into memory in one go. It works on the page's tiny test
+      files and runs out of memory on the first video or virtual machine image.
+    why_here: >-
+      Step 3 hashes whole files and step 4 compares them byte by byte, and both have to work on
+      files far bigger than the test data.
+    origin: beyond
+    resources:
+      - title: "read(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/read.2.html
+      - title: "Merkle-Damgard construction (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Merkle%E2%80%93Damg%C3%A5rd_construction
+      - title: "POSIX: cmp, compare two files"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cmp.html
+
+  - id: hash-cache
+    name: Caching hashes and knowing when they're stale
+    covers:
+      - what the cache is keyed by
+      - size and times as a cheap change detector
+      - timestamp resolution and changes within the same tick
+      - tools that set a modification time back on purpose
+      - entries for files that no longer exist
+      - trusting metadata against reading the content again
+    explanation: |-
+      Hashing is the costly stage, so a tool run again and again over the same tree can keep
+      the hashes from earlier runs, in memory or in a small database. The hard part is knowing
+      when a saved hash no longer describes the file. Reading the file to check would cost as
+      much as hashing it, so a cache stores cheap metadata next to each hash, such as the size,
+      the modification time, the status change time and the inode, and trusts the hash only
+      while all of them still match. That check can be fooled. A file rewritten within the same
+      timestamp tick in which its hash was taken keeps the same time, some file systems record
+      times only to the second or even to two seconds, and copying tools can set a file's
+      modification time back on purpose. On Unix systems the status change time is harder to
+      fool, because the kernel updates it on every change and programs can't set it. Entries
+      for files that were deleted or renamed must be pruned, or the cache grows forever.
+
+      Real example: Git's index keeps each tracked file's size, times and inode so a status
+      check can skip unchanged files, and it treats a file whose time matches the moment the
+      index was written as possibly changed, a case its documentation calls racy. fdupes reuses
+      a cached hash only when the path, inode, size and both times all still match.
+
+      Common mistake: keying the cache by path alone, so an edited file keeps its old hash and
+      is reported as a copy of a file it no longer matches.
+    why_here: >-
+      Step 3 suggests keeping hashes in memory or in a local database, and asks you to think
+      about how you'd know a saved hash is still correct before you rely on it.
+    origin: step
+    resources:
+      - title: "Git documentation: Use of index and Racy Git problem"
+        url: https://git-scm.com/docs/racy-git
+      - title: "rsync(1) manual page (the quick check algorithm)"
+        url: https://download.samba.org/pub/rsync/rsync.1
+
+  - id: file-identity
+    name: "Paths, inodes and links: when two files are one"
+    covers:
+      - a directory entry is a name that points at an inode
+      - hard links, several names for one file
+      - device and inode number as a file's identity
+      - the link count
+      - a symbolic link is a separate file that holds a path
+      - same file against same content
+    explanation: |-
+      A path isn't a file. A directory entry is only a name that points at an inode, the record
+      that holds the file's size, times, permissions and the location of its data. A hard link
+      is a second name for the same inode, in the same directory or another one on that file
+      system, and the inode counts how many names it has. Two paths with the same device and
+      inode numbers are the same file, not two copies: their bytes are equal because there is
+      only one set of bytes. A symbolic link is different. It is a small file of its own whose
+      content is a path, and it breaks when its target goes away. A duplicate finder has to tell
+      same content apart from same file. Removing one name of a hard-linked file frees no space
+      at all, and deleting the target of a symbolic link while keeping the link loses the data.
+
+      Real example: snapshot backup tools such as rsnapshot hard-link every unchanged file to
+      the previous snapshot, so fifty snapshots may hold fifty names for a file and one copy of
+      its data. A naive duplicate finder reports them all and promises space that deleting them
+      would never free.
+
+      Common mistake: comparing paths instead of identities, so a file reached twice, through
+      two starting directories or a link, is reported, and then deleted, as a duplicate of
+      itself.
+    why_here: >-
+      A byte compare can't tell a second name for a file from a real copy, step 6 deletes
+      whatever the user picks, and the optional going further step brings symbolic links in.
+    origin: beyond
+    resources:
+      - title: "inode(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/inode.7.html
+      - title: "link(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/link.2.html
+
+  - id: safe-deletion
+    name: Deleting safely
+    covers:
+      - deleting removes a name, and the data only when no name or open file is left
+      - every group keeps at least one file
+      - anything but a clear, valid choice means keep
+      - checking again right before deleting
+      - a dry run and a log of what was removed
+      - moving files to a holding folder instead of deleting
+    explanation: |-
+      Deleting a file from a program is final. There is no recycle bin, and a bug in a
+      duplicate finder destroys exactly the data someone cared enough to copy. The safeguards
+      are a few firm rules. Every group keeps at least one file, whatever the user types. Any
+      answer that isn't a clear, valid choice means keep everything and move on. Time passes
+      between the scan and the delete, so the file may have changed since it was compared,
+      which is the time-of-check to time-of-use problem. The fix is to check right before
+      removing it that its size, times and identity are still the ones that were compared.
+      Under the hood, deleting removes one name from a directory, and the data is freed only
+      when the last name is gone and no program still has the file open. A log of every file
+      removed, or a dry run that only prints what would go, lets the user see the plan before
+      anything is lost, and moving files to a holding folder instead makes a whole run
+      undoable.
+
+      Real example: fdupes checks right before removing a file that its device, inode, size and
+      times are unchanged, and refuses with a message that the file changed during processing
+      if they aren't. Its manual also warns that naming the same directory twice makes every
+      file there look like its own duplicate.
+
+      Common mistake: letting an empty or mistyped answer fall through to a default that
+      deletes, so one stray press of the enter key removes a file.
+    why_here: >-
+      Step 6 asks the user which copy to delete and acts on the answer, and keeping every file
+      on anything but a valid choice is part of its contract. A log of deletions is one of the
+      optional extras.
+    origin: step
+    resources:
+      - title: "unlink(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/unlink.2.html
+      - title: "rmlint: Cautions (or why it's hard to write a dupefinder)"
+        url: https://rmlint.readthedocs.io/en/latest/cautions.html
+      - title: "Time-of-check to time-of-use (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Time-of-check_to_time-of-use
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and a throwaway test tree: a set of small files of random bytes that
+      all have the same size, a copy of one of them, and nested folders holding more copies at
+      different depths. Install fdupes too if you want a reference to compare against.
+    check: >-
+      The tree has several levels, at least one pair of identical files sits in different
+      folders, and many files share one size while their contents differ.
+    concepts: []
+
+  - id: s1
+    title: List every file
+    objective: >-
+      Take a directory as the argument and print the path of every file beneath it, relative to
+      that directory, going into subdirectories at any depth.
+    check: >-
+      Every file in the test tree appears exactly once, nested ones with their folders in the
+      path, and no directory is printed as if it were a file.
+    concepts: [directory-traversal]
+
+  - id: s2
+    title: Group by size
+    objective: >-
+      Record each file's path and size, group the files that share a size, and print each group
+      with more than one member as potential duplicates. Stop printing the full listing.
+    check: >-
+      The copies you made appear together, and so do all the random files of the same size,
+      which shows that size alone can't decide.
+    concepts: [grouping-by-key, staged-filtering]
+
+  - id: s3
+    title: Group by hash
+    objective: >-
+      Hash the contents of the files in each size group, with MD5 or a SHA hash if you prefer,
+      and print the files that share a hash as probable duplicates. If you like, keep the hashes
+      between runs and make sure a saved hash is still valid before using it.
+    check: >-
+      Only the real copies are reported, the random files of the same size drop out, and a file
+      whose size no other file shares is never hashed.
+    concepts: [content-hashing, chunked-reading, hash-cache]
+
+  - id: s4
+    title: Confirm byte by byte
+    objective: >-
+      Within each group of matching hashes, compare the files byte by byte and print only the
+      ones that match completely as duplicates.
+    check: >-
+      Every reported pair also compares equal with cmp, and the groups are the same ones that
+      fdupes finds when it searches the same tree recursively.
+    concepts: [staged-filtering, content-hashing, chunked-reading]
+
+  - id: s5
+    title: Minimum size
+    objective: >-
+      Add an optional --minsize argument that leaves out files smaller than the given number of
+      bytes before any of them is read. The page doesn't say whether a file of exactly that size
+      counts, so choose and say which.
+    check: >-
+      With a minimum above the size of the test files nothing is reported, and with one well
+      below it the groups are the same as before.
+    concepts: [staged-filtering]
+
+  - id: s6
+    title: Delete a duplicate
+    objective: >-
+      For each group of duplicates, show its files as a numbered list, ask which one to delete,
+      and delete that file. Any answer that isn't one of the numbers keeps every file and moves
+      on to the next group.
+    check: >-
+      On a copy of the test tree, choosing a number removes exactly that file and leaves the
+      rest of its group, and an empty or invalid answer leaves every file in place.
+    concepts: [safe-deletion, file-identity]
+
+  - id: s7
+    title: Going further
+    objective: >-
+      Handle symbolic links on purpose, whether you follow them or skip them, extend deletion
+      beyond one prompt per group if you want to, and keep a log of every file the tool deletes.
+    check: >-
+      A link to a parent folder doesn't make the scan loop, a link is never reported as a copy
+      of its own target, and the log lists each deleted path.
+    concepts: [directory-traversal, file-identity, safe-deletion]
+    optional: true

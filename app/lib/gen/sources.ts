@@ -48,6 +48,35 @@ export function downloadUrl(source: string): string {
   return url.toString();
 }
 
+/**
+ * The file paths inside a zip fixture, as the sandbox extracts them (runner.py puts each member under the fixtures
+ * folder by its own path). Null when the download isn't a zip. Reads only the zip's central directory.
+ */
+export async function zipEntries(source: string): Promise<string[] | null> {
+  let data: Buffer | null = null;
+  for (let i = 1; i <= 5 && !data; i++) {
+    try {
+      const response = await fetch(downloadUrl(source), { headers: { "User-Agent": "Mozilla/5.0 ThinkAloud" }, signal: AbortSignal.timeout(60_000) });
+      if (response.ok) data = Buffer.from(await response.arrayBuffer());
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * i));
+    }
+  }
+  if (!data || data.readUInt32LE(0) !== 0x04034b50) return null;
+  const eocd = data.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (eocd < 0) return null;
+  const count = data.readUInt16LE(eocd + 10);
+  let at = data.readUInt32LE(eocd + 16);
+  const names: string[] = [];
+  for (let i = 0; i < count && data.readUInt32LE(at) === 0x02014b50; i++) {
+    const nameLength = data.readUInt16LE(at + 28);
+    const name = data.toString("utf8", at + 46, at + 46 + nameLength);
+    if (!name.endsWith("/") && !name.startsWith("__MACOSX") && !name.includes("/.") && !name.startsWith(".")) names.push(name);
+    at += 46 + nameLength + data.readUInt16LE(at + 30) + data.readUInt16LE(at + 32);
+  }
+  return names;
+}
+
 /** Whether a fixture downloads now. Tries a few times, because a slow connect is not a dead link. */
 export async function fixtureDownloads(source: string, attempts = 5): Promise<boolean> {
   for (let i = 1; i <= attempts; i++) {

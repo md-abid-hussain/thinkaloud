@@ -4,7 +4,7 @@
   python3 runner.py check SPEC_JSON    prepares fixtures, runs one step's check, prints the results
 
 Results are printed as one line starting with RESULT_MARK, so build noise around it doesn't matter.
-The check kinds (cli, case-files, http) match app/lib/gen/schema.ts.
+The check kinds (cli, case-files, script, http, socket, client) match app/lib/gen/schema.ts.
 """
 import glob
 import json
@@ -14,6 +14,8 @@ import shlex
 import socket
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -151,6 +153,7 @@ def prepare_fixtures(fixtures, into):
     os.makedirs(into, exist_ok=True)
     for f in fixtures:
         target = os.path.join(into, f["name"])
+        os.makedirs(os.path.dirname(target), exist_ok=True)
         if f.get("content") is not None:
             with open(target, "w", encoding="utf-8", newline="") as out:
                 out.write(f["content"])
@@ -192,12 +195,40 @@ def run(cmd, cwd, env, stdin_path=None, timeout=30):
 def base_env(spec):
     env = dict(os.environ)
     env.update({"LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"})
-    env.update(spec.get("env") or {})
+    # A setting may point at test data, such as a folder to serve: {fixture:www}.
+    env.update({k: sub_fixtures(v, spec.get("fixtures_dir", "/work/fixtures")) for k, v in (spec.get("env") or {}).items()})
     return env
 
 
+def exit_ok(code, want):
+    """An expected exit code; -1 means any failure (non-zero), for pages that only say the program fails."""
+    return code is not None and (code != 0 if want == -1 else code == want)
+
+
 def numbers(text):
-    return [int(n) for n in re.findall(r"(?<![\w.])\d+(?![\w.])", text)]
+    """Whole numbers and decimals, with a sign, but not digits inside names such as BFS1985.txt."""
+    return [float(n) for n in re.findall(r"(?<![\w.])-?(?:\d+(?:\.\d+)?|\.\d+)(?![\w.])", text)]
+
+
+def same_numbers(got, want):
+    return len(got) == len(want) and all(abs(a - b) <= 1e-9 * max(1.0, abs(b)) for a, b in zip(got, want))
+
+
+def contains_in_order(out, want):
+    """Every non-empty expected line appears in the output, in this order (other lines may sit between them)."""
+    lines = [l.rstrip() for l in out.splitlines()]
+    at = 0
+    for line in [l.rstrip() for l in want.splitlines() if l.strip()]:
+        while at < len(lines) and lines[at] != line:
+            at += 1
+        if at == len(lines):
+            return False
+        at += 1
+    return True
+
+
+def count_lines(text):
+    return len([l for l in text.splitlines() if l.strip()])
 
 
 def check_cli(spec, check, fixtures_dir):
@@ -207,15 +238,22 @@ def check_cli(spec, check, fixtures_dir):
         args = " ".join(shlex.quote(sub_fixtures(a, fixtures_dir)) for a in k["args"])
         stdin_path = os.path.join(fixtures_dir, k["stdin"]) if k.get("stdin") else None
         code, out, err = run(f"{spec['run']} {args}", spec["cwd"], env, stdin_path)
+        # Paths under the test folder read as relative, as if run from inside it (the way the pages show output).
+        out, err = out.replace(fixtures_dir + "/", ""), err.replace(fixtures_dir + "/", "")
         case = {"name": k["name"], "command": f"<run> {args}".replace(fixtures_dir + "/", ""), "exit": code, "stdout": tail(out, 400), "stderr": tail(err, 400)}
         if code is None:
             case.update(passed=False, detail=err)
         elif k.get("reference"):
             ref = " ".join(shlex.quote(sub_fixtures(a, fixtures_dir)) for a in k["reference"])
             rcode, rout, rerr = run(ref, spec["cwd"], env, stdin_path)
+            rout = rout.replace(fixtures_dir + "/", "")
             case["expected"] = tail(rout, 400)
             if k["compare"] == "numbers":
-                ok = numbers(out) == numbers(rout) and numbers(rout) != []
+                ok = same_numbers(numbers(out), numbers(rout)) and numbers(rout) != []
+            elif k["compare"] == "count":
+                ok = count_lines(out) == count_lines(rout)
+            elif k["compare"] == "contains":
+                ok = contains_in_order(out, rout)
             elif k["compare"] == "lines":
                 ok = [l.rstrip() for l in out.strip().splitlines()] == [l.rstrip() for l in rout.strip().splitlines()]
             elif k["compare"] == "exit":
@@ -223,15 +261,25 @@ def check_cli(spec, check, fixtures_dir):
             else:
                 ok = out == rout
             if k.get("expect_exit") is not None:
-                ok = ok and code == k["expect_exit"]
+                ok = ok and exit_ok(code, k["expect_exit"])
             case.update(passed=ok, detail="matches the reference" if ok else f"differs from the reference ({k['compare']})")
         else:
             ok = True
-            if k.get("expect_stdout") is not None:
-                ok = (numbers(out) == numbers(k["expect_stdout"])) if k["compare"] == "numbers" else out.strip() == k["expect_stdout"].strip()
+            if k.get("expect_stdout") is not None and k["compare"] != "exit":
+                want = k["expect_stdout"]
+                if k["compare"] == "numbers":
+                    ok = same_numbers(numbers(out), numbers(want))
+                elif k["compare"] == "count":
+                    ok = [count_lines(out)] == [int(n) for n in numbers(want)][:1]
+                elif k["compare"] == "contains":
+                    ok = contains_in_order(out, want)
+                elif k["compare"] == "lines":
+                    ok = [l.rstrip() for l in out.strip().splitlines()] == [l.rstrip() for l in want.strip().splitlines()]
+                else:
+                    ok = out.strip() == want.strip()
                 case["expected"] = k["expect_stdout"]
             if k.get("expect_exit") is not None:
-                ok = ok and code == k["expect_exit"]
+                ok = ok and exit_ok(code, k["expect_exit"])
                 case["expected_exit"] = k["expect_exit"]
             case.update(passed=ok, detail="as expected" if ok else "not as expected")
         cases.append(case)
@@ -267,6 +315,44 @@ def check_case_files(spec, check, fixtures_dir):
     return cases
 
 
+def anywhere(run_cmd, repo):
+    """The run command made to work from any folder: words naming files in the repo (main.py, target/classes) become
+    absolute paths, so a check can cd into its own folder and still start the learner's program."""
+    def fix(word):
+        # Only words that look like paths, so a script name such as `npm run build` never becomes one.
+        looks = lambda p: p and ("/" in p or "." in p) and not os.path.isabs(p) and not p.startswith("-")
+        return ":".join(os.path.join(repo, p) if looks(p) and os.path.exists(os.path.join(repo, p)) else p for p in word.split(":"))
+    try:
+        return " ".join(shlex.quote(fix(w)) for w in shlex.split(run_cmd))
+    except ValueError:
+        return run_cmd
+
+
+def check_script(spec, check, fixtures_dir):
+    """Property checks: a few commands, started in the repo folder. <run> is the learner's program, {tmp} a fresh folder."""
+    env = base_env(spec)
+    env.setdefault("PORT", str(free_port()))  # for a step that starts a server, such as a development server
+    tmp = tempfile.mkdtemp(prefix="step-", dir="/work")
+    program = anywhere(spec["run"], spec["cwd"])
+    cases = []
+    for k in check["commands"]:
+        cmd = sub_fixtures(k["run"], fixtures_dir).replace("<run>", program).replace("{tmp}", tmp)
+        stdin_path = os.path.join(fixtures_dir, k["stdin"]) if k.get("stdin") else None
+        code, out, err = run(cmd, spec["cwd"], env, stdin_path, timeout=60)
+        out, err = out.replace(fixtures_dir + "/", ""), err.replace(fixtures_dir + "/", "")
+        problems = []
+        if code is None:
+            problems.append(err)
+        elif k.get("expect_exit") is not None and not exit_ok(code, k["expect_exit"]):
+            problems.append(f"exit {code}, expected {'non-zero' if k['expect_exit'] == -1 else k['expect_exit']}")
+        problems += [f"output doesn't contain {t!r}" for t in k.get("stdout_contains") or [] if t not in out]
+        problems += [f"output contains {t!r}" for t in k.get("stdout_not_contains") or [] if t in out]
+        shown = k["run"].replace(fixtures_dir + "/", "")
+        cases.append({"name": k["name"], "command": shown, "exit": code, "stdout": tail(out, 400), "stderr": tail(err, 400),
+                      "passed": not problems, "detail": "; ".join(problems) or "as expected"})
+    return cases
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None
@@ -280,9 +366,13 @@ def free_port():
     return port
 
 
-def start_server(spec, env, log_path):
+def start_server(spec, env, log_path, args="", udp=False):
+    """Starts the learner's server and waits until it listens on PORT. A UDP server can't be probed, so it only has to stay up."""
     log = open(log_path, "ab")
-    proc = subprocess.Popen(["bash", "-c", f"exec {spec['run']}"], cwd=spec["cwd"], env=env, stdout=log, stderr=log, start_new_session=True)
+    proc = subprocess.Popen(["bash", "-c", f"exec {spec['run']} {args}".rstrip()], cwd=spec["cwd"], env=env, stdout=log, stderr=log, start_new_session=True)
+    if udp:
+        time.sleep(3)
+        return proc, proc.poll() is None
     deadline = time.time() + 90
     while time.time() < deadline:
         if proc.poll() is not None:
@@ -293,6 +383,15 @@ def start_server(spec, env, log_path):
         except OSError:
             time.sleep(0.5)
     return proc, False
+
+
+def server_setup(spec, check, fixtures_dir):
+    """The environment and start arguments for a server check: the contract's settings, this step's own, a free PORT."""
+    env = base_env(spec)
+    env.update({e["name"]: e["value"] for e in check.get("env") or []})
+    env["PORT"] = str(free_port())
+    args = " ".join(shlex.quote(sub_fixtures(a, fixtures_dir)) for a in check.get("start_args") or [])
+    return env, args
 
 
 def stop_server(proc):
@@ -313,24 +412,33 @@ def json_field(body, field):
     return value
 
 
-def check_http(spec, check, log_path):
-    env = base_env(spec)
-    port = free_port()
-    env["PORT"] = str(port)
+def check_http(spec, check, fixtures_dir, log_path):
+    env, args = server_setup(spec, check, fixtures_dir)
+    port = int(env["PORT"])
     base = f"http://localhost:{port}"
     env.setdefault("BASE_URL", base)
-    proc, up = start_server(spec, env, log_path)
+    proc, up = start_server(spec, env, log_path, args)
     cases = []
     if not up:
         stop_server(proc)
         return [{"name": "start", "passed": False, "detail": f"the service didn't listen on PORT {port} within 90 s"}]
     if check.get("restart_before"):
         stop_server(proc)
-        proc, up = start_server(spec, env, log_path)
+        proc, up = start_server(spec, env, log_path, args)
+    # Slow clients: each sends half a request and goes quiet while the real requests run.
+    idle = []
+    for _ in range(check.get("idle_clients") or 0):
+        try:
+            c = socket.create_connection(("127.0.0.1", port), timeout=5)
+            c.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n")
+            idle.append(c)
+        except OSError:
+            break
     saved = {"base_url": base}
     opener = urllib.request.build_opener(NoRedirect)
     try:
         for r in check["requests"]:
+            time.sleep((r.get("wait_ms") or 0) / 1000)
             fill = lambda s: re.sub(r"\{([a-z_]+)\}", lambda m: str(saved.get(m.group(1), m.group(0))), s)
             url = base + fill(r["path"])
             data = fill(r["json_body"]).encode() if r.get("json_body") else None
@@ -371,21 +479,238 @@ def check_http(spec, check, log_path):
             cases.append({"name": r["name"], "request": f"{r['method']} {fill(r['path'])}" + (f" {fill(r['json_body'])}" if r.get("json_body") else ""),
                           "status": status, "body": tail(text, 300), "passed": not problems, "detail": "; ".join(problems) or "as expected"})
     finally:
+        for c in idle:
+            c.close()
         stop_server(proc)
+    return cases
+
+
+# ---------- socket servers and clients ----------
+
+def show(data, n=160):
+    text = json.dumps(data.decode("utf-8", "replace"))[1:-1]
+    return text if len(text) <= n else text[:n] + "..."
+
+
+def recv_reply(sock, want, compare, timeout=5):
+    """Reads until the expected reply is complete, the peer closes, or nothing more comes. A complete reply waits a
+    moment longer, so extra bytes after it show up as a mismatch."""
+    sock.settimeout(0.2)
+    buf = b""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if (compare == "exact" and len(buf) >= len(want)) or (compare == "contains" and want in buf):
+            # Short, so the wait never eats into a lifetime the conversation is timing.
+            sock.settimeout(0.05)
+            try:
+                buf += sock.recv(65536)
+            except socket.timeout:
+                pass
+            break
+        try:
+            chunk = sock.recv(65536)
+        except socket.timeout:
+            continue
+        if not chunk:
+            break
+        buf += chunk
+    return buf
+
+
+def converse(v, port):
+    """One conversation. With several clients all connect first and the last one talks first, so a server that serves
+    one connection at a time never answers it."""
+    udp = v["transport"] == "udp"
+    socks, lines = [], []
+
+    def result(passed, detail):
+        return {"name": v["name"], "transcript": tail("\n".join(lines), 800), "passed": passed, "detail": detail}
+
+    n = max(1, int(v.get("clients") or 1))
+    try:
+        # Several UDP clients are separate sockets, so each sender has its own address to be answered at.
+        if udp:
+            socks = [socket.socket(socket.AF_INET, socket.SOCK_DGRAM) for _ in range(n)]
+        else:
+            socks = [socket.create_connection(("127.0.0.1", port), timeout=5) for _ in range(n)]
+        for i in reversed(range(len(socks))):
+            s, who = socks[i], (f"client {i + 1}: " if len(socks) > 1 else "")
+            for m in v["messages"]:
+                time.sleep((m.get("wait_ms") or 0) / 1000)
+                data, want = m["send"].encode(), m["expect"].encode()
+                if udp:
+                    s.sendto(data, ("127.0.0.1", port))
+                elif m.get("split") and len(data) > 1:
+                    s.sendall(data[: len(data) // 2])
+                    time.sleep(0.3)
+                    s.sendall(data[len(data) // 2:])
+                else:
+                    s.sendall(data)
+                if not want:
+                    lines.append(f"{who}sent {show(data)}")
+                    continue
+                if udp:
+                    s.settimeout(5)
+                    try:
+                        got = s.recvfrom(65536)[0]
+                    except socket.timeout:
+                        got = b""
+                else:
+                    got = recv_reply(s, want, m["compare"])
+                lines.append(f"{who}sent {show(data)} got {show(got) if got else 'nothing'}")
+                if (got != want) if m["compare"] == "exact" else (want not in got):
+                    waiting = " while other clients were connected" if len(socks) > 1 and not got else ""
+                    expected = show(want) if m["compare"] == "exact" else f"a reply containing {show(want)}"
+                    return result(False, f"{who}sent {show(data)}, expected {expected}, got {show(got) if got else 'nothing'}{waiting}")
+    except OSError as e:
+        return result(False, f"connection failed: {e}")
+    finally:
+        for s in socks:
+            s.close()
+    return result(True, "as expected")
+
+
+def check_socket(spec, check, fixtures_dir, log_path):
+    env, args = server_setup(spec, check, fixtures_dir)
+    port = int(env["PORT"])
+    udp = all(v["transport"] == "udp" for v in check["conversations"])
+    proc, up = start_server(spec, env, log_path, args, udp)
+    if not up:
+        stop_server(proc)
+        return [{"name": "start", "passed": False, "detail": "the server didn't stay up" if udp else f"the server didn't listen on PORT {port} within 90 s"}]
+    cases = []
+    try:
+        for v in check["conversations"]:
+            if v.get("restart_before"):
+                stop_server(proc)
+                proc, up = start_server(spec, env, log_path, args, udp)
+                if not up:
+                    cases.append({"name": v["name"], "passed": False, "detail": "the server didn't start again after a restart"})
+                    continue
+            cases.append(converse(v, port))
+    finally:
+        stop_server(proc)
+    return cases
+
+
+class Stub:
+    """A stand-in server for client checks: records every request and answers them with the check's replies in order,
+    repeating the last, so one stub can play several servers (a root, then a top-level domain, then the answer)."""
+
+    def __init__(self, transport, replies, reply_hex):
+        self.udp, self.replies, self.reply_hex = transport == "udp", replies, reply_hex
+        self.received, self.done = [], False
+        self.lock = threading.Lock()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM if self.udp else socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("127.0.0.1", 0))
+        self.port = self.sock.getsockname()[1]
+        if not self.udp:
+            self.sock.listen(8)
+        self.sock.settimeout(0.2)
+        threading.Thread(target=self.serve, daemon=True).start()
+
+    def answer(self, request):
+        """The reply bytes for the request just recorded. In hex, {req:A:B} copies bytes A to B of the request (a DNS
+        answer repeats the query's ID)."""
+        with self.lock:
+            self.received.append(request)
+            reply = self.replies[min(len(self.received), len(self.replies)) - 1]
+        if not self.reply_hex:
+            return reply.encode()
+        out = b""
+        for m in re.finditer(r"\{req:(\d+):(\d*)\}|([0-9a-fA-F\s]+)", reply):
+            if m.group(3) is not None:
+                out += bytes.fromhex(re.sub(r"\s", "", m.group(3)))
+            else:
+                out += request[int(m.group(1)): int(m.group(2)) if m.group(2) else None]
+        return out
+
+    def serve(self):
+        while not self.done:
+            try:
+                if self.udp:
+                    data, addr = self.sock.recvfrom(65536)
+                    self.sock.sendto(self.answer(data), addr)
+                else:
+                    conn, _ = self.sock.accept()
+                    threading.Thread(target=self.handle, args=(conn,), daemon=True).start()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+
+    def handle(self, conn):
+        # A request is complete once the client stops sending for a moment or closes its side.
+        conn.settimeout(0.3)
+        data, deadline = b"", time.time() + 5
+        while time.time() < deadline:
+            try:
+                chunk = conn.recv(65536)
+            except socket.timeout:
+                if data:
+                    break
+                continue
+            except OSError:
+                break
+            if not chunk:
+                break
+            data += chunk
+        try:
+            conn.sendall(self.answer(data))
+        except OSError:
+            pass
+        conn.close()
+
+    def close(self):
+        self.done = True
+        self.sock.close()
+
+
+def check_client(spec, check, fixtures_dir):
+    """Runs the learner's client against a stub server, then checks what it sent and what it printed."""
+    env = base_env(spec)
+    cases = []
+    for k in check["commands"]:
+        stub = Stub(k["transport"], k.get("replies") or [k.get("reply", "")], k.get("reply_hex"))
+        cmd = (sub_fixtures(k["run"], fixtures_dir).replace("<run>", spec["run"]).replace("{stub}", f"127.0.0.1:{stub.port}")
+               .replace("{stub_host}", "127.0.0.1").replace("{stub_port}", str(stub.port)))
+        try:
+            code, out, err = run(cmd, spec["cwd"], env, None, timeout=30)
+        finally:
+            time.sleep(0.1)
+            stub.close()
+        sent = b"".join(stub.received)
+        problems = []
+        if code is None:
+            problems.append(err)
+        elif k.get("expect_exit") is not None and not exit_ok(code, k["expect_exit"]):
+            problems.append(f"exit {code}, expected {'non-zero' if k['expect_exit'] == -1 else k['expect_exit']}")
+        problems += [f"output doesn't contain {t!r}" for t in k.get("stdout_contains") or [] if t not in out]
+        problems += [f"neither output nor errors contain {t!r}" for t in k.get("output_contains") or [] if t not in out + err]
+        texts, hexes = k.get("received_contains") or [], k.get("received_hex_contains") or []
+        if (texts or hexes) and not sent:
+            problems.append("the program never sent anything to the server")
+        elif texts or hexes:
+            problems += [f"the request doesn't contain {t!r}" for t in texts if t.encode() not in sent]
+            problems += [f"the request doesn't contain the bytes {h}" for h in hexes if bytes.fromhex(re.sub(r"\s", "", h)) not in sent]
+        cases.append({"name": k["name"], "command": k["run"], "exit": code, "sent": show(sent, 400), "stdout": tail(out, 400), "stderr": tail(err, 400),
+                      "passed": not problems, "detail": "; ".join(problems) or "as expected"})
     return cases
 
 
 def check_setup(spec, log_path):
     """Step 0 for every project: the program starts. A CLI runs without a launcher error; a server listens on PORT."""
     env = base_env(spec)
-    if spec["runner"] == "http":
+    if spec["runner"] in ("http", "socket"):
         env["PORT"] = str(free_port())
         env.setdefault("BASE_URL", f"http://localhost:{env['PORT']}")
         proc, up = start_server(spec, env, log_path)
         stop_server(proc)
         return [{"name": "starts and listens on PORT", "passed": up, "detail": "listening" if up else "didn't listen within 90 s"}]
     code, out, err = run(spec["run"], spec["cwd"], env, None, timeout=20)
-    ok = code is not None and code < 126 and not LAUNCH_ERRORS.search(err + out)
+    # Still running after 20 s (waiting on the network, say) also means it started.
+    ok = (code is None or code < 126) and not LAUNCH_ERRORS.search(err + out)
     return [{"name": "the program starts", "exit": code, "stdout": tail(out, 300), "stderr": tail(err, 600), "passed": ok,
              "detail": "started" if ok else "the run command didn't start the program"}]
 
@@ -406,8 +731,14 @@ def check(spec_path):
             cases = check_cli(spec, spec["check"], fixtures_dir)
         elif spec["runner"] == "case-files":
             cases = check_case_files(spec, spec["check"], fixtures_dir)
+        elif spec["runner"] == "script":
+            cases = check_script(spec, spec["check"], fixtures_dir)
         elif spec["runner"] == "http":
-            cases = check_http(spec, spec["check"], log_path)
+            cases = check_http(spec, spec["check"], fixtures_dir, log_path)
+        elif spec["runner"] == "socket":
+            cases = check_socket(spec, spec["check"], fixtures_dir, log_path)
+        elif spec["runner"] == "client":
+            cases = check_client(spec, spec["check"], fixtures_dir)
         else:
             cases = []
     except Exception as e:  # noqa: BLE001

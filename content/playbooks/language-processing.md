@@ -3,7 +3,7 @@ id: language-processing
 name: Language processing
 teaches: Programs that read a language (a data format, expressions, a programming language, patterns) and decide validity, evaluate or transform it.
 runs_as: cli
-oracle: case-files
+oracle: page-values
 ---
 
 ## What this type teaches
@@ -49,6 +49,11 @@ Not this: "Which file in the step 2 folder is invalid?"
 ## Check
 
 - **runs_as cli.** The contract is `<run> <file>`: the learner's program reads the file it's given.
+- **Which runner:** case-files only for a validator: each test input is a whole file, the file's name says valid or
+  invalid, and the exit code is the answer. Everything that produces output (an interpreter running a program, a tool
+  that rewrites code, a program that takes a pattern or an expression) uses the cli runner: run it on the input and
+  compare its output with the page's expected output (oracle page-values), or with a real tool only where it really
+  behaves the same.
 - **Oracle case-files:** a folder of inputs per step, each with an expected result: an exit code for valid or invalid,
   or the expected output for an evaluator.
 - **Fixtures:** the page's own test files when it gives them, plus our own cases for the step's grammar. Every expected

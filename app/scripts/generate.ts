@@ -6,25 +6,43 @@
  * the rules and run this again for every project; never edit a generated file by hand.
  */
 import { setDefaultResultOrder } from "node:dns";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { stringify } from "yaml";
+import { parse, stringify } from "yaml";
 import { MODELS, generateModel } from "../lib/agent/models";
-import { readMaps } from "../lib/content";
+import { readMapsWithStaging } from "../lib/content";
 import { env } from "../lib/env";
 import { modelAsk, type CallLog } from "../lib/gen/ask";
 import { generateProject } from "../lib/gen/generate";
-import { fixtureDownloads, readChallengePage, readPlaybooks } from "../lib/gen/sources";
+import type { Generated } from "../lib/gen/schema";
+import { fixtureDownloads, readChallengePage, readPlaybooks, zipEntries } from "../lib/gen/sources";
 
 // Some hosts (Dropbox) time out over IPv4 from Abid's machine but answer over IPv6; Node falls back to IPv4 when a
 // host has no IPv6 address.
 setDefaultResultOrder("ipv6first");
 
+/** --zip-files <slugs>: refreshes only the file lists of zip fixtures in existing layers; no model calls, no new content. */
+async function refreshZipFiles(slugs: string[]) {
+  for (const slug of slugs) {
+    const file = path.join(env.contentDir, "generated", `${slug}.yaml`);
+    const raw = await readFile(file, "utf8");
+    const generated = parse(raw) as Generated;
+    for (const f of generated.profile.fixtures as (Generated["profile"]["fixtures"][number] & { files?: string[] })[]) {
+      const files = f.source ? await zipEntries(f.source) : null;
+      if (files) f.files = files;
+    }
+    const header = raw.split("\n").filter((l) => l.startsWith("#")).join("\n");
+    await writeFile(file, `${header}\n${stringify(generated, { lineWidth: 118 })}`);
+    console.log(`${slug}: ${generated.profile.fixtures.map((f) => `${f.name}${"files" in f ? ` (${(f as { files: string[] }).files.length} files)` : ""}`).join(", ")}`);
+  }
+}
+
 async function main() {
+  if (process.argv[2] === "--zip-files") return refreshZipFiles(process.argv.slice(3));
   const slugs = process.argv.slice(2);
   if (slugs.length === 0) throw new Error("name the projects, for example: wc json-parser url-shortener");
   if (!env.anthropicKey) throw new Error("ANTHROPIC_API_KEY is not set");
-  const maps = await readMaps(env.contentDir);
+  const maps = await readMapsWithStaging(env.contentDir);
   const { rules, playbooks } = await readPlaybooks(env.contentDir);
   const log: CallLog[] = [];
   const ask = modelAsk(generateModel(), log);
@@ -36,7 +54,7 @@ async function main() {
       const map = maps.find((m) => m.project.slug === slug);
       if (!map) throw new Error(`no map content/${slug}.yaml`);
       const page = await readChallengePage(map.project.source_url);
-      const generated = await generateProject({ map, page, rules, playbooks }, ask, MODELS.generate);
+      const generated = await generateProject({ map, page, rules, playbooks, listZip: zipEntries }, ask, MODELS.generate);
       const sources = generated.profile.fixtures.flatMap((f) => (f.source ? [f.source] : []));
       const dead: string[] = [];
       for (const source of sources) if (!(await fixtureDownloads(source))) dead.push(source);

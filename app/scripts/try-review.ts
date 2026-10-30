@@ -8,7 +8,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parse } from "yaml";
 import { MODELS, generateModel } from "../lib/agent/models";
-import { readMaps } from "../lib/content";
+import { readMapsWithStaging } from "../lib/content";
 import { env } from "../lib/env";
 import { modelAsk, type CallLog } from "../lib/gen/ask";
 import type { Generated } from "../lib/gen/schema";
@@ -27,7 +27,7 @@ function flag(name: string): string | null {
 async function main() {
   const [slug, repoUrl, stepId] = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && !all[i - 1]?.startsWith("--sha") && !all[i - 1]?.startsWith("--base"));
   if (!slug || !repoUrl || !stepId) throw new Error("usage: try-review <slug> <repo-url> <step> [--sha SHA] [--base SHA] [--local] [--no-ai]");
-  const map = (await readMaps(env.contentDir)).find((m) => m.project.slug === slug)!;
+  const map = (await readMapsWithStaging(env.contentDir)).find((m) => m.project.slug === slug)!;
   const generated = parse(await readFile(path.join(env.contentDir, "generated", `${slug}.yaml`), "utf8")) as Generated;
   const local = process.argv.includes("--local");
   const started = Date.now();

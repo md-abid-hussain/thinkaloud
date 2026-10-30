@@ -1,0 +1,359 @@
+project:
+  slug: grep
+  title: Build your own grep
+  source_url: https://codingchallenges.fyi/challenges/challenge-grep
+  level: advanced
+  summary: >-
+    A command-line program that prints the lines of a file, a folder tree or piped input that
+    match a pattern, and says through its exit code whether anything matched, like the Unix grep
+    tool. You can lean on a regular-expression library or write the matching engine yourself, and
+    either way you learn what a pattern really is: a small language that is parsed into a
+    structure and run as a machine over every line.
+
+concepts:
+  - id: regex-automata
+    name: "Regular expressions as machines: automata versus backtracking"
+    covers:
+      - finite automata, NFA and DFA
+      - tracking every possible state at once
+      - backtracking and its exponential worst case
+      - back-references, which no automaton can match
+      - deciding yes or no versus finding where
+    explanation: |-
+      A regular expression describes a set of strings, and every such set can be recognised by a
+      finite automaton: a machine with a fixed number of states that reads the text one character
+      at a time. Thompson's construction turns a pattern into a nondeterministic automaton, an
+      NFA, with a number of states proportional to the pattern's length. Running it means
+      tracking the whole set of states you could be in, so the time grows with pattern length
+      times text length, whatever the input. A DFA precomputes those sets so each character costs
+      a single step. Building every DFA state up front can explode, so GNU grep builds them
+      lazily, only as the text needs them. Many regex libraries work differently: they backtrack,
+      trying one choice and going back to try the next when it fails. That's simple and allows
+      back-references (matching the same text a second time), which no automaton can do, but
+      nested or overlapping repetition makes the number of paths grow exponentially with the line
+      length. grep only needs a yes or a no for each line, which is the easiest question for an
+      automaton.
+
+      Real example: in July 2019 one regular expression in Cloudflare's firewall rules backtracked
+      so heavily that it exhausted the CPUs serving web traffic, and the service went down for 27
+      minutes.
+
+      Common mistake: judging a pattern by how fast it runs on your test lines. With a
+      backtracking engine the cost depends on the input, and the slow case is usually a long line
+      that almost matches, for example a repeated group of letters inside another repetition, on
+      a line that fails only at its last character.
+    why_here: >-
+      Matching is the heart of grep on both tracks. On the hard track you build one of these
+      machines, and on the easy track you pick a library and need to know which kind it is,
+      because every user's pattern runs against every line of every file.
+    origin: beyond
+    resources:
+      - title: "Regular Expression Matching Can Be Simple And Fast (Russ Cox)"
+        url: https://swtch.com/~rsc/regexp/regexp1.html
+      - title: "Details of the Cloudflare outage on July 2, 2019 (Cloudflare blog)"
+        url: https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/
+      - title: "Regular expression Denial of Service, ReDoS (OWASP)"
+        url: https://community.owasp.org/attacks/Regular_expression_Denial_of_Service_-_ReDoS
+
+  - id: pattern-parsing
+    name: "The pattern is a language: parsing it into a structure"
+    covers:
+      - tokens and escapes
+      - precedence of repetition, sequence and alternation
+      - basic versus extended syntax
+      - the empty pattern
+      - invalid patterns
+    explanation: |-
+      A pattern is a small program in its own language, so it has a grammar. Its pieces are
+      literal characters, the dot, escapes, bracket expressions, anchors, groups and operators.
+      Repetition binds tightest and applies only to the single piece before it, then comes
+      sequence, and alternation binds weakest. Parsing turns the text into a tree, or straight
+      into automaton states, once, before any line is read, and the same structure then runs
+      against millions of lines. The dialect changes the grammar: in grep's basic syntax the plus
+      sign, question mark, vertical bar and parentheses are ordinary characters unless a
+      backslash comes before them, and -E makes them operators. The empty pattern is valid too.
+      It matches the empty string, which every line contains. A pattern that breaks the grammar,
+      such as an unclosed bracket, is an error to report, not a pattern that matches nothing.
+
+      Real example: with -E, a vertical bar between two words, such as cat and dog, matches either
+      whole word, not just the letters on each side of the bar, because alternation binds
+      weakest.
+
+      Common mistake: matching by walking the pattern text and the line side by side, with a
+      special case for each symbol. It works for plain letters and breaks as soon as a star
+      follows a group or a backslash changes the next character. On the easy track, the same
+      mistake is passing the user's pattern straight to a library whose dialect isn't grep's.
+    why_here: >-
+      Each step adds syntax, from the empty pattern to classes and anchors. A parsed structure
+      lets you add each piece without rewriting the matcher, and on the easy track it's where you
+      translate grep's dialect into your library's.
+    origin: step
+    resources:
+      - title: "Let's Build a Regex Engine (kean.blog)"
+        url: https://kean.blog/post/lets-build-regex
+      - title: "A Regular Expression Matcher (Rob Pike and Brian Kernighan, from Beautiful Code)"
+        url: https://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
+      - title: "POSIX base definitions: Regular Expressions"
+        url: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html
+
+  - id: classes-and-anchors
+    name: Character classes and anchors
+    covers:
+      - shorthand classes for digits and word characters
+      - bracket expressions, ranges and negation
+      - what the locale puts in a class
+      - anchors match positions, not characters
+    explanation: |-
+      A character class is a set of characters that matches exactly one character of the line.
+      Backslash d is shorthand for digits, and backslash w for word characters: letters, digits
+      and the underscore. A bracket expression lists members or ranges, and a caret just inside
+      the bracket turns it into "anything except these". Which characters belong to a set is a
+      decision. In a Unicode-aware engine, digits include Arabic-Indic and fullwidth digits and
+      word characters include accented letters, while an ASCII-only engine stops at 0 to 9 and a
+      to z. GNU grep follows the locale. Anchors match no character at all. They match a
+      position: the caret matches the position before the first character of a line, and the
+      dollar sign the position after the last.
+
+      Real example: GNU grep's backslash w finds all of café in a UTF-8 locale but stops at caf
+      in the plain POSIX locale. GNU grep supports backslash d only with its -P option; without
+      it, the pattern means a plain letter d.
+
+      Common mistake: forgetting that each line of a Windows file ends with a carriage return
+      before the newline. The last character isn't the one you see, so a search for lines ending
+      in na matches none of them.
+    why_here: >-
+      Steps 5 and 6 add the two shorthand classes and the two anchors. For backslash d the page,
+      not GNU grep, is the reference, because the two disagree.
+    origin: step
+    resources:
+      - title: "GNU grep manual: Character Classes and Bracket Expressions"
+        url: https://www.gnu.org/software/grep/manual/html_node/Character-Classes-and-Bracket-Expressions.html
+      - title: "GNU grep manual: Special Backslash Expressions"
+        url: https://www.gnu.org/software/grep/manual/html_node/Special-Backslash-Expressions.html
+      - title: "Regular-Expressions.info: Start and End of String or Line Anchors"
+        url: https://www.regular-expressions.info/anchors.html
+
+  - id: case-folding
+    name: Case-insensitive matching beyond ASCII
+    covers:
+      - case folding versus lowercasing
+      - simple versus full folding
+      - language rules, such as the Turkish i
+      - folding the parsed pattern, not its text
+    explanation: |-
+      Ignoring case means treating two characters as equal when their case-folded forms are
+      equal. For ASCII that's one rule, but case in Unicode isn't one-to-one. Greek capital sigma
+      has two lowercase forms, one used only at the end of a word. The German sharp s uppercases
+      to two letters, SS, so a full fold changes the length of the text. Turkish has a dotted and
+      a dotless i, so the uppercase of i depends on the language. The Kelvin sign folds to an
+      ordinary k. Unicode publishes a case folding table with simple one-to-one mappings and full
+      mappings that can change the length, and most regex engines, GNU grep included, use only
+      the simple ones.
+
+      Real example: GNU grep with -i doesn't match straße against STRASSE, and its manual says so.
+
+      Common mistake: lowercasing the pattern text before parsing it. Backslash W, which means
+      "not a word character", becomes backslash w, and the meaning flips. Fold the literals and
+      the classes in the parsed pattern instead, and compare each character of the line in its
+      folded form.
+    why_here: >-
+      The final step adds -i. The sample files are plain ASCII, but real text isn't, and a fold
+      that only knows A to Z quietly misses É and é.
+    origin: step
+    resources:
+      - title: "Unicode FAQ: Character Properties, Case Mappings and Names"
+        url: https://www.unicode.org/faq/casemap_charprop.html
+      - title: "UTS #18 Unicode Regular Expressions: Simple Loose Matches"
+        url: https://www.unicode.org/reports/tr18/#Simple_Loose_Matches
+      - title: "Dotted and dotless I in computing (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Dotted_and_dotless_I_in_computing
+
+  - id: directory-traversal
+    name: Walking a directory tree
+    covers:
+      - depth-first traversal
+      - symbolic links and cycles
+      - unreadable files and directories
+      - the order of entries
+      - who expands the star
+    explanation: |-
+      With -r, each argument is the root of a tree: a directory holds files and more directories,
+      and the program visits every file below it. That's a depth-first traversal, done with
+      recursion or with an explicit stack of directories still to visit. Symbolic links turn the
+      tree into a graph. A link that points to a parent directory creates a cycle, and following
+      it means looping forever. GNU grep's -r follows links named on the command line but skips
+      those it finds during the walk, and -R follows all of them. A file or directory you can't
+      read is reported on standard error, and the walk carries on. Entries come back in whatever
+      order the file system keeps them, not sorted, so two machines can print the same matches in
+      a different order. And a star on the command line is expanded by the shell before your
+      program starts, so your program only ever sees a list of names.
+
+      Real example: GNU find prints a "file system loop detected" warning and skips the
+      directory when following links leads back to a directory it is already inside.
+
+      Common mistake: following every symbolic link, or stopping the whole search at the first
+      file that can't be opened.
+    why_here: >-
+      Step 3 searches a folder that contains a subfolder, and every matching line has to say
+      which file it came from.
+    origin: step
+    resources:
+      - title: "GNU grep manual: File and Directory Selection"
+        url: https://www.gnu.org/software/grep/manual/html_node/File-and-Directory-Selection.html
+      - title: "ftw(3) and nftw, Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/ftw.3.html
+      - title: "symlink(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/symlink.7.html
+
+  - id: exit-codes
+    name: Exit codes as an interface
+    covers:
+      - "three answers: selected, none selected, error"
+      - what -v changes
+      - errors on standard error
+      - the status of a pipeline
+    explanation: |-
+      grep's exit code is an answer, not just a success flag. 0 means at least one line was
+      selected, 1 means none was, and 2 means something went wrong, such as a missing file or an
+      invalid pattern. Scripts branch on it without reading any output, which is why grep has a
+      quiet mode. With -v, a selected line is one that doesn't match, so the code follows the
+      lines printed, not the pattern. Error messages go to standard error, so they never mix into
+      the matches flowing to the next program. In a pipeline the shell reports only the last
+      command's status unless the pipefail option is set, so a failure early in the pipe can go
+      unseen.
+
+      Real example: a build check that fails whenever a forbidden word appears in the source
+      runs grep and looks only at its exit code.
+
+      Common mistake: returning 1 for errors too, so a script can't tell "not found" from
+      "couldn't search". GNU grep returns 2 when one file is missing, even if another file
+      matched.
+    why_here: >-
+      Step 2 makes the exit code part of the result, and later steps add -v and files that can't
+      be read, which change what each code means.
+    origin: step
+    resources:
+      - title: "GNU grep manual: Exit Status"
+        url: https://www.gnu.org/software/grep/manual/html_node/Exit-Status.html
+      - title: "POSIX grep utility (see EXIT STATUS)"
+        url: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/grep.html
+      - title: "Bash manual: Pipelines"
+        url: https://www.gnu.org/software/bash/manual/html_node/Pipelines.html
+
+  - id: line-streaming
+    name: Line-oriented streaming
+    covers:
+      - the line as the unit of matching and output
+      - files and standard input read the same way
+      - memory bounded by the longest line
+      - searching the buffer, not every line
+      - output buffering in a pipeline
+    explanation: |-
+      grep decides line by line, but it doesn't have to read line by line. It reads large
+      chunks, from a file or from standard input, which can only be read once, and its memory is
+      bounded by the longest line rather than the size of the input. A line that crosses a chunk
+      boundary has to be carried over to the next chunk, and a file with no final newline still
+      has a last line. Fast greps search the whole buffer for the pattern and only look for the
+      newlines around a match, because finding every newline means looking at every byte. On the
+      way out, output to a terminal is written a line at a time, but output to a pipe is held
+      back in blocks, so the next program can see nothing for a while.
+
+      Real example: a minified file, or a log written without newlines, is one huge line, and
+      grep has to hold all of it to print it.
+
+      Common mistake: reading the whole input into memory and then splitting it into lines. It
+      fails on a file bigger than memory and on a pipe that never ends, such as a log being
+      followed live. A fixed-size line buffer is the opposite mistake, and cuts long lines in two.
+    why_here: >-
+      The first step must print every line back exactly as it was, and step 4 only works if the
+      program reads standard input when no file is named.
+    origin: step
+    resources:
+      - title: "why GNU grep is fast (Mike Haertel)"
+        url: https://lists.freebsd.org/pipermail/freebsd-current/2010-August/019310.html
+      - title: "getline(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/getline.3.html
+      - title: "setvbuf(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/setvbuf.3.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project, save the challenge's Project Gutenberg text as the main test file, and
+      unpack the challenge's test data next to it: a list of rock bands, a file of symbols and a
+      subfolder with one more text file.
+    check: >-
+      The test folder holds the four files, one of them inside the subfolder, and the real grep
+      runs on them so you can compare your results with it.
+    concepts: []
+
+  - id: s1
+    title: Match everything with an empty pattern
+    objective: >-
+      Given an empty pattern and a file, print every line of the file, because the empty pattern
+      matches every line.
+    check: >-
+      The output is identical to the input file, so comparing the two with diff shows no
+      difference.
+    concepts: [pattern-parsing, line-streaming]
+
+  - id: s2
+    title: One letter and the exit code
+    objective: >-
+      Given a single letter, print every line that contains it anywhere. Exit with 0 when at
+      least one line matched and with a non-zero code when none did.
+    check: >-
+      Searching the band list for a capital J prints only the three bands with a J in their
+      names, and the exit code is 0. A letter that appears nowhere prints nothing and gives a
+      non-zero code.
+    concepts: [regex-automata, exit-codes]
+
+  - id: s3
+    title: Search directories with -r
+    objective: >-
+      With -r, search every file below the named directories, and put the file's path and a
+      colon before each matching line.
+    check: >-
+      Searching the test folder recursively for Nirvana gives five lines: one from the band list
+      and four from the file in the subfolder, each with its path in front.
+    concepts: [directory-traversal, exit-codes]
+
+  - id: s4
+    title: Invert the match with -v
+    objective: >-
+      With -v, print the lines that don't match. When no file is named, read standard input, so
+      the program can take another program's output through a pipe.
+    check: >-
+      Piping the recursive search from the last step into the program with -v and the word
+      Madonna leaves only the line from the band list.
+    concepts: [line-streaming, exit-codes]
+
+  - id: s5
+    title: Digits and word characters
+    objective: >-
+      Support backslash d, which matches any digit, and backslash w, which matches a letter, a
+      digit or an underscore.
+    check: >-
+      Searching the subfolder's file for a digit prints the five lines that contain one, and
+      searching the symbols file for a word character prints only the two lines that hold a word.
+      Compare with the page, not with GNU grep, which reads backslash d as a plain d.
+    concepts: [classes-and-anchors, pattern-parsing, regex-automata]
+
+  - id: s6
+    title: Start and end of line
+    objective: >-
+      Support the caret, which ties the pattern to the start of a line, and the dollar sign, which
+      ties it to the end.
+    check: >-
+      A caret followed by A lists only the bands whose names start with A, and na followed by a
+      dollar sign matches only Nirvana.
+    concepts: [classes-and-anchors, pattern-parsing, regex-automata]
+
+  - id: s7
+    title: Ignore case with -i
+    objective: >-
+      With -i, match letters regardless of their case.
+    check: >-
+      In the band list, a capital A appears on 8 lines, and with -i the letter matches 58 lines.
+    concepts: [case-folding]

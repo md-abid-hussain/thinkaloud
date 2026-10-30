@@ -1,0 +1,388 @@
+project:
+  slug: curl
+  title: Build your own curl
+  source_url: https://codingchallenges.fyi/challenges/challenge-curl
+  level: intermediate
+  summary: >-
+    A command-line HTTP client like curl, written directly on a TCP connection: it takes a URL,
+    writes an HTTP/1.1 request by hand, reads the response off the connection and supports GET,
+    DELETE, POST and PUT. Building it shows what every HTTP library hides: how a URL becomes an
+    address and a request line, how a client knows where a response ends, what each method
+    promises, and why a tool keeps its data and its diagnostics apart.
+
+concepts:
+  - id: url-anatomy
+    name: "URLs: the parts a client needs, and default ports"
+    covers:
+      - the scheme and the protocol it names
+      - the host, a name or an address, with IPv6 in brackets
+      - the port and each scheme's default
+      - the path and query as the request target
+      - the fragment stays with the client
+      - the host and port in the Host header
+    explanation: |-
+      A URL packs several decisions into one string. The scheme says which protocol to speak, and
+      each scheme has a default port: 80 for http and 443 for https. The host is a name to look
+      up or an address written out, and an IPv6 address is wrapped in square brackets because it
+      contains colons itself. A port written in the URL overrides the default. The path and the
+      query become the request target that goes on the request line, and an empty path is sent as
+      a single slash. The fragment after a hash sign is for the client only and is never sent.
+      The host, with its port when that isn't the default, also goes into the Host header,
+      because one server address often hosts many sites and the server needs to know which one
+      you meant.
+
+      Real example: for http://localhost:8080/api/items?page=2#top a client connects to port
+      8080 on the local machine, sends /api/items?page=2 as the target, and keeps #top to itself.
+
+      Common mistake: dropping the query string when building the request target, so a request
+      for the second page of a list quietly returns the first. Another is finding the port by
+      splitting on a colon, which breaks on an IPv6 address such as [::1]:8080.
+    why_here: >-
+      Step 1 turns the URL into the address to connect to and the request line to send, and a
+      port written in the URL must win over the default.
+    origin: step
+    resources:
+      - title: "What is a URL? (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Learn_web_development/Howto/Web_mechanics/What_is_a_URL
+      - title: "RFC 3986: Uniform Resource Identifier (URI): Generic Syntax"
+        url: https://www.rfc-editor.org/rfc/rfc3986.html
+      - title: "RFC 9112, section 3.2: Request Target"
+        url: https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2
+
+  - id: http-request
+    name: Writing an HTTP/1.1 request
+    covers:
+      - the request line
+      - the Host header
+      - default headers and headers the user replaces
+      - CRLF line endings
+      - the empty line that ends the headers
+      - a body and its Content-Length in bytes
+      - Connection close
+    explanation: |-
+      A request is text with a strict layout, sent as bytes. First comes the request line: the
+      method, the request target and the version, separated by single spaces. Header fields
+      follow, one per line, each a name, a colon and a value, and HTTP/1.1 requires a Host header
+      in every request. Every line ends with a carriage return and a line feed, called CRLF, and
+      an empty line ends the headers. That empty line is how the server knows the request head is
+      complete. If there is a body, it follows the empty line, and the Content-Length header says
+      how many bytes it has, so the server knows where it stops. That size is counted in bytes,
+      not characters, and the two differ as soon as the text has an accented letter in UTF-8. A
+      Connection: close header tells the server that this is the only request, so it closes the
+      connection after answering. A header the user supplies should replace the client's default
+      of the same name instead of being sent twice, which is what the real curl does.
+
+      Real example: the real curl in verbose mode shows its own request, a request line, Host,
+      User-Agent and Accept, and then a line holding only the > marker. That is the empty line
+      that ends the headers.
+
+      Common mistake: setting Content-Length to the number of characters, so a body containing
+      an accented letter arrives cut short and the server sees broken JSON. Another is leaving
+      out the empty line, so the server waits for more headers while the client waits for an
+      answer.
+    why_here: >-
+      Step 1 builds the request line and headers, and step 5 adds user headers and a body that
+      the server can only read correctly when Content-Length is right.
+    origin: step
+    resources:
+      - title: "RFC 9112: HTTP/1.1"
+        url: https://www.rfc-editor.org/rfc/rfc9112.html
+      - title: "HTTP messages (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages
+      - title: "RFC 9110, section 8.6: Content-Length"
+        url: https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6
+
+  - id: response-framing
+    name: "Reading a response from a stream: where it ends"
+    covers:
+      - reading in a loop into a buffer
+      - the status line and its code
+      - headers up to the first empty line
+      - responses that never have a body
+      - chunked transfer coding
+      - Content-Length
+      - reading until the server closes
+      - the body as bytes, not text
+    explanation: |-
+      TCP delivers a stream of bytes with no message boundaries. One read can return half the
+      status line, or the headers and part of the body together, so a client reads in a loop
+      into a buffer. The response head is the status line, with the version, a three-digit code
+      and a short reason phrase, then header lines up to the first empty line. Whatever follows
+      in the buffer is already body. Where the body ends is decided by rules in a fixed order.
+      Some responses never have a body: the answer to a HEAD request, and the codes 1xx, 204 and
+      304. Next, a chunked transfer coding sends the body in pieces, each one preceded by its size
+      in hexadecimal, and a piece of size zero marks the end. Then Content-Length gives the size
+      in bytes. Only when none of these applies does the body run until the server closes the
+      connection, which shows up as a read that returns no bytes. The body itself is bytes. It
+      may be an image or compressed data, so it should be passed on as it arrived, not decoded as
+      text.
+
+      Real example: some sites answer a request that asked for Connection: close with a chunked
+      body anyway. A client that reads until the close and prints everything shows hexadecimal
+      sizes scattered through the page.
+
+      Common mistake: reading once and treating the result as the whole response. It works
+      against a server on the same machine and fails over a real network, where the response
+      arrives in several pieces.
+    why_here: >-
+      Step 2 reads until the server closes the connection, and step 3 must split the head from
+      the body to show only the body by default. Keeping the connection open, in the going
+      further step, means finding the end from the headers alone.
+    origin: step
+    resources:
+      - title: "RFC 9112, section 6.3: Message Body Length"
+        url: https://www.rfc-editor.org/rfc/rfc9112.html#section-6.3
+      - title: "Transfer-Encoding (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Transfer-Encoding
+      - title: "Connection management in HTTP/1.x (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Connection_management_in_HTTP_1.x
+
+  - id: dns-and-connect
+    name: "From host name to connection: DNS and client sockets"
+    covers:
+      - name resolution and the hosts file
+      - several addresses, IPv4 and IPv6
+      - trying each address in turn
+      - connection refused versus a timeout
+      - the client's temporary port
+      - writing until every byte is sent
+    explanation: |-
+      Before any HTTP is spoken, the client turns the host name into addresses and opens a TCP
+      connection. The system resolver checks the local hosts file and then asks DNS, and the
+      answer is often a list: several IPv4 addresses, IPv6 addresses, or both. A client tries
+      them in order and moves on when one fails. Modern clients give IPv6 a short head start and
+      then race IPv4 against it, an approach called Happy Eyeballs, so one broken path doesn't
+      cost a long wait. Connecting runs TCP's handshake, and the operating system picks a
+      temporary port for the client's end. When nothing listens on the port, the other machine
+      refuses at once. When a firewall silently drops the packets, the attempt hangs until a
+      timeout, so a client needs a timeout of its own. Once connected, one write may send fewer
+      bytes than it was given, so the client keeps writing until the whole request has gone.
+
+      Real example: on many machines localhost resolves to the IPv6 address ::1 first. A test
+      server listening only on 127.0.0.1 refuses that first attempt. The real curl moves on to
+      127.0.0.1 and succeeds, while a client that tries one address reports a failure.
+
+      Common mistake: using only the first address the resolver returns and treating its failure
+      as final. Another is connecting with no timeout, so an address behind a firewall makes the
+      tool hang for a long time.
+    why_here: >-
+      Step 2 resolves the host from the URL and connects to its port before sending anything,
+      and a local test server is often reachable on only one of the addresses its name gives.
+    origin: step
+    resources:
+      - title: "Beej's Guide to Network Programming"
+        url: https://beej.us/guide/bgnet/
+      - title: "RFC 8305: Happy Eyeballs Version 2"
+        url: https://www.rfc-editor.org/rfc/rfc8305.html
+      - title: "getaddrinfo(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/getaddrinfo.3.html
+
+  - id: method-semantics
+    name: "What a method promises: safe, idempotent, with or without a body"
+    covers:
+      - GET reads
+      - DELETE removes
+      - POST hands the body to the server to process
+      - PUT replaces the target with the body
+      - safe and idempotent methods
+      - which requests carry a body
+      - what a client may retry
+      - HEAD and PATCH
+    explanation: |-
+      The method is the verb of a request, and HTTP defines what each one promises. GET asks for
+      the target and is safe: it shouldn't change anything on the server. DELETE asks the server
+      to remove the target, and PUT asks it to replace the target with the body sent. Both are
+      idempotent: sending the same request twice leaves the server in the same state as sending
+      it once. POST hands the body to the target to process however it defines, often creating
+      something new, and is neither safe nor idempotent, so two identical POSTs can place two
+      orders. These promises matter to a client. It may resend an idempotent request after a
+      dropped connection, but it should not silently resend a POST. A body in a GET has no
+      defined meaning, and some servers reject it. HEAD is a GET that returns only the head, and
+      PATCH changes part of a target.
+
+      Real example: a browser asks before reloading a page that came from a submitted form,
+      because the form was sent as a POST and sending it again could place the order twice.
+
+      Common mistake: treating the method as just a word to copy into the request line. A
+      response to HEAD can carry a Content-Length but never a body, so a client that doesn't
+      know this waits for bytes that never come. The real curl's manual warns that its -X option
+      has exactly this limit.
+    why_here: >-
+      Step 4 sends a DELETE, and step 6 sends a PUT, which carries a body just like POST but
+      promises something different. The going further step adds HEAD and PATCH.
+    origin: step
+    resources:
+      - title: "RFC 9110, section 9: Methods"
+        url: https://www.rfc-editor.org/rfc/rfc9110.html#section-9
+      - title: "HTTP request methods (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods
+      - title: "Idempotent (MDN Glossary)"
+        url: https://developer.mozilla.org/en-US/docs/Glossary/Idempotent
+
+  - id: output-streams
+    name: "Data and diagnostics: verbose output on separate streams"
+    covers:
+      - the body alone on standard output
+      - verbose and error messages on standard error
+      - marking sent and received lines
+      - exit codes for network failures
+      - an HTTP error status is still a completed transfer
+    explanation: |-
+      A command-line client is often one stage of a pipeline, with its output piped into a JSON
+      tool or saved to a file. That only works if standard output carries the body and nothing
+      else. Everything meant for a person, such as verbose lines, progress and error messages,
+      goes to standard error, which still shows in the terminal but never mixes into the data.
+      The real curl's verbose mode marks the lines it sent with >, the lines it received with <,
+      and its own notes with *, all on standard error. The exit code tells a script what
+      happened, and the real curl uses different codes for a host it couldn't resolve and a
+      connection it couldn't open. A 404 or a 500 is still a completed transfer, so by default
+      curl prints that body and exits with 0, and an option makes HTTP errors count as failures.
+
+      Real example: the real curl in verbose mode, with its output piped into a JSON formatter,
+      still works. The formatter receives only the body, while the request and response headers
+      stay on the screen.
+
+      Common mistake: printing the verbose lines or error messages on standard output, so a
+      saved response starts with headers and the next tool in the pipe can't parse it.
+    why_here: >-
+      Step 3 shows only the body by default and adds the request and response lines with -v,
+      which forces a decision about where each kind of output goes.
+    origin: step
+    resources:
+      - title: "curl man page"
+        url: https://curl.se/docs/manpage.html
+      - title: "stdin(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/stdin.3.html
+      - title: "Bash manual: Exit Status"
+        url: https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+
+  - id: tls
+    name: "HTTPS: the same HTTP inside TLS"
+    covers:
+      - the https scheme and port 443
+      - the handshake after the TCP connection
+      - certificate chains and trusted authorities
+      - checking the name on the certificate
+      - sending the host name in the handshake
+    explanation: |-
+      HTTPS is the same HTTP request and response, carried inside an encrypted TLS channel, on
+      port 443 by default. After the TCP connection opens, client and server run a handshake.
+      They agree on keys, and the server presents a certificate. The client checks that a chain
+      of signatures leads from that certificate to an authority it already trusts, and that the
+      name in the certificate matches the host in the URL. Without both checks, the encryption
+      protects you from everyone except an attacker sitting in the middle. The client also sends
+      the host name during the handshake, an extension called Server Name Indication, so that a
+      server holding many sites on one address can present the right certificate. Only then does
+      the client write the same request it would write over plain TCP.
+
+      Real example: companies that inspect their staff's web traffic install their own
+      certificate authority on company laptops. Those laptops accept the inspecting proxy's
+      certificates, while any other machine on the same network gets a certificate error.
+
+      Common mistake: turning certificate checks off to make an error go away. The connection
+      stays encrypted, but anyone in the middle can now read it.
+    why_here: >-
+      The going further step suggests HTTPS, which wraps everything the earlier steps write and
+      read in TLS and changes the default port.
+    origin: step
+    resources:
+      - title: "RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3"
+        url: https://www.rfc-editor.org/rfc/rfc8446.html
+      - title: "The Illustrated TLS 1.3 Connection"
+        url: https://tls13.xargs.org/
+      - title: "Transport Layer Security (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Transport_Layer_Security
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project for a command-line program that takes a URL. Choose an HTTP server to
+      test against: the page uses a public service that echoes each request back as JSON, and any
+      server you can reach by a URL works too, including one on your own machine on a port of
+      your choice.
+    check: >-
+      The real curl gets an answer from the server you'll test against, so you have its output to
+      compare with yours.
+    concepts: []
+
+  - id: s1
+    title: Parse the URL and print the request
+    objective: >-
+      Take a URL from the command line, check that its scheme is http, and pull out the host,
+      the port, which is 80 when the URL gives none, and the path. Print the host you would
+      connect to and the GET request you would send: the request line, a Host header and an
+      Accept header of */*. Don't send anything yet.
+    check: >-
+      The echo service's /get URL prints a request line for /get with the right Host header, and
+      the same URL with :80 written in it prints exactly the same request. A URL with another
+      port names that port as the one to connect to.
+    concepts: [url-anatomy, http-request]
+
+  - id: s2
+    title: Send the request and print the response
+    objective: >-
+      Connect to the host and port from the URL and send the request from step 1, adding a
+      Connection: close header and ending the headers with an empty line. Read until the server
+      closes the connection, and print everything it sent: the status line, the headers and the
+      body.
+    check: >-
+      The echo service's /get URL gives a 200 status line, then the headers, then a JSON body
+      listing the URL and the headers you sent. A server on your own machine, on a port other
+      than 80, works the same way.
+    concepts: [dns-and-connect, response-framing]
+
+  - id: s3
+    title: Add a verbose flag
+    objective: >-
+      By default print only the body. With -v, also show each line of the request marked with >
+      and the status line and headers received marked with <, kept on a separate stream from
+      the body, as the real curl does.
+    check: >-
+      Without -v the output is the body alone. With -v the request and response headers appear
+      with their markers, and saving or piping the program's standard output still gives only
+      the body.
+    concepts: [output-streams, response-framing]
+
+  - id: s4
+    title: Send a DELETE
+    objective: >-
+      Add -X to choose the method, and use it to send a DELETE.
+    check: >-
+      A DELETE to the echo service's /delete URL gets a 200 and a body whose URL ends in /delete,
+      and with -v the request line starts with DELETE.
+    concepts: [method-semantics]
+
+  - id: s5
+    title: POST a body with headers
+    objective: >-
+      Add -d to send a string as the request body and -H to add a header such as Content-Type.
+      Send the body after the empty line that ends the headers, with a Content-Length header
+      giving its size in bytes.
+    check: >-
+      POSTing a small JSON object with a JSON Content-Type to the echo service's /post URL comes
+      back with your body both as raw data and as parsed JSON, your Content-Type header, and a
+      Content-Length equal to the body's size in bytes.
+    concepts: [http-request]
+
+  - id: s6
+    title: Send a PUT
+    objective: >-
+      Support PUT, which sends a body in exactly the same way as POST.
+    check: >-
+      PUTting a JSON body to the echo service's /put URL echoes it back with the right
+      Content-Length, just as POST did.
+    concepts: [method-semantics]
+
+  - id: s7
+    title: "Going further: HEAD, PATCH, keep-alive and HTTPS"
+    objective: >-
+      Add HEAD and PATCH. Send several requests over one connection by leaving out Connection:
+      close, which means finding the end of each response from its headers instead of waiting
+      for the server to close. Support https URLs by running the same exchange inside TLS.
+    check: >-
+      A HEAD request prints the status and headers and returns at once without waiting for a
+      body. Two requests sent over one connection both get complete responses. An https URL
+      gives the same answer as its http form, and a site with an invalid certificate is refused.
+    concepts: [response-framing, method-semantics, tls]
+    optional: true

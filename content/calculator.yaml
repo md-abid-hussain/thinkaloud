@@ -1,0 +1,316 @@
+project:
+  slug: calculator
+  title: Build your own calculator
+  source_url: https://codingchallenges.fyi/challenges/challenge-calculator
+  level: intermediate
+  summary: >-
+    A program that takes an arithmetic expression as text, a mix of numbers, the four basic
+    operators and parentheses, and prints its value. Getting every answer right teaches how any
+    program reads a language with operators: breaking text into tokens, deciding which operator
+    binds tighter, rewriting the expression into a form a stack can evaluate, and choosing how
+    numbers and bad input are handled.
+
+concepts:
+  - id: tokenising-expressions
+    name: Tokenising an expression
+    covers:
+      - characters into tokens
+      - numbers with many digits and a decimal point
+      - whitespace between tokens
+      - unary minus versus subtraction
+      - characters the calculator doesn't know
+    explanation: |-
+      The first stage turns a string of characters into a list of tokens: numbers, operators
+      and parentheses. A number can be many characters long, so the scanner keeps reading
+      digits, and at most one decimal point, until something else appears. Whitespace separates
+      tokens but is never one, so an expression means the same with or without spaces. The
+      minus sign is the hard case, because it has two jobs. After a number or a closing
+      parenthesis it subtracts. At the start, after another operator or after an opening
+      parenthesis, it is a sign that negates what follows. The token just before it tells the
+      two apart, and giving each its own kind of token means later stages never have to guess.
+
+      Real example: graphing calculators give the negative sign its own key, apart from the
+      subtraction key, because the two are different operations. Typed text has only one minus
+      character, so in 2 - -3 the scanner must decide that the first subtracts and the second
+      negates.
+
+      Common mistake: splitting the input on spaces, which fails on 2*(3+4), or letting the
+      scanner read -3 as one negative number, which turns 5-3 into two numbers with no operator
+      between them.
+    why_here: >-
+      Every expression arrives as one line of text, with or without spaces, and nothing in it
+      marks whether a minus sign subtracts or negates.
+    origin: step
+    resources:
+      - title: "Crafting Interpreters: Scanning"
+        url: https://craftinginterpreters.com/scanning.html
+      - title: "Lexical analysis (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Lexical_analysis
+
+  - id: precedence-associativity
+    name: Operator precedence and associativity
+    covers:
+      - precedence levels
+      - left and right associativity
+      - parentheses as an override
+      - where a sign and a power meet
+    explanation: |-
+      Precedence says which operator binds tighter. In 1 + 2 * 3, multiplication goes first,
+      so the answer is 7, not 9. Associativity settles a tie between operators on the same
+      level. Subtraction and division group from the left, so 8 - 3 - 2 means (8 - 3) - 2,
+      which is 3, not 7. Powers usually group from the right, so 2 ^ 3 ^ 2 means 2 to the
+      power 9. Parentheses override both. These rules are conventions, not facts of arithmetic,
+      so a calculator has to choose them on purpose and apply them the same way everywhere,
+      especially where a minus sign meets a power.
+
+      Real example: simple pocket calculators work in the order the keys are pressed, so
+      1 + 2 * 3 gives 9 on them and 7 on a scientific calculator. Spreadsheets apply a leading
+      minus before a power, so minus three squared gives 9 there and -9 in ordinary
+      mathematics.
+
+      Common mistake: evaluating strictly from left to right, which already gets the
+      challenge's first long example wrong, or splitting the expression at its first minus
+      sign, which makes subtraction group from the right.
+    why_here: >-
+      The first example on the page already mixes all four operators, so it needs
+      multiplication and division before addition and subtraction, and step 2 adds parentheses
+      to override that order.
+    origin: step
+    resources:
+      - title: "Order of operations (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Order_of_operations
+      - title: "Operator associativity (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Operator_associativity
+      - title: "Crafting Interpreters: Parsing Expressions, Ambiguity and the Parsing Game"
+        url: https://craftinginterpreters.com/parsing-expressions.html#ambiguity-and-the-parsing-game
+
+  - id: infix-postfix-shunting-yard
+    name: Infix, postfix and the shunting-yard algorithm
+    covers:
+      - infix, prefix and postfix notation
+      - why postfix needs no parentheses
+      - the operator stack and the output
+      - popping by precedence and associativity
+      - parentheses and functions on the stack
+      - precedence climbing as another route
+    explanation: |-
+      People write infix, with each operator between its operands, which is why they need
+      precedence rules and parentheses. Postfix, also called reverse Polish notation, puts each
+      operator after its operands: (1 + 2) * 3 becomes 1 2 + 3 *. The order of the tokens alone
+      says what to do, so postfix needs no parentheses and no precedence. Dijkstra's
+      shunting-yard algorithm converts infix to postfix in one pass, keeping waiting operators
+      on a stack. A number goes straight to the output. An operator first sends to the output
+      every waiting operator that binds tighter, or equally tight when the new one groups from
+      the left, and then waits itself. An opening parenthesis waits as a barrier, and a closing
+      one sends everything above that barrier to the output. A function such as sine waits like
+      an operator and follows its argument out. At the end, the stack empties into the output.
+      Precedence climbing reaches the same result with recursion instead of an explicit stack.
+
+      Real example: the Unix calculator dc reads postfix directly, and the first versions of bc
+      were a front end that translated ordinary infix expressions into postfix for dc.
+
+      Common mistake: getting the "equally tight" rule backwards, so 8 - 3 - 2 comes out as 7,
+      or missing a closing parenthesis that empties the stack without finding its opening one.
+    why_here: >-
+      Step 2 recommends this route: convert the expression to postfix with the shunting-yard
+      algorithm, then evaluate the postfix form.
+    origin: step
+    resources:
+      - title: "Shunting yard algorithm (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Shunting_yard_algorithm
+      - title: "Reverse Polish notation (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Reverse_Polish_notation
+      - title: "Parsing expressions by precedence climbing (Eli Bendersky)"
+        url: https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing
+
+  - id: stack-evaluation
+    name: Evaluating with a stack
+    covers:
+      - push numbers, pop for operators
+      - operand order
+      - how many operands each operator takes
+      - exactly one value at the end
+      - building a syntax tree instead of a value
+    explanation: |-
+      A postfix expression is evaluated in one pass with one stack. A number is pushed. An
+      operator pops as many values as it needs, two for subtraction, one for negation or sine,
+      applies itself and pushes the result. When the input runs out, exactly one value must be
+      left, and that is the answer. Pop order matters: the first value off the stack is the
+      right operand. If each operator pushes a small tree of itself and its operands instead of
+      a number, the same walk builds a syntax tree, which is how compilers hold expressions
+      before they simplify or translate them.
+
+      Real example: WebAssembly and many other virtual machines run their instructions on this
+      kind of operand stack, so compiling an expression for them means emitting it in postfix
+      order.
+
+      Common mistake: applying operands in the order they come off the stack, so 7 2 - gives -5
+      instead of 5, or not checking what is left at the end, so the input 2 3 is accepted with
+      the answer 3.
+    why_here: >-
+      Step 2 evaluates the shunting-yard output with a stack, and the whole challenge is meant
+      as practice with that data structure.
+    origin: step
+    resources:
+      - title: "Stack (abstract data type) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Stack_(abstract_data_type)
+      - title: "Stack machine (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Stack_machine
+      - title: "Crafting Interpreters: A Virtual Machine"
+        url: https://craftinginterpreters.com/a-virtual-machine.html
+
+  - id: number-representation
+    name: "Numbers: integers, floating point and division"
+    covers:
+      - whole versus decimal results
+      - binary fractions and rounding error
+      - how integer division rounds
+      - division by zero
+      - how many digits to print
+      - comparing within a tolerance
+    explanation: |-
+      Integers are exact, but dividing them drops the fraction, so 7 / 2 gives 3, and systems
+      disagree on whether a negative result rounds towards zero or down. Floating point keeps
+      the fraction but stores it in binary, where most decimals have no exact form, so
+      0.1 + 0.2 comes out as 0.30000000000000004. Dividing by zero in floating point gives
+      infinity or "not a number" rather than an error, unless you check. A calculator has to
+      choose: compute in floating point and print whole results without a decimal part, use
+      exact decimals or fractions, or stay in integers while every value is whole. Whatever it
+      picks, it must also decide what division by zero means and how many digits to show.
+
+      Real example: the Unix calculator bc works in decimal with a set number of digits after
+      the point, zero by default, so it answers 1 / 3 with 0. And the sine of pi in floating
+      point is a tiny number, not 0.
+
+      Common mistake: comparing decimal results for exact equality, in the program or in its
+      tests, and letting division by zero crash the program or print "inf".
+    why_here: >-
+      Step 1 asks you to decide between whole and decimal results, and division is where the
+      choice shows: 7 / 2 has to give 3 or 3.5 on purpose. The sine, cosine and tangent of step
+      3 only work in floating point.
+    origin: step
+    resources:
+      - title: "The Floating-Point Guide"
+        url: https://floating-point-gui.de/
+      - title: "What Every Computer Scientist Should Know About Floating-Point Arithmetic (David Goldberg)"
+        url: https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html
+      - title: "Modulo, including how integer division rounds (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Modulo
+
+  - id: malformed-input
+    name: Reporting malformed expressions
+    covers:
+      - which stage finds which error
+      - unbalanced parentheses
+      - missing operands and operators in a row
+      - syntax errors versus arithmetic errors
+      - a message, a position and a non-zero exit code
+    explanation: |-
+      Bad input fails at different stages, and each stage can say something precise. The
+      scanner meets characters it doesn't know, such as a letter where a number belongs. The
+      parser meets tokens in an impossible order: two operators in a row, an operator with
+      nothing after it, a closing parenthesis with no opening one. The evaluator meets
+      expressions that are well formed but have no value, such as a division by zero. A useful
+      message says what was expected, what was found and where in the expression. The program
+      writes it to standard error and exits with a non-zero code, so a script using the
+      calculator can tell a failure from an answer.
+
+      Real example: a spreadsheet refuses to store a formula with a syntax error, but stores a
+      well-formed formula that divides by zero and shows #DIV/0! in the cell. They are
+      different kinds of error, found at different times.
+
+      Common mistake: trusting the shunting-yard algorithm to reject bad input. It turns
+      1 + + 2 into postfix without complaint, and the problem only shows later, as a crash
+      when the evaluator pops from an empty stack.
+    why_here: >-
+      Step 1 asks you to handle invalid input, and a calculator meets plenty of it: typos,
+      missing numbers, stray brackets and division by zero.
+    origin: step
+    resources:
+      - title: "Crafting Interpreters: Parsing Expressions, Syntax Errors"
+        url: https://craftinginterpreters.com/parsing-expressions.html#syntax-errors
+      - title: "Bash manual: Exit Status"
+        url: https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+
+  - id: test-driven-development
+    name: Tests that let you change the design
+    covers:
+      - test first, then code, then clean up
+      - a table of expressions and expected results
+      - one case for each rule
+      - expected values from outside your program
+      - refactoring under tests
+    explanation: |-
+      Test-driven development writes a small failing test first, then just enough code to pass
+      it, then cleans the code up while every test still passes. For an evaluator, the tests
+      are a table: an expression and the value or error it must give. A good table aims one
+      case at each rule: precedence, grouping from the left, unary minus, nested parentheses,
+      division by zero, each kind of malformed input. Expected values come from working them
+      out by hand or from a trusted tool such as bc, never from your own program. The payoff
+      comes when the design changes. Moving from a first simple evaluator to the shunting-yard
+      algorithm is a rewrite, and the same table shows at once whether every old answer still
+      holds.
+
+      Real example: Martin Fowler describes refactoring as a series of small changes that keep
+      behaviour the same, each one checked by running the tests.
+
+      Common mistake: filling in the expected results by running your own program, which locks
+      its bugs into the tests.
+    why_here: >-
+      Step 3 asks for your own automated tests, and the page warns that the step 2 design will
+      probably replace your first one, which is only safe with tests in place.
+    origin: step
+    resources:
+      - title: "Test-driven development (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Test-driven_development
+      - title: "Martin Fowler: Test Driven Development"
+        url: https://martinfowler.com/bliki/TestDrivenDevelopment.html
+      - title: "Refactoring (Martin Fowler)"
+        url: https://martinfowler.com/books/refactoring.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and settle how the calculator runs: a command-line program that takes
+      the whole expression as a single argument and prints the result.
+    check: >-
+      An expression passed in quotes reaches your program as one argument, multiplication sign
+      included. Without the quotes, the shell may expand the star into file names.
+    concepts: []
+
+  - id: s1
+    title: Simple expressions
+    objective: >-
+      Evaluate an expression made of numbers and the four basic operators, without
+      parentheses, and print its value, doing multiplication and division before addition and
+      subtraction. Decide whether results are whole numbers or decimals, and reject input that
+      isn't a valid expression with a clear message.
+    check: >-
+      2 * 3 gives 6, and the page's longer example, 1 + 22 - 12 * 33 / 2, gives -175.
+      Input such as two operators in a row gives an error message instead of a number.
+    concepts: [tokenising-expressions, precedence-associativity, number-representation, malformed-input]
+
+  - id: s2
+    title: Precedence and parentheses
+    objective: >-
+      Support parentheses, so that grouping can override the usual order of operators. The
+      challenge suggests converting the expression to postfix with the shunting-yard algorithm,
+      then evaluating the postfix form with a stack.
+    check: >-
+      1 + 1 * 5 gives 6 and (1 + 1) * 5 gives 10, worked out by hand since the page gives no
+      answers for them. The page's opening examples also hold: 2 * 3 + 4 gives 10 and
+      10 / (6 - 1) gives 2.
+    concepts: [precedence-associativity, infix-postfix-shunting-yard, stack-evaluation]
+
+  - id: s3
+    title: Your own tests and functions
+    objective: >-
+      Go further on your own: write and automate your own test cases, handle parentheses
+      nested several levels deep, and add functions such as sine, cosine and tangent.
+    check: >-
+      Your automated tests pass, with at least one case for each rule and each kind of bad
+      input, and expressions with functions match a trusted calculator such as bc with its
+      maths library, which works in radians, within a small tolerance.
+    concepts: [infix-postfix-shunting-yard, number-representation, test-driven-development]
+    optional: true

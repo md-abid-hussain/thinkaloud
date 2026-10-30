@@ -1,0 +1,319 @@
+project:
+  slug: echo
+  title: Build your own echo server
+  source_url: https://codingchallenges.fyi/challenges/challenge-echo
+  level: beginner
+  summary: >-
+    A server that sends back every byte a client sends it, first over TCP and then over UDP,
+    following the one-page Echo Protocol in RFC 862. Building it teaches what sits under every
+    network service: how a connection is accepted and how its end shows up, why TCP delivers a
+    stream of bytes rather than messages, how one program serves many clients at once, and how it
+    stops without losing data.
+
+concepts:
+  - id: socket-lifecycle
+    name: Sockets and the life of a connection
+    covers:
+      - bind, listen and accept
+      - the listening socket versus connected sockets
+      - the queue of connections waiting to be accepted
+      - wildcard and loopback addresses
+      - privileged ports
+      - the client's temporary port
+      - a read of zero bytes means the peer closed
+    explanation: |-
+      A TCP server goes through fixed stages. It binds a socket to an address and a port, then
+      listens, and from that moment the operating system completes connections for it and holds
+      them in a queue. Each accept takes one connection from that queue and returns a new socket
+      for that client, while the listening socket stays open for the next one. A connection is
+      known by four things: the server's address and port, and the client's address and port. The
+      client's port is a temporary one its operating system picks, which is how two clients on
+      the same machine stay apart. Binding to the wildcard address accepts connections arriving
+      on any of the machine's networks, while the loopback address accepts them only from the
+      machine itself. Ports below 1024 need special rights on most Unix-like systems, so a server
+      under test takes its port from the environment. On a connected socket, a read waits until
+      data arrives. A read that returns zero bytes is neither an error nor an empty message. It
+      means the client has closed its side, and nothing more will come.
+
+      Real example: a busy web server has one listening socket on its port and one connected
+      socket per visitor on that same port, told apart only by each visitor's address and
+      temporary port. Tools such as ss or netstat list them all.
+
+      Common mistake: treating a read of zero bytes as "no data yet" and reading again. The loop
+      spins at full speed on a dead connection, and the server never notices the client has gone.
+    why_here: >-
+      Step 1 binds, listens and accepts one client by hand, and step 3 has to notice the moment
+      that client goes away.
+    origin: step
+    resources:
+      - title: "Beej's Guide to Network Programming"
+        url: https://beej.us/guide/bgnet/
+      - title: "listen(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/listen.2.html
+      - title: "recv(2), Linux manual page (see the return value)"
+        url: https://man7.org/linux/man-pages/man2/recv.2.html
+
+  - id: byte-stream
+    name: TCP is a byte stream, not a series of messages
+    covers:
+      - no message boundaries
+      - one write can arrive in several reads, and several writes in one
+      - echo only the bytes each read returned
+      - a write can take fewer bytes than it was given
+      - bytes, not text
+      - flow control and full buffers
+    explanation: |-
+      TCP promises that bytes arrive in order and without gaps, and nothing more. It keeps no
+      record of how the sender divided them, so what one side wrote in a single call can arrive
+      over several reads, and two separate writes can come out of one read. Each read returns
+      whatever has arrived so far, up to the size of the buffer you gave it. An echo server
+      therefore has no lines or messages to wait for. It writes back exactly the bytes each read
+      returned, as they are, without decoding them as text, because a client may send any bytes
+      at all. Writing has its own catch: a write can accept fewer bytes than it was given,
+      especially on a non-blocking socket, and the rest has to be sent later. Both ends also have
+      limited buffers. When a receiver stops reading, its buffer fills and TCP's flow control
+      makes the sender's writes wait, which is how a slow reader protects itself from a fast
+      writer.
+
+      Real example: a test client that sends several megabytes and only then starts reading the
+      echo hangs forever. The server is not broken. Its writes wait for the client to read, so it
+      stops reading, and then the client's writes wait for the server. Both sides are blocked on
+      full buffers.
+
+      Common mistake: writing back the whole buffer instead of only the bytes the last read
+      returned, so every short read is followed by leftover bytes from an earlier one. Another is
+      waiting for a newline before echoing, which the protocol never asks for.
+    why_here: >-
+      Step 3 reads from a connection and writes the same bytes back, and it only works if those
+      bytes are treated as a stream rather than as lines or messages.
+    origin: beyond
+    resources:
+      - title: "RFC 9293: Transmission Control Protocol (TCP)"
+        url: https://www.rfc-editor.org/rfc/rfc9293.html
+      - title: "Message Framing (Stephen Cleary)"
+        url: https://blog.stephencleary.com/2009/04/message-framing.html
+
+  - id: concurrency-models
+    name: "Serving many clients: threads, event loops and their costs"
+    covers:
+      - why one loop can serve only one client
+      - a thread or task per connection
+      - an event loop over many sockets
+      - memory and switching costs
+      - slow and idle clients
+      - state shared between connections
+    explanation: |-
+      A server that accepts a client and then reads from it can do nothing else while it waits,
+      because that read blocks until the client sends something. There are two classic ways out.
+      In the first, the accepting loop hands each new connection to its own thread, or to a
+      lightweight task, and goes straight back to accept. Each handler can then block on its own
+      client without holding up the others. It is simple to write, but every thread reserves its
+      own stack, often a megabyte or more of address space, and thousands of them cost memory and
+      switching time. In the second, one thread runs an event loop. It asks the operating system
+      which of many sockets are ready and serves only those, so no single client can make it
+      wait. That scales to many thousands of connections, at the price of code that must never
+      block. The async tasks many languages offer are built on such a loop. Either way, anything
+      the connections share, such as a count of open clients or the log, can be changed by two of
+      them at once and needs protecting.
+
+      Real example: in 1999 the C10K problem asked how one machine could hold ten thousand
+      connections at once. Servers such as nginx answered with a few event loops, where the
+      classic Apache design had used one process per connection.
+
+      Common mistake: doing one blocking thing inside an event loop, such as a write to a client
+      that has stopped reading, which freezes every other client. With threads, the mirror mistake
+      is starting one for every connection with no limit, so a flood of idle connections uses up
+      the machine's memory.
+    why_here: >-
+      Step 2 has to keep accepting new clients while earlier ones stay connected, which a single
+      loop that waits on one client can't do.
+    origin: step
+    resources:
+      - title: "Concurrent Servers, Part 1: Introduction (Eli Bendersky)"
+        url: https://eli.thegreenplace.net/2017/concurrent-servers-part-1-introduction/
+      - title: "Concurrent Servers, Part 3: Event-driven (Eli Bendersky)"
+        url: https://eli.thegreenplace.net/2017/concurrent-servers-part-3-event-driven/
+      - title: "The C10K problem (Dan Kegel)"
+        url: http://www.kegel.com/c10k.html
+
+  - id: tcp-vs-udp
+    name: "Streams versus datagrams: TCP and UDP"
+    covers:
+      - connections versus independent datagrams
+      - one socket for every client
+      - replying to each sender's address
+      - boundaries kept, delivery not promised
+      - datagrams cut short by a small buffer
+      - forged senders
+    explanation: |-
+      UDP has no connections. There is no listen, no accept and no disconnect. The server opens
+      one socket, and every read returns one whole datagram together with the address and port it
+      came from. To answer, the server sends a datagram back to that address. Unlike TCP, UDP
+      keeps message boundaries, so one send arrives as exactly one datagram or not at all. It
+      promises nothing else: a datagram can be lost, duplicated or arrive out of order, and no one
+      is told. A client that wants an answer has to wait with a timeout and try again. If the
+      server reads into a buffer smaller than the datagram, most systems throw the rest away, so
+      the buffer must fit the largest datagram, just under 64 kilobytes. And because the sender's
+      address is only a field in the packet, it can be forged.
+
+      Real example: in 1996 CERT warned that one forged datagram could set an echo service and a
+      chargen service, on one machine or two, sending traffic to each other without end. It is
+      one reason these services are switched off on almost every system today.
+
+      Common mistake: reading into a small buffer, so long datagrams are silently cut short and
+      the echo no longer matches what was sent. Another is carrying over TCP habits, such as
+      replying to one remembered address instead of to the sender of each datagram.
+    why_here: >-
+      Step 4 runs the same service over UDP, where the server never sees a connection, only
+      datagrams that each carry a return address.
+    origin: step
+    resources:
+      - title: "RFC 768: User Datagram Protocol"
+        url: https://www.rfc-editor.org/rfc/rfc768.html
+      - title: "RFC 8085: UDP Usage Guidelines"
+        url: https://www.rfc-editor.org/rfc/rfc8085.html
+      - title: "udp(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/udp.7.html
+
+  - id: graceful-shutdown
+    name: Graceful shutdown and draining
+    covers:
+      - stop signals, and the one that can't be caught
+      - stop accepting first
+      - draining data already received
+      - closing the write side to signal the end
+      - waking handlers that are blocked
+      - a deadline for clients that never leave
+    explanation: |-
+      Stopping a server well happens in order. First it notices the request to stop, usually a
+      signal: SIGINT when someone presses Ctrl+C, or SIGTERM from a service manager or a
+      container platform. The usual pattern is for the signal only to set a flag or wake the main
+      loop, and for ordinary code to do the rest. Then the server closes its listening socket, so
+      no new clients arrive. Next it drains: every byte already read from a client is written
+      back before that connection closes. A handler blocked waiting on a quiet client has to be
+      woken, for example by shutting its socket down. Closing only the write side sends the
+      client a clean end of stream while the server can still read. Finally, a deadline caps the
+      whole process, because a client that never leaves must not keep the server alive forever.
+      The platform won't wait forever either. After its grace period it sends SIGKILL, which no
+      program can catch.
+
+      Real example: during a rolling deploy, Kubernetes sends SIGTERM to the old copies of a
+      service and waits a grace period before killing them. Servers that drain finish what they
+      started, and servers that exit at once drop work on every deploy.
+
+      Common mistake: exiting straight from the signal. Echoes already received are lost, and
+      closing a socket that still holds unread incoming data makes the system send a reset, so
+      the client can lose even data that had already been sent to it.
+    why_here: >-
+      Step 5 asks the server to close every connection and send back any echoes still in flight
+      before it exits.
+    origin: step
+    resources:
+      - title: "shutdown(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/shutdown.2.html
+      - title: "The ultimate SO_LINGER page, or: why is my TCP not reliable (Bert Hubert)"
+        url: https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable
+      - title: "Pod Lifecycle, see Termination of Pods (Kubernetes documentation)"
+        url: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/
+
+  - id: reading-an-rfc
+    name: Reading an RFC and turning it into behaviour
+    covers:
+      - what kind of RFC it is, and whether it is current
+      - requirement words, and RFCs older than them
+      - one statement, one testable rule
+      - what the spec leaves open
+    explanation: |-
+      An RFC is the Internet's form of a specification. Each one is numbered and never changes
+      after publication. Corrections are listed as errata, and later RFCs update or replace it,
+      so the first check is whether you are reading the current document and what status it has.
+      Newer RFCs mark requirements with capitalised words such as MUST, SHOULD and MAY, defined
+      in RFC 2119. Older ones, like RFC 862 from 1983, state them in plain sentences, and every
+      sentence counts. Turning a spec into behaviour means writing each statement down as a rule
+      you can test, then listing what it leaves open, such as how many clients to serve, how long
+      a silent client may stay, or how large a datagram can be. Those are your decisions, and
+      they belong in your notes rather than in guesses buried in the code.
+
+      Real example: RFC 862 is one page and still an Internet Standard. Its TCP section says that
+      whatever arrives is sent back until the client ends the connection, so in normal running
+      it is the client, not the server, that decides when a session is over.
+
+      Common mistake: learning a protocol from a tool or a tutorial instead of its RFC, and
+      copying the tool's habits as if they were rules. Echoing line by line because nc happens to
+      send whole lines is one such habit, while the RFC only speaks of data.
+    why_here: >-
+      Step 3 is where the RFC's single rule for TCP, send back whatever arrives until the client
+      ends the connection, becomes exact behaviour, with nothing added and nothing left out.
+    origin: step
+    resources:
+      - title: "RFC 862: Echo Protocol"
+        url: https://www.rfc-editor.org/rfc/rfc862.html
+      - title: "How to Read an RFC (Mark Nottingham)"
+        url: https://mnot.net/blog/2018/read_rfc
+      - title: "RFC 2119: Key words for use in RFCs to Indicate Requirement Levels"
+        url: https://www.rfc-editor.org/rfc/rfc2119.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project, read RFC 862, and make sure netcat or telnet is installed to act as a
+      client. The server listens on the port named in the PORT environment variable rather than
+      the privileged port 7, so it runs and can be tested without special rights.
+    check: >-
+      You can say in a sentence what the RFC asks of the TCP service and of the UDP service, and
+      nc can open a connection to a port on your machine.
+    concepts: []
+
+  - id: s1
+    title: Accept one connection
+    objective: >-
+      Bind to all local addresses on the port from PORT, listen, accept a single TCP connection,
+      log the client's address and port, and then exit.
+    check: >-
+      With the server running, connecting with nc to that port on localhost makes the server log
+      the connection with the client's address, such as 127.0.0.1, and a client port that changes
+      on every run, and then exit.
+    concepts: [socket-lifecycle]
+
+  - id: s2
+    title: Serve many clients at once
+    objective: >-
+      Keep accepting after the first client. The main loop goes back to listening while each
+      client is handled by its own concurrent unit of work, a thread or an async task.
+    check: >-
+      Several nc clients connected at the same time are each logged with a different client port,
+      and the server keeps running when any of them leaves.
+    concepts: [concurrency-models]
+
+  - id: s3
+    title: Echo the data
+    objective: >-
+      Read whatever each client sends and write the same bytes back, until the client
+      disconnects. Then log that the client disconnected and carry on serving the others.
+    check: >-
+      A line typed into nc comes back unchanged, two clients connected together each get back
+      only their own data, and closing a client logs the disconnection while the server keeps
+      running.
+    concepts: [byte-stream, socket-lifecycle, reading-an-rfc]
+
+  - id: s4
+    title: Echo over UDP
+    objective: >-
+      Add a -udp flag that runs the service over UDP on the same port. Each datagram received is
+      sent back unchanged, in a datagram addressed to its sender. Log that the server is listening
+      for UDP.
+    check: >-
+      Using nc in UDP mode with -u, a line typed and sent to the port comes back unchanged.
+    concepts: [tcp-vs-udp]
+
+  - id: s5
+    title: Shut down cleanly
+    objective: >-
+      When asked to stop, stop accepting new clients, finish sending back everything already
+      received, close every connection, and exit.
+    check: >-
+      The page gives no test. One way: with clients connected and data on its way, stop the
+      server. Every byte it had already received still comes back, the clients see the connection
+      close cleanly rather than reset, and the process exits promptly with a success code.
+    concepts: [graceful-shutdown]

@@ -1,0 +1,327 @@
+project:
+  slug: code-comment-remover
+  title: Build your own code comment remover
+  source_url: https://codingchallenges.fyi/challenges/challenge-code-comment-remover
+  level: intermediate
+  summary: >-
+    A command-line program that reads a source file and prints it again with the comments
+    removed and everything else exactly as it was, for five languages with three styles of
+    comment, while keeping the comments that tools rely on. Building it teaches how a scanner
+    keeps track of where it is in the text, why searching for comment markers breaks as soon as
+    one sits inside a string, and how the same stream of tokens sits under compilers, minifiers
+    and formatters.
+
+concepts:
+  - id: scanner-state-machine
+    name: A scanner is a state machine
+    covers:
+      - "the states: code, string, character literal, line comment, block comment"
+      - escaped quotes inside strings
+      - state carried from one line to the next
+      - why a line-by-line pattern breaks
+      - nesting needs a counter or a stack
+    explanation: |-
+      A comment marker only starts a comment in the right place. A hash sign or a double slash
+      inside a string is data, and a quote inside a comment is just text. So a comment remover
+      reads the source one character at a time and remembers where it is: in code, in a string,
+      in a character literal, in a line comment or in a block comment. Each character either
+      keeps the current state or moves to another one, and only the code state treats a marker
+      as the start of a comment. Inside a string, a backslash escapes the next character, so an
+      escaped quote doesn't end the string. Block comments and some strings run over several
+      lines, so the state has to survive from one line to the next. When things can nest, such
+      as block comments in some languages, a fixed set of states is no longer enough, and the
+      scanner needs a depth counter, or a stack when different kinds of things nest inside each
+      other.
+
+      Real example: a string holding a web address, and another holding a colour code that
+      starts with a hash sign. A pattern that deletes everything after the first marker on a
+      line cuts both strings in half, and the program no longer runs.
+
+      Common mistake: searching each line for the comment marker. It breaks on markers inside
+      strings, on escaped quotes, and on block comments that open on one line and close on
+      another. A pattern only works if it matches strings and comments together, from left to
+      right, and keeps the strings, and at that point it is a scanner in disguise.
+    why_here: >-
+      Every step removes comments without touching strings that contain the same characters,
+      and from step 2 a block comment can run across many lines.
+    origin: step
+    resources:
+      - title: "Crafting Interpreters: Scanning (Robert Nystrom)"
+        url: https://craftinginterpreters.com/scanning.html
+      - title: "Lexical analysis (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Lexical_analysis
+      - title: "Finite-state machine (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Finite-state_machine
+
+  - id: lexical-rules
+    name: Each language has its own lexical rules
+    covers:
+      - line comments and block comments
+      - block comments that do or don't nest
+      - quote styles, multi-line strings and raw strings
+      - strings with embedded code
+      - character literals and digit separators
+      - a slash that starts a regular expression
+      - a backslash at the end of a line
+    explanation: |-
+      A language's lexical rules say how its characters group into tokens, and they differ in
+      ways that matter here. Some languages have only line comments, starting with a hash sign.
+      Others have line comments starting with a double slash, and block comments that open
+      with a slash and a star and close at the first star and slash, so they can't nest there,
+      while a few other languages let block comments nest. Strings differ even
+      more: single or double quotes, triple quotes that span lines, raw strings that turn
+      escapes off, though not always completely, and back-quoted template strings that hold
+      embedded code with its own strings and comments. A single quote can start a string, a
+      character literal, or in newer versions of some languages sit between the digits of a
+      number as a separator. A slash can mean division or the start of a regular expression
+      literal. Even a backslash at the end of a line plays opposite roles: in two of the page's
+      languages it pulls the next line into a line comment, and in another a backslash never
+      continues a comment.
+
+      Real example: when one compiled language added double-slash line comments, a slash
+      written directly before a slash-star comment changed meaning. The older version read a
+      division sign followed by a comment, and the newer one read the first two slashes as a
+      line comment that hid the rest of the line.
+
+      Common mistake: writing the rules once and reusing them for every language, for example
+      treating every single quote as the start of a string, so a digit separator swallows the
+      code that follows it.
+    why_here: >-
+      Steps 1 to 3 cover three comment styles across four languages, and each has strings,
+      character literals or slashes that rules borrowed from another language get wrong.
+    origin: step
+    resources:
+      - title: "Python Language Reference: Lexical analysis (comments, string literals)"
+        url: https://docs.python.org/3/reference/lexical_analysis.html
+      - title: "MDN: JavaScript lexical grammar (comments, regular expression and template literals)"
+        url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Lexical_grammar
+      - title: "cppreference: Comments in C (no nesting, line splicing, the C99 change)"
+        url: https://en.cppreference.com/c/comment
+
+  - id: exact-preservation
+    name: Removing only the comments
+    covers:
+      - everything outside comments copied byte for byte
+      - a deleted comment can glue two words together
+      - a block comment with a line break counts as a line break
+      - comment-only lines and leftover spaces
+      - line numbers that still match
+    explanation: |-
+      The output must be the same program with the comments gone, so everything outside a
+      comment comes out exactly as it went in: strings, indentation, blank lines and line
+      endings. The space a comment takes up still counts. A block comment between two words
+      keeps them apart, so deleting it outright can glue them into one word, which is why the
+      languages of step 3 define each comment as replaced by a single space. In languages that
+      can end a statement at a line break, a block comment that contains a line break counts as
+      one, so deleting it together with its line breaks can join two statements. Then there are
+      choices to make: a line that held only a comment usually disappears, and a comment after
+      code leaves spaces to trim. Dropping lines shifts line numbers, so an error about line 40
+      of the stripped file isn't about line 40 of the original.
+
+      Real example: a return keyword, then a block comment spanning two lines, then a value.
+      The language treats the comment as a line break and ends the statement there, so the
+      function returns nothing. Delete the comment with its line breaks and the same function
+      now returns the value.
+
+      Common mistake: checking the output by eye. A glued pair of words or a lost line break
+      looks fine and changes what the program does.
+    why_here: >-
+      The page's expected outputs drop the comment-only lines and keep every line of code as it
+      was. The language of step 2 can end a statement at a line break, and the languages of step
+      3 define a comment as a space.
+    origin: step
+    resources:
+      - title: "cppreference: Phases of translation (phase 3, each comment becomes one space)"
+        url: https://en.cppreference.com/c/language/translation_phases
+      - title: "The Go Programming Language Specification: Comments"
+        url: https://go.dev/ref/spec#Comments
+
+  - id: meaningful-comments
+    name: Comments that carry meaning
+    covers:
+      - doc comments attached to the declaration below
+      - directives read by linters and build tools
+      - the exact form a tool recognises
+      - directives tied to a line or a place in the file
+      - comments the system reads, such as the interpreter line
+    explanation: |-
+      Some comments are read by programs, not only by people. Documentation tools take the
+      comment placed directly above a declaration and publish it as that item's documentation.
+      In the language of step 4, a doc comment sits immediately before a top-level declaration
+      with no blank line in between, so one blank line turns it back into an ordinary comment.
+      Tools also read directives written as comments: a note that tells a linter to skip one
+      warning on its line, a line that tells the build whether to include the file, a line that
+      tells a generator what to run. Each tool recognises its directive by an exact form, often
+      with no space after the comment marker, and many only work on the line they sit on, or
+      only before a certain point in the file. The system reads comments too. On Unix, a first line
+      starting with a hash sign and an exclamation mark names the interpreter that runs the
+      file, and one scripting language reads the file's text encoding from a comment in its
+      first two lines.
+
+      Real example: minifiers that strip every other comment keep license comments, marked by
+      an exclamation mark or a license tag, because the license has to travel with the code.
+
+      Common mistake: deciding by what a comment says instead of where it sits and its exact
+      form. A comment with a blank line before its declaration isn't documentation, and a
+      directive written with a space after the slashes isn't a directive.
+    why_here: >-
+      Step 4 keeps doc comments and step 5 keeps linter and build directives, so the remover has
+      to tell the comments that are part of the program from the ones that are only notes.
+    origin: step
+    resources:
+      - title: "Go Doc Comments (doc comments and directives)"
+        url: https://go.dev/doc/comment
+      - title: "flake8: Selecting and Ignoring Violations (noqa comments)"
+        url: https://flake8.pycqa.org/en/latest/user/violations.html
+      - title: "Shebang (Unix) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Shebang_(Unix)
+
+  - id: token-stream
+    name: "The token stream: one scanner, many tools"
+    covers:
+      - tokens with a kind, exact text and position
+      - comments kept as trivia attached to tokens
+      - context from the token before
+      - lookahead to the token after
+      - minifiers, formatters, highlighters and obfuscators
+    explanation: |-
+      A scanner that knows where every string and comment starts is one step from a lexer: a
+      program that turns source text into a stream of tokens, each with a kind (keyword, name,
+      string, number, operator, comment), its exact text and its position. Removing comments is
+      then printing every token except the comments. Many tools share that stream. A minifier
+      drops comments and most whitespace, a syntax highlighter colours tokens by kind, and a
+      formatter keeps each comment attached to a nearby token so it can move code without
+      losing it. Some decisions need the neighbouring tokens. A slash after a name or a closing
+      bracket is usually division, and after an operator it starts a regular expression. A
+      comment is documentation only if the next token begins a top-level declaration. Giving
+      every name a short random replacement, to obfuscate code, needs more than tokens, because
+      one name can mean different things in different scopes.
+
+      Real example: one compiler platform keeps every space and comment as trivia on its
+      tokens, so its syntax tree turns back into the exact original text. That is what lets
+      refactoring tools change code without disturbing the comments around it.
+
+      Common mistake: throwing comments and whitespace away in the lexer, then finding that a
+      formatter or documentation tool built on top has nothing left to attach them to.
+    why_here: >-
+      Step 4 can only tell a doc comment from an ordinary one by looking at the token after it,
+      and the page's going-further ideas, a minifier and an obfuscator, are built on the same
+      stream.
+    origin: beyond
+    resources:
+      - title: "Microsoft Learn: the .NET Compiler Platform syntax model (see Syntax trivia)"
+        url: https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/work-with-syntax#syntax-trivia
+      - title: "Minification (programming) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Minification_(programming)
+      - title: "Prettier: Rationale (see the section on comments)"
+        url: https://prettier.io/docs/rationale
+
+  - id: transformation-testing
+    name: Testing a rewrite that must keep the meaning
+    covers:
+      - properties that hold for any input
+      - the same tokens before and after, minus the comments
+      - running it twice changes nothing
+      - the compiler or interpreter as an oracle
+      - real code plus hand-written nasty cases
+    explanation: |-
+      A comment remover rewrites programs, and its output is right only if it means exactly
+      what the input meant. Expected outputs are rarely written down, so test properties that
+      must hold for any input. The output's tokens equal the input's tokens without the
+      removed comments, and the language's own tokenizer, where there is one, can check that.
+      Running the remover on its own output changes nothing. The stripped program still
+      compiles or runs and behaves the same. Real open-source files exercise those properties
+      on cases you'd never invent, and a small set of hand-written nasty cases with exact
+      expected outputs covers the rest: markers inside strings, escaped quotes, a comment on
+      the last line with no newline after it.
+
+      Real example: some code formatters check every result this way by default. They parse
+      their own output, confirm its syntax tree matches the input's, and format it a second
+      time to make sure nothing more changes.
+
+      Common mistake: testing only on the page's examples, which have no comment markers inside
+      strings, so the bugs that matter never show up.
+    why_here: >-
+      The page gives no test files. Step 1 asks you to test on real open-source code and your
+      own examples, and steps 2 and 3 give one expected output each.
+    origin: beyond
+    resources:
+      - title: "Metamorphic testing (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Metamorphic_testing
+      - title: "Black documentation: The basics (see --fast and --safe)"
+        url: https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and settle the interface, which the page leaves open: the program
+      takes the path of one source file, picks the comment rules from the file's extension, and
+      prints the result to standard output. Collect a few real source files in each of the
+      page's languages to test on.
+    check: >-
+      Before removing anything, the program prints a file back byte for byte, so comparing its
+      output with the original shows no difference.
+    concepts: []
+
+  - id: s1
+    title: Hash-sign comments
+    objective: >-
+      For a scripting language whose comments start with a hash sign and run to the end of the
+      line, remove every comment, whether it fills a whole line or follows code. A hash sign
+      inside a string is not a comment, and a string written as documentation is code, so both
+      stay.
+    check: >-
+      On real open-source files and on examples of your own, no comments are left, every string
+      containing a hash sign is unchanged, and each stripped file still runs the same as the
+      original.
+    concepts: [scanner-state-machine, transformation-testing]
+
+  - id: s2
+    title: Line and block comments
+    objective: >-
+      For the main scripting language of web pages, remove both of its comment styles: line
+      comments that start with a double slash, and block comments that open with a slash and a
+      star and close with a star and a slash, even many lines later. Strings, template strings
+      and regular expression literals that contain those characters stay as they are.
+    check: >-
+      The page's example function comes out exactly like its expected output: lines that held
+      only a comment are gone, blank lines stay, and every line of code is unchanged.
+    concepts: [scanner-state-machine, lexical-rules, exact-preservation]
+
+  - id: s3
+    title: Comments in two compiled languages
+    objective: >-
+      Apply the same two comment styles to two compiled systems languages, with the rules that
+      are their own: character literals in single quotes, a backslash at the end of a line
+      comment that pulls the next line into it, and in one of them, raw strings and digit
+      separators.
+    check: >-
+      The page's example comes out exactly like its expected output, a block comment squeezed
+      between two words leaves them as two words, and a stripped file of your own still
+      compiles and behaves the same.
+    concepts: [lexical-rules, exact-preservation, transformation-testing]
+
+  - id: s4
+    title: Keep doc comments
+    objective: >-
+      For a compiled language whose documentation tool reads comments, remove every comment
+      except doc comments: the ones directly above a top-level declaration of the package, a
+      constant, a function, a type or a variable, with no blank line in between.
+    check: >-
+      In a file of your own, a comment directly above a top-level declaration survives whole,
+      every line of it, while a comment with a blank line before its declaration, or one inside
+      a function body, is removed.
+    concepts: [meaningful-comments, token-stream]
+
+  - id: s5
+    title: Keep tool directives
+    objective: >-
+      Also keep the comments that configure tools: the linter suppression on a line of the step
+      1 language, and the code-generation and build directives of the step 4 language. Every
+      other comment is still removed.
+    check: >-
+      The page's three directive examples come through unchanged and in place, the linter still
+      skips the warning the suppression names, and a file marked to be left out of the build is
+      still left out.
+    concepts: [meaningful-comments]

@@ -1,0 +1,421 @@
+project:
+  slug: brainfuck
+  title: Build your own Brainfuck interpreter
+  source_url: https://codingchallenges.fyi/challenges/challenge-brainfuck
+  level: intermediate
+  summary: >-
+    An interpreter for Brainfuck, a tiny language of eight one-character commands, that grows into
+    a compiler to bytecode and a virtual machine to run it, then gets many times faster through
+    optimisation. Because the language is so small, nothing hides the machinery every interpreter
+    shares: memory and a program counter, loops resolved before the program runs, and speed won by
+    doing more work per instruction and measured with care.
+
+concepts:
+  - id: repl
+    name: The read-eval-print loop
+    covers:
+      - read, evaluate, print, repeat
+      - state kept between entries
+      - input that isn't complete yet
+      - ending cleanly at end of input
+    explanation: |-
+      A read-eval-print loop, or REPL, is the interactive face of an interpreter. It reads one
+      entry, evaluates it, prints the result and waits for the next. Two design questions come
+      with it. Does the machine's state survive from one entry to the next, so a cell set on one
+      line still holds its value on the following one? And what happens when an entry isn't
+      complete, such as a loop opened on one line and closed on the next? Good REPLs keep the
+      state and wait for more input until the entry is complete. The loop also has to stop
+      cleanly when input ends, instead of spinning or crashing.
+
+      Real example: a Unix shell is a REPL. It reads a command line, runs it, shows the output and
+      prompts again. If a quote is left open, it shows a continuation prompt and waits for the
+      rest instead of running a broken command.
+
+      Common mistake: resetting the tape for every line, or running a line with an unmatched
+      bracket as if it were complete. Both make a program typed over several lines behave
+      differently from the same program read from a file.
+    why_here: >-
+      The first step is a REPL that only echoes, and it becomes the front end that feeds your
+      interpreter, alongside running a whole file.
+    origin: step
+    resources:
+      - title: "Read-eval-print loop (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop
+      - title: "Bash Reference Manual: Shell Operation"
+        url: https://www.gnu.org/software/bash/manual/html_node/Shell-Operation.html
+
+  - id: machine-model
+    name: "The machine: a tape of cells, a data pointer and a program counter"
+    covers:
+      - the tape of cells, all starting at zero
+      - the data pointer
+      - the program counter, kept apart from the data
+      - loops as the only control flow
+      - Turing completeness
+    explanation: |-
+      Brainfuck describes a tiny abstract machine. Memory is a row of cells, the tape, all set to
+      zero at the start. A data pointer marks the current cell. The right and left commands move
+      it, the plus and minus commands change the cell it points at, and the dot and comma commands
+      write or read one byte there. A separate program counter marks the next command to run. The
+      two brackets are the only control flow: the opening one skips past its loop when the current
+      cell is zero, and the closing one jumps back while it isn't. The program lives apart from
+      the data, so a program can never change its own code. With an unbounded tape this is enough
+      to compute anything any computer can, which makes the language Turing complete and close to
+      Turing's own machine.
+
+      Real example: printing the letter H means a cell must hold its character code, 72. Adding
+      one at a time would take 72 plus commands, so programs multiply with a loop instead: set one
+      cell to 8, then loop 8 times, adding 9 to the next cell on each pass.
+
+      Common mistake: confusing the two pointers. The data pointer chooses which cell the commands
+      touch, and the program counter chooses which command runs next. The brackets move only the
+      program counter, and the left and right commands move only the data pointer.
+    why_here: >-
+      Your interpreter is this machine. Every command is a small change to the tape, the data
+      pointer or the program counter.
+    origin: step
+    resources:
+      - title: "Brainfuck (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Brainfuck
+      - title: "Turing Machines (Sam Rose)"
+        url: https://samwho.dev/turing-machines/
+
+  - id: fetch-decode-execute
+    name: "Fetch, decode, execute: the loop inside every interpreter"
+    covers:
+      - the program counter moving one step at a time
+      - deciding what an instruction means
+      - jumps that set the program counter
+      - the fixed cost of every trip round the loop
+    explanation: |-
+      A processor and an interpreter run the same cycle. Fetch the instruction the program counter
+      points at, decode it to find out what it means, and execute it by changing the machine's
+      state. Then move the program counter, normally to the next instruction, or to a new place if
+      the instruction was a jump. A source interpreter fetches characters straight from the
+      program text, so every character costs a trip round the loop, comments included, and
+      decoding means comparing a character with the eight commands. That fixed cost per
+      instruction, paid before any useful work, is what the later steps fight.
+
+      Real example: a processor's instruction cycle works this way, and so do the interpreters
+      inside many language runtimes, where decoding is one big choice over the opcodes.
+
+      Common mistake: an off-by-one around jumps. Decide whether a stored target means the
+      matching bracket or the command just after it, and move the program counter the same way
+      everywhere, or loops will skip their first command.
+    why_here: >-
+      The interpreter in step 2 is this loop over the source text, and the virtual machine in
+      step 4 is the same loop over bytecode.
+    origin: step
+    resources:
+      - title: "Instruction cycle (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Instruction_cycle
+      - title: "Adventures in JIT compilation, part 1: an interpreter (Eli Bendersky)"
+        url: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/
+
+  - id: bracket-matching
+    name: Matching brackets and precomputing jump targets
+    covers:
+      - nesting and a stack of open brackets
+      - scanning at run time versus a jump table built once
+      - unmatched brackets as errors found before running
+    explanation: |-
+      Each opening bracket pairs with exactly one closing bracket, and loops nest, so the partner
+      of a bracket is not simply the next bracket of the other kind. One way to find it is to scan
+      through the program at run time, counting depth until it returns to zero. That works, but
+      the scan repeats every time a loop is entered or repeated, so a tight inner loop pays for it
+      on every pass. The better way is one pass before running. Push each opening bracket's
+      position onto a stack, and at each closing bracket pop the top position. Those two are
+      partners, so record each as the other's jump target in a table, and every jump becomes one
+      lookup. The same pass finds the errors: a closing bracket when the stack is empty, or
+      opening brackets still on the stack at the end. It can say where they are before any
+      command runs.
+
+      Real example: in Eli Bendersky's step-by-step interpreter write-up, replacing the run-time
+      scan with a precomputed jump table roughly halved the time to draw the Mandelbrot set.
+
+      Common mistake: jumping to the next bracket of the other kind without counting depth, which
+      picks the wrong partner as soon as loops nest.
+    why_here: >-
+      Step 2 needs the program counter to find matching brackets, and step 3 moves that work to
+      compile time by storing each jump's target in the bytecode.
+    origin: step
+    resources:
+      - title: "Adventures in JIT compilation, part 1: an interpreter (Eli Bendersky)"
+        url: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/
+      - title: "Crafting Interpreters: Jumping Back and Forth"
+        url: https://craftinginterpreters.com/jumping-back-and-forth.html
+
+  - id: cell-semantics
+    name: "What the spec leaves open: cell size, wrap-around, tape ends and end of input"
+    covers:
+      - cell size and wrap-around
+      - moving off either end of the tape
+      - what the comma command does at end of input
+      - implementation-defined behaviour and portable programs
+    explanation: |-
+      The original description of Brainfuck leaves several choices to whoever implements it. How
+      big is a cell? 8 bits is the usual choice, but 16 and 32 bits exist. When a cell goes below
+      zero or past its largest value, does it wrap around, or is that an error? What happens when
+      the data pointer moves left of the first cell or past the last one? And when the comma
+      command reads after input has run out, does the cell become zero, become minus one, or stay
+      as it was? Each choice is reasonable, but programs are written against one of them, and a
+      program that relies on a different one misbehaves. Specifications for real languages have
+      the same gaps, called implementation-defined or unspecified behaviour, and portable programs
+      avoid relying on them. The honest response is to choose on purpose, document the choice, and
+      report an error such as leaving the tape clearly instead of crashing.
+
+      Real example: a program that copies its input to its output, written for an interpreter that
+      sets the cell to zero at end of input, never stops on one that leaves the cell unchanged. It
+      prints the last character forever.
+
+      Common mistake: storing cells in the language's default integer type, so subtracting one
+      from zero gives minus one instead of wrapping, and loops that count down past zero never
+      end.
+    why_here: >-
+      The page settles none of these, and the sample programs only work when your choices match
+      what they expect. You decide them when you build the interpreter and must keep them when you
+      optimise.
+    origin: beyond
+    resources:
+      - title: "The Epistle to the Implementors (Daniel B. Cristofani)"
+        url: http://brainfuck.org/epistle.html
+      - title: "Brainfuck (Esolang wiki)"
+        url: https://esolangs.org/wiki/Brainfuck
+      - title: "Unspecified behavior (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Unspecified_behavior
+
+  - id: bytecode-compilation
+    name: "Compiling to bytecode: moving work from run time to compile time"
+    covers:
+      - translate once, run many times
+      - opcodes and operands
+      - dropping comments and resolving jumps ahead of time
+      - errors found before running
+      - the next step down, native code and just-in-time compilation
+    explanation: |-
+      Interpreting the source directly means redoing the same analysis every time a command runs:
+      skipping comments, recognising characters, finding brackets. A compiler does that work once,
+      before running, and writes the result as bytecode. Bytecode is a compact list of
+      instructions, each an opcode that says what to do plus any operands it needs, such as a jump
+      target. Anything that depends only on the program text, not on the input, can move to
+      compile time. Errors move with it, so an unmatched bracket is reported before the program
+      starts rather than halfway through a long run. One step further, a just-in-time compiler
+      turns the bytecode into the processor's own machine code and removes the interpreter loop
+      altogether.
+
+      Real example: a database prepares a query once, parsing and planning it into an internal
+      program, then runs that plan many times with different values.
+
+      Common mistake: calling it bytecode while keeping the source characters as the
+      instructions, so the virtual machine still has to skip comments and search for brackets, and
+      nothing has really moved to compile time.
+    why_here: >-
+      Step 3 asks for exactly this split: a compiler that drops comments and fixes every loop's
+      jump target, so the virtual machine only has to run instructions.
+    origin: step
+    resources:
+      - title: "Crafting Interpreters: Chunks of Bytecode"
+        url: https://craftinginterpreters.com/chunks-of-bytecode.html
+      - title: "Bytecode (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Bytecode
+      - title: "Adventures in JIT compilation, part 2: an x64 JIT (Eli Bendersky)"
+        url: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-2-an-x64-jit/
+
+  - id: virtual-machine
+    name: "Virtual machines: an instruction set run by software"
+    covers:
+      - designing the instruction set
+      - the instruction set as a contract with the compiler
+      - the machine state, held by the virtual machine
+      - dispatch cost per instruction
+      - growing the instruction set
+    explanation: |-
+      A virtual machine is a program that acts like a simple processor with an instruction set you
+      design. It holds the machine's state, here the tape, the data pointer and its own program
+      counter over the bytecode, and runs the fetch, decode, execute loop on instructions that are
+      already split into opcodes and operands. The instruction set is a contract between the
+      compiler and the virtual machine: the compiler only emits what the machine understands, and
+      both agree exactly on what each instruction does. Most of a simple virtual machine's time
+      goes on dispatch, the bookkeeping of fetching and choosing what to do next, rather than on
+      the work each instruction does. So the way to go faster is to make each instruction do
+      more, which is why instruction sets grow new, bigger instructions over time.
+
+      Real example: tcpdump compiles a filter expression into bytecode for the kernel's packet
+      filter, a small virtual machine that runs it on every packet, and its -d option prints that
+      bytecode.
+
+      Common mistake: expecting the virtual machine alone to be much faster. With one instruction
+      per source command it saves little beyond skipping comments and searching for brackets. The
+      large gains come when one instruction replaces many, which the next steps add.
+    why_here: >-
+      Step 4 builds the virtual machine that runs your bytecode, and step 6 grows its instruction
+      set with instructions for common patterns.
+    origin: step
+    resources:
+      - title: "Crafting Interpreters: A Virtual Machine"
+        url: https://craftinginterpreters.com/a-virtual-machine.html
+      - title: "Berkeley Packet Filter (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Berkeley_Packet_Filter
+
+  - id: peephole-optimisation
+    name: "Peephole optimisation: run-length and recognised patterns"
+    covers:
+      - collapsing a run of the same command into one counted instruction
+      - recognising idioms such as the clear loop
+      - keeping the meaning exactly the same
+      - finding the hot patterns by counting what runs
+    explanation: |-
+      A peephole optimiser looks at a small window of instructions and swaps it for a cheaper
+      sequence that does exactly the same thing. In Brainfuck the first win is run-length: ten
+      plus commands become one instruction that adds ten, and a run of right moves becomes one
+      move by that many cells. The next win is idioms. A loop whose only command subtracts one
+      does nothing but set the cell to zero, so it becomes one clear instruction, and a clear
+      followed by a move right is common enough to earn an instruction of its own. Because a
+      virtual machine's cost is mostly per instruction, fewer and bigger instructions mean less
+      time. Every rewrite must keep the meaning exactly, edges included: adding 300 to an 8-bit
+      cell must give the same result as 300 single plus commands. Counting how often each loop
+      runs shows which patterns are worth an instruction.
+
+      Real example: a loop that subtracts one until the cell is zero can run up to 255 times on an
+      8-bit cell. As one clear instruction it costs a single step, whatever the value.
+
+      Common mistake: rewriting any loop that subtracts as a clear. A loop that subtracts two
+      never reaches zero from an odd value on a wrapping 8-bit cell, so it never ends, and turning
+      it into a clear changes what the program does.
+    why_here: >-
+      Steps 5 and 6 are this optimiser: first runs of the same command, then the clear loop and the
+      clear-and-move pair, each judged by unchanged output and by time.
+    origin: step
+    resources:
+      - title: "Brainfuck optimization strategies (Mats Linander)"
+        url: http://calmerthanyouare.org/2015/01/07/optimizing-brainfuck.html
+      - title: "Peephole optimization (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Peephole_optimization
+
+  - id: measuring-performance
+    name: Measuring speed honestly
+    covers:
+      - wall-clock time versus processor time
+      - a recorded baseline and the same inputs
+      - noise and repeated runs
+      - keeping output out of the measurement
+      - profiling to find where the time goes
+      - correct output before any speed claim
+    explanation: |-
+      An optimisation is only real if a fair measurement shows it. The time command reports three
+      numbers: real time on the wall clock, user time spent running your own code, and system
+      time spent in the kernel on your behalf. Compare like with like: the same program, the same
+      input, the same machine, and a baseline recorded before the change. Single runs are noisy,
+      so run each version several times and compare typical values. Writing to a terminal can be
+      slower than the computation itself, so send the output to a file or throw it away while
+      timing, and check separately that the output is still right, because a fast wrong answer is
+      worth nothing. When you don't know where the time goes, a profiler, or simply counting how
+      often each instruction runs, shows the hot spots, which are rarely where you guessed.
+
+      Real example: Mats Linander's study of Brainfuck optimisations reports each time as the
+      average of ten runs and uses six different programs. That mattered: turning scan loops into
+      single instructions made one program more than three times faster and barely changed the
+      others.
+
+      Common mistake: comparing one run of the new version with one run of the old, taken under
+      different conditions, and crediting the change with a difference that is only noise.
+    why_here: >-
+      The page asks you to time the Mandelbrot program after the interpreter, the virtual machine
+      and each optimisation, and to judge every change by how much faster it got.
+    origin: step
+    resources:
+      - title: "time(1), Linux manual page"
+        url: https://man7.org/linux/man-pages/man1/time.1.html
+      - title: "Crafting Interpreters: Optimization (see Measuring Performance)"
+        url: https://craftinginterpreters.com/optimization.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Choose your language and editor, and save the challenge's sample programs as files: the
+      short Hello! program, the test script and the Mandelbrot program from the linked blog post.
+      Before reading the page's answer, try writing a program that prints Hello! yourself.
+    check: >-
+      The three sample programs are saved and ready to run, and you can explain how the Hello!
+      program builds each letter in its cells.
+    concepts: []
+
+  - id: s1
+    title: REPL and echo
+    objective: >-
+      Start an interactive prompt that reads what you type and prints it straight back. Then, when
+      a file name is given, print that file's contents instead.
+    check: >-
+      A line typed at the prompt comes back unchanged, and running the program on the Hello! file
+      prints the file's text exactly.
+    concepts: [repl]
+
+  - id: s2
+    title: Interpreter
+    objective: >-
+      Run a program one command at a time on a tape of 30,000 cells set to zero, or a size you can
+      choose. Ignore every character that isn't one of the eight commands, and make the program
+      counter jump to the matching bracket when a loop is skipped or repeated.
+    check: >-
+      The Hello! program prints Hello!, the test script prints a readable message, and the
+      Mandelbrot program draws a recognisable Mandelbrot set in text. Timed with its output thrown
+      away, the Mandelbrot run takes tens of seconds at this stage, and that time is your baseline.
+    concepts: [machine-model, fetch-decode-execute, bracket-matching, cell-semantics]
+
+  - id: s3
+    title: Bytecode compiler
+    objective: >-
+      Compile the source into bytecode with one instruction for each command. Leave the comments
+      out, and give every loop instruction the position of its partner, worked out at compile
+      time.
+    check: >-
+      The bytecode for each sample program has no comments, one instruction per command, and loop
+      instructions that point at each other, and the programs still behave exactly as before.
+    concepts: [bytecode-compilation, bracket-matching]
+
+  - id: s4
+    title: Virtual machine
+    objective: >-
+      Run the bytecode in a virtual machine with its own program counter and data pointer. It
+      reads each opcode and, for loops, its target, then updates the program counter or the
+      current cell.
+    check: >-
+      Every earlier program gives the same output as with the step 2 interpreter, and the
+      Mandelbrot program is timed again under the same conditions and compared with the baseline.
+    concepts: [virtual-machine, fetch-decode-execute, measuring-performance]
+
+  - id: s5
+    title: Collapse repeated commands
+    objective: >-
+      Make the compiler turn a run of the same command into one instruction with a count, such as
+      a single instruction that adds ten in place of ten plus commands, and make the virtual
+      machine carry it out.
+    check: >-
+      The Hello! program compiles to about a third as many instructions as it has commands (the
+      page gets 26 from 70), its output is unchanged, and the Mandelbrot program runs much faster
+      than the baseline.
+    concepts: [peephole-optimisation, cell-semantics]
+
+  - id: s6
+    title: Replace common patterns
+    objective: >-
+      Recognise the loop that subtracts one until its cell is zero, and that loop followed by a
+      move right, and compile each into a single new instruction that the virtual machine
+      supports.
+    check: >-
+      Every sample program still gives the same output, and timing shows a clear further speed-up
+      over step 5.
+    concepts: [peephole-optimisation, virtual-machine]
+
+  - id: s7
+    title: Going further
+    objective: >-
+      Count how often each loop runs and turn the most common loop shapes into new instructions.
+      Beyond that, replace the virtual machine with a just-in-time compiler, or emit assembly or a
+      compiler back end's intermediate form instead of bytecode.
+    check: >-
+      The Mandelbrot program draws the same picture in a small fraction of the original time, with
+      the page's target under 15 percent of it.
+    concepts: [measuring-performance, peephole-optimisation, bytecode-compilation]
+    optional: true

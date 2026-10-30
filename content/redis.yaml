@@ -1,0 +1,501 @@
+project:
+  slug: redis
+  title: Build your own Redis server
+  source_url: https://codingchallenges.fyi/challenges/challenge-redis
+  level: intermediate
+  summary: >-
+    A small server that speaks the Redis wire protocol, so the real redis-cli and redis-benchmark
+    can talk to it, and stores strings, counters and lists with optional expiry and a snapshot on
+    disk. Building it teaches how a protocol marks where each message ends on a TCP stream, how
+    one process serves many clients without corrupting shared data, how keys expire cheaply, and
+    how a snapshot survives a restart.
+
+concepts:
+  - id: resp-wire-format
+    name: "RESP: a typed, length-prefixed wire format"
+    covers:
+      - the first byte names the type
+      - simple strings, errors and integers
+      - length-prefixed bulk strings
+      - null versus empty
+      - arrays and nesting
+      - CRLF as the terminator
+      - lengths count bytes, not characters
+      - complete, incomplete and invalid input
+    explanation: |-
+      RESP is the format Redis clients and servers use for every message. The first byte of each
+      value names its type: a plus sign for a simple string, a minus sign for an error, a colon
+      for an integer, a dollar sign for a bulk string and an asterisk for an array. Every header
+      line ends with a carriage return and a line feed, called CRLF. Simple strings and errors are
+      short and may not contain CR or LF. A bulk string is different: its header gives a length in
+      bytes, and exactly that many bytes follow, so the value can hold anything, CRLF and binary
+      data included, with no escaping. An array's header gives its number of elements, and each
+      element is another RESP value, so arrays can nest. A client always sends a command as an
+      array of bulk strings, and the reply's type depends on the command. RESP2 has two kinds of
+      nothing: an empty bulk string, of length 0, is a real value, while a length of -1 means
+      null, which GET sends for a missing key. So a decoder has three possible answers for a
+      buffer: a complete value and how many bytes it used, not enough bytes yet, or invalid.
+
+      Real example: ECHO with the argument hello world travels as an array of two bulk strings,
+      the second with the length 11. Because the length comes first, a parser never scans the
+      value for special characters, which is why RESP parses about as fast as a binary format
+      while staying readable.
+
+      Common mistake: counting a bulk string's length in characters instead of bytes. A value
+      with an accented letter or an emoji then gets the wrong length, and every message after it
+      on that connection is misread. Another is treating the empty string and null as the same.
+    why_here: >-
+      Step 1 builds the encoder and decoder on their own, tested before any networking exists,
+      and every later step sends and receives these values.
+    origin: step
+    resources:
+      - title: "Redis serialization protocol (RESP) specification"
+        url: https://redis.io/docs/latest/develop/reference/protocol-spec/
+      - title: "RESP3 specification (redis-specifications)"
+        url: https://github.com/redis/redis-specifications/blob/master/protocol/RESP3.md
+      - title: "Type-length-value (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Type%E2%80%93length%E2%80%93value
+
+  - id: stream-framing
+    name: Framing messages on a TCP byte stream
+    covers:
+      - a stream keeps no message boundaries
+      - partial reads
+      - several commands in one read
+      - a read buffer per connection
+      - pipelining and reply order
+      - partial writes
+      - the client closing the connection
+    explanation: |-
+      TCP delivers bytes in order, but it doesn't keep the boundaries of the writes that produced
+      them. One command written by a client can arrive as two reads on the server, and two
+      commands written separately can arrive together in one read. So a server can't treat one
+      read as one command. Each connection gets its own buffer. New bytes are appended to it, the
+      parser tries to take one complete command from the front, and if the bytes stop partway it
+      keeps them and waits for more. When a command is complete, the server removes its bytes,
+      runs it, and tries again on what is left before reading more, because the buffer may hold
+      several commands. Replies go back in the order the commands arrived. RESP makes this
+      workable because every part either states its length or ends with CRLF, so the parser
+      always knows whether it holds a whole message. A read that returns zero bytes means the
+      client has closed its side, and the server closes the connection and frees its buffer.
+      Writes can be partial too, so a reply is sent until every byte has gone.
+
+      Real example: redis-benchmark opens with two CONFIG GET commands sent back to back before it
+      reads any reply, and with -P 16 it sends sixteen commands at a time. This is pipelining,
+      and real applications use it to avoid paying a network round trip per command.
+
+      Common mistake: reading once, parsing what arrived and answering one command. On your own
+      machine small commands usually arrive whole, so the bug hides until a pipelining client
+      waits forever for its second reply, or a large value arrives in pieces and is rejected as
+      invalid.
+    why_here: >-
+      Step 2 is the first time bytes come from a real client, and redis-cli and redis-benchmark
+      split and merge commands in ways the unit tests of step 1 never did.
+    origin: step
+    resources:
+      - title: "Beej's Guide to Network Programming: Son of Data Encapsulation"
+        url: https://beej.us/guide/bgnet/html/split/slightly-advanced-techniques.html#sonofdataencap
+      - title: "Redis pipelining (Redis docs)"
+        url: https://redis.io/docs/latest/develop/using-commands/pipelining/
+      - title: "recv(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/recv.2.html
+
+  - id: command-dispatch
+    name: Command dispatch and error replies
+    covers:
+      - the command name and its arguments
+      - case-insensitive names
+      - a table from name to handler
+      - arity checks before running
+      - each command's reply type
+      - error replies versus closing the connection
+    explanation: |-
+      Once a whole command is decoded, the server holds a list of byte strings. The first is the
+      command name, which Redis matches without regard to case, so ping, PING and Ping are the
+      same command. A table maps each name to its handler and its arity, the number of arguments
+      it accepts: GET takes exactly one key, while SET takes at least a key and a value, plus
+      options. Checking the arity and the argument formats before running anything means a
+      handler never reads an argument that isn't there. Each command also fixes its reply type:
+      PING answers with the simple string PONG, ECHO with a bulk string, GET with a bulk string or
+      null, and SET with OK. Two kinds of failure need different handling. A wrong command, such
+      as an unknown name or a missing argument, gets an error reply that starts with an upper-case
+      prefix such as ERR, and the connection carries on. Bytes that aren't valid RESP are worse:
+      the server can no longer tell where the next command starts, so Redis answers with a
+      protocol error and closes the connection.
+
+      Real example: a client that wants RESP3 opens the connection with HELLO 3, and the
+      specification tells it to fall back to RESP2 when the server replies ERR unknown command. A
+      server that answers that way works with such clients, while one that crashes or hangs up
+      breaks them before their first real command.
+
+      Common mistake: matching only upper-case names, so a lower-case command typed into
+      redis-cli fails, or letting an error inside one handler bring down the server, which
+      disconnects every client instead of answering one with an error.
+    why_here: >-
+      Step 2 adds the first commands, PING and ECHO, and step 3 adds SET and GET with their own
+      argument rules and error cases.
+    origin: step
+    resources:
+      - title: "RESP specification: Simple errors (Redis docs)"
+        url: https://redis.io/docs/latest/develop/reference/protocol-spec/#simple-errors
+      - title: "COMMAND: arity and command metadata (Redis docs)"
+        url: https://redis.io/docs/latest/commands/command/
+
+  - id: keyspace-hash-table
+    name: The keyspace as a hash table
+    covers:
+      - hashing a key to a bucket
+      - average constant-time lookups
+      - collisions and the load factor
+      - growing and rehashing
+      - incremental rehashing
+      - keys compared as bytes
+    explanation: |-
+      The whole database is one big map from keys to values, and nearly every command starts with
+      a lookup in it, so its cost sets the pace of the server. A hash table turns a key into a
+      number with a hash function and uses that number to pick a bucket, so a lookup takes about
+      the same time with ten keys or ten million. Different keys can land in the same bucket, a
+      collision, and the table copes by chaining entries in the bucket or by probing nearby slots.
+      As entries pile up, the load factor, the number of entries per bucket, rises and lookups
+      slow down, so the table grows, usually doubling, and every entry moves to its new bucket.
+      That move, rehashing, touches every key at once, which is a long pause for a big table. Keys
+      are byte strings, so two keys are equal only when their bytes are equal.
+
+      Real example: Redis keeps two tables while it grows. New keys go into the new table, and
+      each lookup or write also moves a little of the old table across, so the cost of rehashing
+      is spread over many commands instead of stalling every client at once. Redis also seeds its
+      hash function with random bytes at start-up, so an attacker can't pick keys that all
+      collide.
+
+      Common mistake: storing keys in a type whose equality compares identity rather than
+      contents, such as a raw byte buffer, so GET builds a new key with the same bytes and never
+      finds the entry SET stored. Another is keeping a list of pairs and scanning it, which works
+      with five keys in a test and collapses under a benchmark.
+    why_here: >-
+      Step 3 leaves the choice of storage to you, and step 7 asks whether your data structure is
+      the right one when your server is slower than Redis.
+    origin: step
+    resources:
+      - title: "Hash table: Dynamic resizing (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Hash_table#Dynamic_resizing
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 3.4 Hash Tables"
+        url: https://algs4.cs.princeton.edu/34hash/
+
+  - id: serving-many-clients
+    name: Serving many clients safely
+    covers:
+      - a thread per connection
+      - an event loop over non-blocking sockets
+      - readiness notification such as epoll and kqueue
+      - shared data and data races
+      - making a whole command atomic
+      - one slow command or client holding up the rest
+    explanation: |-
+      A server that reads from one client until it disconnects leaves every other client
+      waiting, so it needs a way to serve many at once. There are two common models. In the
+      first, each connection gets its own thread, which blocks on reads and runs commands. The
+      code stays simple, but every thread reserves memory for its stack, switching between
+      thousands of threads costs time, and all of them share one keyspace. Without coordination,
+      two threads can change the map at the same moment and corrupt it, and read-modify-write
+      commands lose updates: two INCRs both read 41 and both write 42. A lock fixes this, as long
+      as it covers the whole command rather than each map access. In the second model, one thread
+      runs an event loop. Sockets are non-blocking, the operating system reports which ones are
+      ready, through epoll on Linux or kqueue on BSD and macOS, and the loop reads what has
+      arrived, runs every complete command and moves on. Each command runs to the end before the
+      next starts, so commands are atomic without locks. The price is that one slow command
+      stalls every client, and only one core does the work. Some async runtimes spread tasks over
+      several threads, so async code can still race.
+
+      Real example: Redis runs all commands on one thread with an event loop, which is why its
+      documentation warns that KEYS on a large database blocks everyone else. Against an empty
+      server, redis-benchmark -t incr sends INCRs on one counter from 50 connections, and on a
+      correct server the counter ends exactly at the number of requests sent.
+
+      Common mistake: locking the map read and the map write of an INCR separately. Each access
+      is safe on its own, but another client can slip in between them, so counts still go missing
+      under load.
+    why_here: >-
+      Step 4 has to survive redis-benchmark's 50 parallel connections, and the page suggests
+      trying both a thread per client and async I/O.
+    origin: step
+    resources:
+      - title: "The C10K problem (Dan Kegel)"
+        url: http://www.kegel.com/c10k.html
+      - title: "Redis event library (Redis docs)"
+        url: https://redis.io/docs/latest/operate/oss_and_stack/reference/internals/internals-rediseventlib/
+      - title: "Race condition: In software (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Race_condition#In_software
+
+  - id: key-expiry
+    name: "Key expiry: deadlines, lazy checks and sampling"
+    covers:
+      - relative and absolute expiry times
+      - one absolute deadline per key
+      - lazy expiry on access
+      - active expiry by random sampling
+      - why not a timer per key
+      - wall-clock versus monotonic time
+      - which writes clear an expiry
+    explanation: |-
+      SET can give a key a lifetime in four ways. EX and PX give a duration in seconds or
+      milliseconds from now, while EXAT and PXAT give the moment of expiry as a Unix time. All
+      four come down to one stored value, an absolute deadline in milliseconds, worked out once
+      when the command runs. Removing keys exactly on time would need a timer per key, which costs
+      memory and scheduling work with millions of keys, so Redis combines two cheap methods. Lazy
+      expiry checks the deadline whenever a command touches a key, and treats an expired key as
+      missing and deletes it there and then, so no client ever sees a stale value. Active expiry
+      catches the keys nobody reads again: ten times a second, Redis samples 20 random keys among
+      those with a deadline, deletes the expired ones, and samples again at once if more than a
+      quarter had expired. Both keep the work per operation small. Deadlines follow the wall
+      clock, which can jump when it is corrected, while a duration is best measured with a
+      monotonic clock, which never goes backwards. A plain SET with no option removes any earlier
+      expiry, while INCR and LPUSH keep it.
+
+      Real example: the Redis documentation notes that if you give a key 1000 seconds to live and
+      then move the computer's clock 2000 seconds forward, the key expires at once, because its
+      deadline is an absolute wall-clock time.
+
+      Common mistake: checking the deadline only in GET, so EXISTS still counts an expired key
+      and INCR carries on from its old value. Another is scanning every key on each tick, which
+      makes the server slower the more keys it holds.
+    why_here: >-
+      Step 5 adds the four expiry options to SET, tests values before and after they expire, and
+      asks for expiry that stays cheap as the keyspace grows.
+    origin: step
+    resources:
+      - title: "EXPIRE: Appendix, Redis expires (Redis docs)"
+        url: https://redis.io/docs/latest/commands/expire/#appendix-redis-expires
+      - title: "SET (Redis docs)"
+        url: https://redis.io/docs/latest/commands/set/
+      - title: "clock_gettime(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/clock_gettime.2.html
+
+  - id: typed-values
+    name: Typed values and type errors
+    covers:
+      - one type per key
+      - binary-safe strings
+      - strings that hold integers
+      - the 64-bit range and overflow
+      - lists with cheap pushes at both ends
+      - WRONGTYPE errors
+      - multi-key commands and their counts
+    explanation: |-
+      Each key holds a value of exactly one type. This challenge uses two: strings, which are
+      binary-safe byte sequences, and lists. Redis has more, such as hashes, sets and sorted sets.
+      Commands are typed too. GET, INCR and DECR work on strings, LPUSH and RPUSH on lists, and a
+      command used on a key of the wrong type gets a WRONGTYPE error, while SET simply replaces
+      whatever was there. There is no separate integer type: INCR reads the string as a signed
+      base-10 64-bit integer, treats a missing key as 0, and answers with an error if the string
+      isn't a valid integer or the result would overflow. Lists need adding at both ends to be
+      cheap. In a plain array every push at the front moves every element, so LPUSH gets slower
+      as the list grows, while a linked list or a double-ended queue adds at either end in
+      constant time. Given several elements, LPUSH pushes them one at a time from left to right,
+      so LPUSH k a b c leaves c first. Multi-key commands answer with counts: DEL with how many
+      keys it removed, and EXISTS with how many of the given keys exist, counting a repeated key
+      each time.
+
+      Real example: INCR is the classic page-view counter and the base of many rate limiters,
+      because it reads, adds and writes in one atomic step on the server, where a client doing
+      GET and then SET would race with other clients.
+
+      Common mistake: letting GET on a list key return something instead of a WRONGTYPE error,
+      or accepting values such as 10.5, or a number with spaces around it, in INCR, which Redis
+      rejects.
+    why_here: >-
+      Step 6 adds counters and lists next to plain strings, so the store has to remember each
+      value's type and every command has to check it.
+    origin: step
+    resources:
+      - title: "Redis data types (Redis docs)"
+        url: https://redis.io/docs/latest/develop/data-types/
+      - title: "Redis lists (Redis docs)"
+        url: https://redis.io/docs/latest/develop/data-types/lists/
+      - title: "INCR (Redis docs)"
+        url: https://redis.io/docs/latest/commands/incr/
+
+  - id: snapshot-persistence
+    name: Snapshot persistence and loading at start-up
+    covers:
+      - a point-in-time snapshot
+      - a consistent view while clients write
+      - a self-describing file with types and lengths
+      - storing absolute deadlines
+      - writing a temporary file, then renaming it
+      - flushing to the disk
+      - loading at start-up and skipping expired keys
+      - what a crash between snapshots loses
+    explanation: |-
+      SAVE writes the whole dataset to a file as it is at one moment, and the server reads that
+      file back when it starts. The snapshot must be consistent: if clients keep writing while
+      it is being written, the file can hold half of a change. Redis's SAVE avoids this by
+      blocking every client until it finishes, while BGSAVE forks a child process whose
+      copy-on-write memory freezes the data at the moment of the fork as the parent keeps serving.
+      The file has to describe itself. For each key it holds the type, the name and the value as
+      length-prefixed bytes, so any byte can appear, and the deadline as an absolute time, so a
+      key that expires while the server is down is gone after the restart. A magic string and a
+      version at the start, and a checksum at the end, let the loader reject a file that is
+      foreign or damaged. Writing over the old file in place is risky, because a crash halfway
+      leaves neither the old snapshot nor the new one. Redis writes a temporary file and renames
+      it over the old one only when it is complete, since a rename replaces a file atomically.
+      Even then, written data can sit in the operating system's cache, so flushing it to the disk
+      before the rename is what makes the new file safe. Anything written after the last snapshot
+      is lost in a crash, which is the price of snapshots.
+
+      Real example: an RDB file starts with the bytes REDIS and a version number and ends with an
+      8-byte CRC64 checksum. The Redis documentation says the file is safe to copy while the
+      server runs, because a finished snapshot is never modified.
+
+      Common mistake: saving each value as a line of text, so a value that contains a newline
+      breaks loading, or saving the time left to live instead of the deadline, so every key gains
+      extra life with each restart.
+    why_here: >-
+      Step 6 adds SAVE and loading on start, so the data has to outlive the process and come back
+      with the same keys, types and deadlines.
+    origin: step
+    resources:
+      - title: "Redis persistence: Snapshotting (Redis docs)"
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/#snapshotting
+      - title: "rename(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/rename.2.html
+      - title: "Files are hard (Dan Luu)"
+        url: https://danluu.com/file-consistency/
+
+  - id: measuring-throughput
+    name: Measuring throughput honestly
+    covers:
+      - throughput versus latency
+      - closed-loop clients and Little's law
+      - round trips and pipelining
+      - comparing like with like
+      - noise and repeated runs
+      - finding the bottleneck before optimising
+    explanation: |-
+      Throughput is how many requests a server completes per second, and latency is how long one
+      request takes. How they relate depends on how the load is made. redis-benchmark is a closed
+      loop: each of its 50 connections sends one request, waits for the reply, then sends the
+      next. So throughput is roughly 50 divided by the average round trip, and anything that adds
+      to each round trip, such as a system call, a log line or a wait for a lock, lowers it even
+      when the CPU is mostly idle. Pipelining, with -P, puts many requests in each round trip and
+      shows how much of the time was spent waiting rather than working. A fair comparison runs
+      both servers on the same machine with the same flags, value size and key range, uses a
+      build with optimisations on, and repeats each run several times, because laptops change
+      their CPU speed and background work adds noise. The benchmark client shares the machine and
+      can be the bottleneck itself. By default redis-benchmark uses a single key, so the -r option
+      is needed to exercise a large keyspace. Before optimising, find out where the time goes
+      with a profiler instead of guessing.
+
+      Real example: the Redis benchmark documentation warns that a loop of single commands from
+      one client measures the network and the client library rather than the server, and shows a
+      small laptop passing 1.5 million SETs per second once 16 commands share each round trip.
+
+      Common mistake: comparing your numbers with the figures on the challenge page, which come
+      from someone else's machine, or measuring with a log line for every request and then
+      blaming the data structure.
+    why_here: >-
+      Step 7 compares your server with real Redis using redis-benchmark, and the numbers only mean
+      something if both runs are set up the same way.
+    origin: step
+    resources:
+      - title: "Redis benchmark (Redis docs)"
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/benchmarks/
+      - title: "Active Benchmarking (Brendan Gregg)"
+        url: https://www.brendangregg.com/activebenchmarking.html
+      - title: "Little's law (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Little%27s_law
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project for a long-running server that listens on the port given in the PORT
+      environment variable rather than always on 6379, so it can run next to a real Redis and be
+      tested in a sandbox. Install Redis too if you can, for its redis-cli and redis-benchmark
+      tools, which later steps use as clients.
+    check: >-
+      Your program starts, reads PORT from the environment and keeps running, and redis-cli runs
+      on your machine.
+    concepts: []
+
+  - id: s1
+    title: Encode and decode RESP
+    objective: >-
+      Write a decoder that turns RESP bytes into values and an encoder that turns values back
+      into bytes, for simple strings, errors, integers, bulk strings, arrays and both forms of
+      null. There is no networking yet.
+    check: >-
+      Unit tests pass for the page's sample messages, among them a null, an empty bulk string, an
+      OK reply, an error, and PING and ECHO sent as arrays: each decodes to the expected value and
+      encodes back to the same bytes. Input cut off partway is reported as incomplete, broken
+      input as invalid, and neither crashes the decoder.
+    concepts: [resp-wire-format]
+
+  - id: s2
+    title: Serve PING and ECHO
+    objective: >-
+      Accept TCP connections on the port from PORT, read commands with the decoder from step 1,
+      answer PING with PONG and ECHO with its argument, and keep each connection open for more
+      commands until the client closes it.
+    check: >-
+      redis-cli, pointed at your port, gets PONG back for PING and Hello World back for ECHO with
+      that argument, and several commands in one session all get their answers.
+    concepts: [stream-framing, command-dispatch]
+
+  - id: s3
+    title: Store keys with SET and GET
+    objective: >-
+      Add SET with a key and a value, replying OK, and GET, replying with the value or with null
+      for a missing key. Choose the data structure that holds the keys, and answer a wrong number
+      of arguments or an unknown command with an error reply.
+    check: >-
+      After SET Name John, GET Name returns John, and GET on a key that was never set returns
+      nil. A command with missing arguments gets an error and the connection stays usable.
+      Automated tests cover both the normal and the error cases, through a Redis client library
+      if you like.
+    concepts: [keyspace-hash-table, command-dispatch]
+
+  - id: s4
+    title: Serve many clients at once
+    objective: >-
+      Serve many connections at the same time, with a thread per client or with asynchronous
+      I/O, and keep the shared keyspace correct when clients change it together. Trying both
+      models is worth it if you have time.
+    check: >-
+      redis-benchmark -t SET,GET -q against your port, with its default 50 connections, finishes
+      with no errors and no crash, using -n 1000 if it runs slowly. Speed doesn't matter yet.
+    concepts: [serving-many-clients]
+
+  - id: s5
+    title: Expiry options for SET
+    objective: >-
+      Extend SET with EX and PX, a lifetime in seconds or milliseconds, and EXAT and PXAT, an
+      absolute Unix time in seconds or milliseconds. An expired key behaves as if it doesn't
+      exist, and expiry stays cheap however many keys there are.
+    check: >-
+      Automated tests set keys with each option and find them readable before their deadline and
+      gone after it.
+    concepts: [key-expiry]
+
+  - id: s6
+    title: More commands and saving to disk
+    objective: >-
+      Add EXISTS and DEL, which take one or more keys, INCR and DECR for counters, LPUSH and RPUSH
+      for lists, and SAVE, which writes the dataset to a file. On start, load that file if it
+      exists. Every command treats an expired key as missing.
+    check: >-
+      Each command's replies match the examples in the Redis documentation, including the error
+      for a command used on a key of the wrong type. After SAVE, a stop and a restart, the same
+      keys come back with their values, types and deadlines.
+    concepts: [typed-values, snapshot-persistence]
+
+  - id: s7
+    title: Compare performance with Redis
+    objective: >-
+      Run redis-benchmark -t set,get -n 100000 -q against a real Redis and then against your
+      server on the same machine. Compare the results and look for what slows yours down, such
+      as the data structure or the way clients share the keyspace.
+    check: >-
+      You have results for both servers from the same machine and settings, repeated a few
+      times. Your server answers every request without errors, and you can say where it spends
+      its time.
+    concepts: [measuring-throughput]

@@ -1,0 +1,461 @@
+project:
+  slug: bitcask
+  title: Build your own Bitcask
+  source_url: https://codingchallenges.fyi/challenges/challenge-bitcask
+  level: intermediate
+  summary: >-
+    A key-value store, driven from the command line, that keeps its data in a folder of
+    append-only log files and finds each value through an in-memory index of positions, following
+    the design of Bitcask, the storage engine from the Riak database. Building it teaches what it
+    takes for data to be truly saved, how to lay out records on disk so that a crash can't fool the
+    reader, and how updates, deletes, file rotation and compaction work when nothing is ever
+    overwritten.
+
+concepts:
+  - id: durability
+    name: Durability and what the operating system buffers
+    covers:
+      - what saved really means
+      - the page cache between a write and the disk
+      - fsync and its cost
+      - the directory entry of a new file
+      - replacing a file safely with a temporary file and a rename
+      - choosing how often to flush
+    explanation: |-
+      When a program writes to a file, the call usually returns as soon as the bytes are copied
+      into the operating system's page cache, in memory. The kernel writes them to the device
+      later, often seconds later. If the process exits, the data is safe, because the kernel still
+      holds it. If the machine loses power first, it's gone. fsync asks the kernel to push a
+      file's data to the device and waits until the device has stored it, which can take
+      milliseconds, so every store picks a policy: flush after every write, flush every second, or
+      leave it to the system. A new file also needs its folder flushed, or its name can be lost
+      even though its bytes were saved. To replace a whole file safely, write the new version
+      under a temporary name, flush it, rename it over the old one, which swaps them in a single
+      step, and then flush the folder.
+
+      Real example: Redis flushes its append-only file once a second by default, so a power cut
+      can lose about a second of writes, and Bitcask by default leaves flushing to the operating
+      system. In 2018 PostgreSQL found that on Linux a failed fsync could mark unsaved pages as
+      clean, so a retry reported success, and it now treats a failed fsync as fatal and recovers
+      from its log instead of retrying.
+
+      Common mistake: rewriting the data file in place. A crash halfway through leaves a file
+      that is half old and half new, or empty, and every key is lost, not only the last change.
+      Another is taking "the next run found it" as proof of durability, when it only proves that
+      the kernel kept the data, not that the disk did.
+    why_here: >-
+      Step 1 rewrites the whole file after every change, and each command is a separate process,
+      so the store has to decide when a change counts as saved. The page doesn't cover flushing,
+      so this goes deeper than it.
+    origin: beyond
+    resources:
+      - title: "fsync(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/fsync.2.html
+      - title: "Files are hard (Dan Luu)"
+        url: https://danluu.com/file-consistency/
+      - title: "Atomic Commit In SQLite"
+        url: https://www.sqlite.org/atomiccommit.html
+
+  - id: append-only-log
+    name: The append-only log and sequential writes
+    covers:
+      - appending instead of overwriting
+      - why sequential writes are fast
+      - why a crash can only hurt the end
+      - the data files as the log
+      - space that grows with every write
+    explanation: |-
+      An append-only log never changes a byte once it's written. Every set, even of a key that
+      already exists, adds a new record at the end. That makes writes cheap. On a spinning disk,
+      writing in place means moving the head and waiting for the platter to turn, several
+      milliseconds each time, while appending keeps writing into the next free space, so a disk
+      that manages a couple of hundred small random writes a second can stream over a hundred
+      megabytes a second sequentially. Flash drives shrink the gap, yet they can't overwrite a page
+      in place either, and inside they already work much like a log. Appending helps safety too:
+      old records are never touched, so a crash can only damage the end of the file. The price is
+      space, because every replaced value stays on disk until something reclaims it.
+
+      Real example: Kafka's design notes report linear writes on a disk array thousands of times
+      faster than random ones, which is why Kafka keeps every stream of messages as a log on disk.
+      The Bitcask paper notes that its data files and its commit log are the same thing, which
+      keeps recovery simple.
+
+      Common mistake: seeking back to the old record to overwrite it when a key changes. The new
+      value may not fit in the old space, and a crash in the middle destroys the old value along
+      with the new one.
+    why_here: >-
+      Step 2 replaces the full rewrite with appends, and every later step relies on records never
+      changing once they're written.
+    origin: step
+    resources:
+      - title: "Operating Systems: Three Easy Pieces, Hard Disk Drives (Arpaci-Dusseau)"
+        url: https://pages.cs.wisc.edu/~remzi/OSTEP/file-disks.pdf
+      - title: "Operating Systems: Three Easy Pieces, Log-structured File Systems (Arpaci-Dusseau)"
+        url: https://pages.cs.wisc.edu/~remzi/OSTEP/file-lfs.pdf
+      - title: "Apache Kafka design: Persistence"
+        url: https://kafka.apache.org/41/design/design/
+
+  - id: record-framing
+    name: Record framing on disk
+    covers:
+      - a fixed-size header, then the key and the value
+      - length prefixes instead of separators
+      - fixed-width integers and byte order
+      - the checksum and what it covers
+      - keys and values as bytes
+    explanation: |-
+      A data file is one long run of bytes, so the reader needs a rule for where each record
+      starts and ends. Separators, such as a colon between key and value and a newline after,
+      break as soon as a value contains a colon or a newline. Length prefixes don't: each record
+      starts with a fixed-size header that says how long the key and the value are, followed by
+      exactly that many bytes, so the reader finds the next record without looking inside the
+      data. Numbers in the header are fixed-width binary integers, and their byte order, least
+      significant byte first (little-endian) or most significant first (big-endian), is chosen
+      once and used everywhere, or a file written on one machine reads as nonsense on another. A
+      checksum such as CRC-32, computed over every byte after it, lets the reader tell a complete
+      record from a damaged or half-written one. Keys and values are bytes, so text is encoded,
+      for example as UTF-8, before its length is counted.
+
+      Real example: LevelDB's log starts every record with a 4-byte checksum, a 2-byte length and
+      a 1-byte type, all little-endian, while the headers of internet protocols carry their
+      numbers big-endian, which is why that order is called network byte order.
+
+      Common mistake: counting a key's length in characters instead of bytes, so a key with an
+      accented letter is cut short, or computing the checksum over different bytes from the ones
+      the reader checks, so every record looks damaged.
+    why_here: >-
+      Step 2 replaces step 1's placeholder lines with binary records that start with a CRC-32.
+      The page only guesses at the byte order, so the format is yours to define and write down.
+    origin: step
+    resources:
+      - title: "LevelDB log format"
+        url: https://github.com/google/leveldb/blob/main/doc/log_format.md
+      - title: "Endianness (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Endianness
+      - title: "Cyclic redundancy check (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+
+  - id: segments-rotation
+    name: File rotation and immutable segments
+    covers:
+      - one active file and many closed ones
+      - the size limit and when to roll over
+      - file ids that keep their order
+      - why closed files never change
+      - what a restart does to the active file
+    explanation: |-
+      One log that grows forever is hard to manage: it can't be cleaned up piece by piece and it
+      gets slow to copy. So the store splits it into segments. One file is active and takes every
+      append. When a write takes it past a size limit, it is closed and a new active file starts
+      with the next id. Closed files are never written again, and that promise pays off
+      everywhere. Readers use them without locks, a backup can copy them while the store runs,
+      and compaction can rewrite them while new writes go elsewhere. File ids must keep their
+      order, because start-up needs to know which file is newer. Bitcask also treats a file as
+      closed when its process exits. With one process per command, as here, that would make a new
+      file for every command, so decide whether a new run reopens the newest file for appending or
+      starts a fresh one.
+
+      Real example: Riak's Bitcask closes its active file at 2 GB by default, and Kafka stores
+      each partition as a series of segment files and expires old data by deleting whole
+      segments.
+
+      Common mistake: splitting one record across two files when the limit falls in the middle of
+      it. The index stores one file id per key, so a value has to sit whole in one file.
+    why_here: >-
+      Step 2 asks you to start a new file once the active one passes a size limit. With the limit
+      as a setting, tests can use a few hundred bytes and see rotation quickly.
+    origin: step
+    resources:
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data (Sheehy and Smith)"
+        url: https://riak.com/assets/bitcask-intro.pdf
+      - title: "Riak KV documentation: Bitcask"
+        url: https://docs.riak.com/riak/kv/2.2.3/setup/planning/backend/bitcask/index.html
+
+  - id: keydir-index
+    name: The in-memory index of positions
+    covers:
+      - key to file id, position and size
+      - one disk read per lookup
+      - rebuilding the index at start-up
+      - replay order decides the winner
+      - every key must fit in memory
+    explanation: |-
+      Bitcask's index, which it calls the keydir, is a hash table in memory that maps each key to
+      where its latest value sits on disk: the file id, the position in that file, the size and a
+      timestamp. A get is one hash lookup and one read of exactly that many bytes at that
+      position, so it costs at most one disk seek however much data the store holds, and recently
+      read data is often still in the operating system's cache. The index lives only in memory,
+      so every start-up rebuilds it by reading the files from oldest to newest and keeping, for
+      each key, the position of the last record seen. Start-up time therefore grows with the
+      size of the data, which is the reason hint files exist. The design has one firm limit: every
+      key must fit in memory, while the values don't have to.
+
+      Real example: Riak's documentation offers a capacity calculator for Bitcask, and its memory
+      estimate depends on the number of keys and their length, not on the size of the values.
+
+      Common mistake: reading the files in whatever order the folder listing returns, or sorting
+      numbered names as text so that file 10 comes before file 2. Either way an older value can
+      end up in the index over a newer one.
+    why_here: >-
+      Step 3 swaps the values in the table for their positions, and step 4 reads every value
+      through it. Each command is a new process, so the index is rebuilt on every run.
+    origin: step
+    resources:
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data (Sheehy and Smith)"
+        url: https://riak.com/assets/bitcask-intro.pdf
+      - title: "Riak KV documentation: Bitcask Capacity Calculator"
+        url: https://docs.riak.com/riak/kv/2.2.3/setup/planning/bitcask-capacity-calc/index.html
+
+  - id: updates-tombstones
+    name: Updates and tombstones in an append-only store
+    covers:
+      - the latest record wins
+      - old values as garbage on disk
+      - a tombstone as a delete record
+      - why removing the key from memory isn't enough
+      - ordering by place in the log, not by clock
+    explanation: |-
+      When nothing is overwritten, an update is simply a newer record for the same key, and the
+      index moves to point at it. The old record stays on disk as garbage until compaction. A
+      delete works the same way: it appends a tombstone, a small record saying the key is gone,
+      and drops the key from the index. Dropping it from memory alone isn't enough, because the
+      next start-up rebuilds the index from disk, finds the old record and brings the key back.
+      When start-up replays a tombstone it removes the key, and a set that comes after it brings
+      the key back with its new value. What counts as later is the record's place in the log,
+      its file id and then its position. A timestamp can't settle it reliably, since two writes
+      can share the same second and a clock can be set back.
+
+      Real example: Cassandra writes a tombstone for every delete and keeps it for ten days by
+      default before compaction may drop it, so that a replica that was offline during the delete
+      learns about it instead of spreading the old value again.
+
+      Common mistake: marking a tombstone with an ordinary value, such as an empty one, so a user
+      who stores an empty value deletes the key by accident. The marker belongs in the record's
+      header, where no real value can imitate it.
+    why_here: >-
+      Step 4 checks that an update appends a new record and moves the index, and step 5 adds
+      deletes, which must still hold after a restart.
+    origin: step
+    resources:
+      - title: "Tombstone (data store) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Tombstone_(data_store)
+      - title: "Apache Cassandra documentation: Tombstones"
+        url: https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/tombstones.html
+
+  - id: compaction-hint-files
+    name: Compaction and hint files
+    covers:
+      - live records versus dead ones
+      - merging closed files into new ones
+      - when a tombstone can be dropped
+      - switching over safely, then deleting
+      - hint files for a fast start-up
+    explanation: |-
+      Every update and delete leaves dead records behind, so the files keep growing even when the
+      data doesn't. Compaction, which Bitcask calls merge, reads the closed files, copies only the
+      live records into new files and then deletes the old ones. A record is live when the index
+      still points at that exact record, file and position both, not merely when its key still
+      exists. A tombstone can be dropped only when no older record for its key survives anywhere,
+      or the old value comes back. While merging, the store writes a hint file beside each new
+      data file, listing every key with its position, size and timestamp but not its value, so
+      start-up can read the small hint files instead of every value. The order of the switch
+      matters: write and flush the new files and their hints, update the index, and only then
+      delete the old files, so a crash at any moment leaves either the old set or the new one
+      whole.
+
+      Real example: Redis rewrites its append-only file in the background into the shortest list
+      of commands that rebuilds the current data, then swaps the new file in. Kafka's log
+      compaction keeps at least the latest value for each key.
+
+      Common mistake: deleting the old files before the new ones are safely on disk, or merging
+      the active file while writes are still landing in it, so a write made during the merge is
+      lost.
+    why_here: >-
+      Step 6 adds the merge and the hint files and asks start-up to load the index from the
+      hints wherever they exist.
+    origin: step
+    resources:
+      - title: "Bitcask: A Log-Structured Hash Table for Fast Key/Value Data (Sheehy and Smith)"
+        url: https://riak.com/assets/bitcask-intro.pdf
+      - title: "Redis persistence: log rewriting"
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+      - title: "Apache Kafka design: Log Compaction"
+        url: https://kafka.apache.org/41/design/design/
+
+  - id: crash-recovery
+    name: Crash recovery from torn writes
+    covers:
+      - torn writes at the end of the log
+      - checking each record's checksum at start-up
+      - bounding a length before trusting it
+      - cutting back to the last good record
+      - damage in the middle versus at the end
+    explanation: |-
+      A crash can stop an append partway, leaving a torn record at the end of the active file: a
+      header with no value, or a value cut short. Because the store only appends, that is the only
+      place a crash alone can do damage, which keeps recovery simple. At start-up, read the
+      records one by one. Before trusting a length, check that the record it describes fits
+      inside the file. Then compute the checksum over the record's bytes and compare it with the
+      stored one. The first record that fails marks the end of the good data: drop it, cut the
+      file back to the last good record so that new appends don't land after garbage, and carry
+      on. A bad record in the middle of an older file is a different problem, such as a failing
+      disk, and deserves a loud warning instead of a silent repair. A checksum only detects
+      damage. It can't say what the bytes should have been.
+
+      Real example: Redis by default loads an append-only file whose last command is cut short,
+      dropping that command, but refuses to start when it finds damage in the middle. RocksDB
+      lets you choose among such policies, and by default it stops replaying at the first bad
+      record.
+
+      Common mistake: treating any bad record as fatal, so the store won't start after a power
+      cut, or trusting a torn length field and trying to read gigabytes of value that were never
+      written.
+    why_here: >-
+      Step 6 asks start-up to check each record's CRC and drop the incomplete or damaged ones a
+      crash leaves behind. Cutting a few bytes off the end of the newest file is how you test it.
+    origin: step
+    resources:
+      - title: "Operating Systems: Three Easy Pieces, Data Integrity and Protection (Arpaci-Dusseau)"
+        url: https://pages.cs.wisc.edu/~remzi/OSTEP/file-integrity.pdf
+      - title: "RocksDB wiki: WAL Recovery Modes"
+        url: https://github.com/meta/rocksdb/wiki/WAL-Recovery-Modes
+      - title: "All File Systems Are Not Created Equal: On the Complexity of Crafting Crash-Consistent Applications (OSDI 2014)"
+        url: https://www.usenix.org/system/files/conference/osdi14/osdi14-paper-pillai.pdf
+
+  - id: single-writer
+    name: One writer and many clients
+    covers:
+      - why two writers corrupt a log
+      - locking the data folder
+      - a server as the one owner
+      - reading closed files side by side
+      - group commit
+    explanation: |-
+      An append-only log has one simple rule: one writer. Two processes appending to the same
+      active file each believe they know where the end is, so their records can interleave, each
+      one's index points at the wrong bytes, and both may rotate to a file with the same id.
+      Bitcask allows one writing process per data folder, and Riak enforces it with a lock file in
+      the folder. A long-running server makes the rule natural: it owns the folder, and many
+      clients send it commands over the network. Inside the server, writes still pass through one
+      path in order, but reads can run side by side, because a record never changes once written
+      and only the index needs protecting. A server can also cover several clients' writes with
+      one flush, called group commit, so durability costs less per write.
+
+      Real example: SQLite lets many processes read a database at once but uses file locks so
+      that only one writes at a time, and Redis, when told to flush after every write, groups
+      the writes from several clients into a single flush.
+
+      Common mistake: checking whether a lock file exists and creating it in a second step, so
+      two processes can both pass the check. Take the lock in one atomic step, such as an
+      exclusive create or an operating system lock, and decide what happens to a lock a crashed
+      process left behind.
+    why_here: >-
+      The page says only one process may use a database at a time, and the optional server turns
+      that one process into a service that many clients share.
+    origin: beyond
+    resources:
+      - title: "flock(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/flock.2.html
+      - title: "File Locking And Concurrency In SQLite Version 3"
+        url: https://www.sqlite.org/lockingv3.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project: a small library that holds the store, with a command-line tool on top
+      that takes the data folder as a setting. If you want the optional network server later, the
+      page points to the Redis challenge for its protocol.
+    check: >-
+      The tool runs, accepts the data folder setting, and treats an empty folder as an empty
+      database.
+    concepts: []
+
+  - id: s1
+    title: Set and get with one file
+    objective: >-
+      Keep keys and values in an in-memory hash table. Set stores a value and then writes the
+      whole table to a file in the data folder, replacing what was there, and get prints a value.
+      At start-up, load the file back into the table. Each command runs as its own process, so get
+      only finds what an earlier run left on disk. Keep the data folder a setting, so that tests
+      can give each run a fresh one.
+    check: >-
+      Setting a key in one run and getting it in the next prints the value, and keys set in
+      earlier runs are still there after later runs set other keys.
+    concepts: [durability]
+
+  - id: s2
+    title: Append records to a log
+    objective: >-
+      Replace the full rewrite with an append-only log. Each set adds one binary record to the
+      end of the active file: a CRC-32 checksum first, then a timestamp, the key and value sizes,
+      the key and the value, with the checksum covering every byte after it. When a write takes
+      the active file past a size limit, close it and start a new file. Make the limit a setting,
+      so that tests can use a few hundred bytes and see rotation quickly.
+    check: >-
+      A hex dump with xxd shows each set as one new record at the end of the active file, laid out
+      as you designed it, and enough sets create a second data file. Get still returns the latest
+      value in a later run.
+    concepts: [append-only-log, record-framing, segments-rotation]
+
+  - id: s3
+    title: Keep positions in the index
+    objective: >-
+      Change the in-memory table so that, for each key, it holds where the latest value lives
+      instead of the value itself: the file id, the value's position and size, and the timestamp.
+      Set records these after each append, and start-up rebuilds the table by reading every data
+      file in order.
+    check: >-
+      The page gives no test here. Printed for debugging, the table after a restart matches the
+      one before it entry for entry, and it holds no values.
+    concepts: [keydir-index]
+
+  - id: s4
+    title: Read values through the index
+    objective: >-
+      Make get look the key up in the table, open the data file named by its file id, move to the
+      stored position and read exactly the stored number of bytes.
+    check: >-
+      After enough sets to fill several data files, every key returns its value in a later run.
+      Setting a key again adds a new record to the log and moves its entry in the table, and get
+      returns the new value.
+    concepts: [keydir-index, updates-tombstones]
+
+  - id: s5
+    title: Delete with tombstones
+    objective: >-
+      Add a del command that appends a tombstone record for the key and removes the key from the
+      table. The page's version records the time of the delete and sets the position, size and
+      file id to their largest values, and any marker works as long as no real record can look
+      like it. Get on a deleted key prints (nil).
+    check: >-
+      Set, get, del and get, each in its own run, print the value and then (nil), and the key
+      stays deleted through later runs. Setting it again returns the new value.
+    concepts: [updates-tombstones]
+
+  - id: s6
+    title: Merge, hint files and recovery
+    objective: >-
+      Add a merge command. It reads the closed data files, writes only the latest live record of
+      each key into new files, writes a hint file beside each one with every key's timestamp,
+      sizes and position, and then deletes the old files. At start-up, load the table from hint
+      files where they exist and read the remaining files record by record, checking each CRC and
+      dropping the incomplete or damaged records a crash leaves behind.
+    check: >-
+      The page gives no test. After many overwrites and deletes, merge makes the data folder
+      clearly smaller, every live key returns its latest value, and deleted keys stay deleted.
+      Cutting a few bytes off the end of the newest data file loses at most its last record, and
+      the store still starts.
+    concepts: [compaction-hint-files, crash-recovery]
+
+  - id: s7
+    title: "Going further: a network server"
+    objective: >-
+      Run the store as a long-lived server that speaks a protocol such as RESP, the one from the
+      Redis challenge, so that clients can set, get and delete keys over the network. The server
+      becomes the one process that owns the data folder.
+    check: >-
+      A Redis client such as redis-cli can set, get and delete keys, several clients at once get
+      consistent answers, and the data is still there after the server restarts.
+    concepts: [single-writer]
+    optional: true

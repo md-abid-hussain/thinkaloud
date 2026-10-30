@@ -1,0 +1,278 @@
+project:
+  slug: diff
+  title: Build your own diff
+  source_url: https://codingchallenges.fyi/challenges/challenge-diff
+  level: intermediate
+  summary: >-
+    A command-line tool, like the Unix diff, that compares two text files and prints the lines
+    removed from the first and the lines added in the second. Building it teaches the longest
+    common subsequence and the dynamic programming table behind it, how a diff is derived from
+    it, and why real tools switch to faster algorithms when files get large.
+
+concepts:
+  - id: lcs
+    name: Longest common subsequence
+    covers:
+      - subsequence versus substring
+      - the common part as what didn't change
+      - why the answer is often not unique
+    explanation: |-
+      A subsequence keeps the order of the items but may skip some of them. A substring must be
+      one unbroken run. The longest common subsequence (LCS) of two sequences is the longest one
+      that appears in both, in the same order. In a diff, the LCS is the part that didn't change:
+      every item outside it was either removed from the first version or added in the second.
+      Two sequences often have several different LCSs of the same length, and each is correct.
+
+      Real example: two drafts of an essay share most sentences in the same order, with a few
+      rewritten. The shared sentences are the LCS, and the rewritten ones are the changes.
+
+      Common mistake: matching greedily, pairing each item with the first equal item you find
+      in the other sequence. If the first line of one file matches the last line of the other,
+      that single early match rules out everything else they share.
+    why_here: >-
+      Steps 1 and 2 ask for the LCS, first of two strings and then of two lists of lines, and
+      every later step is built on it.
+    origin: step
+    resources:
+      - title: "Longest common subsequence (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Longest_common_subsequence
+      - title: "diff (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Diff
+
+  - id: dynamic-programming
+    name: "Dynamic programming: the LCS table and its cost"
+    covers:
+      - optimal substructure and overlapping subproblems
+      - the table of prefixes
+      - tracing back to recover the answer
+      - time and memory as the inputs grow
+    explanation: |-
+      Dynamic programming solves each smaller version of a problem once, stores the answer and
+      builds on it. For the LCS, the smaller versions are prefixes. If the last items of two
+      prefixes are equal, their LCS is one longer than the LCS of both prefixes without that
+      item. If not, it's the longer of the two answers you get by dropping the last item from
+      one side or the other. A table with a row for each item of the first sequence and a column
+      for each item of the second holds every answer, each cell worked out from three
+      neighbours. The last cell holds the length, and walking back from it recovers one LCS.
+
+      The cost is the product of the two lengths, in time and in memory. Two files of 1,000
+      lines need a million cells, which is nothing. Two files of 100,000 lines need ten billion,
+      more than a laptop can hold. If you only need the length, two rows are enough.
+
+      Real example: spell checkers use the same kind of table to measure how far a typed word is
+      from each word in the dictionary.
+
+      Common mistake: writing the rule as plain recursion without storing answers. The same pairs
+      of prefixes are solved again and again, and the time grows exponentially.
+    why_here: >-
+      The table is the standard way to compute the LCS in steps 1 and 2, and step 1 asks you to
+      think about its time and memory cost.
+    origin: step
+    resources:
+      - title: "Dynamic programming (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Dynamic_programming
+      - title: "Jeff Erickson, Algorithms, chapter 3: Dynamic Programming"
+        url: https://jeffe.cs.illinois.edu/teaching/algorithms/book/03-dynprog.pdf
+
+  - id: edit-script
+    name: "Edit scripts: from the LCS to a diff"
+    covers:
+      - deletions and insertions
+      - the shortest edit script and its link to the LCS
+      - why many valid diffs exist
+      - checking a diff by applying it
+    explanation: |-
+      An edit script is a list of operations that turns the first file into the second: delete
+      this line, insert that one. Every line outside the LCS has to be deleted or inserted, so
+      the shortest script has as many operations as both files have lines, minus twice the
+      length of the LCS. A longer LCS means a shorter diff. Because several LCSs can have the
+      same length, and a deletion next to an insertion can be listed in either order, many
+      different scripts are equally short and equally correct. Real tools choose among them for
+      readability, for example by listing deletions before insertions.
+
+      Real example: you add a new block of code right after one that ends with the same closing
+      line. The diff can mark the new lines as starting one line earlier or one line later. Both
+      are minimal, and only one reads naturally. Git slides changes like this so they line up
+      with blank lines and indentation.
+
+      Common mistake: testing your output against the real diff character for character. A
+      sound check applies your script to the first file, confirms it gives the second, and
+      confirms the script is no longer than the reference.
+    why_here: >-
+      Step 3 turns the LCS into the list of removed and added lines, and step 4 prints that list
+      for real files.
+    origin: step
+    resources:
+      - title: "Edit distance (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Edit_distance
+      - title: "The Myers diff algorithm, part 1 (James Coglan)"
+        url: https://blog.jcoglan.com/2017/02/12/the-myers-diff-algorithm-part-1/
+
+  - id: lines-as-units
+    name: Lines as the unit of comparison
+    covers:
+      - choosing the unit, from characters to words to lines
+      - comparing lines by hash
+      - line endings and a missing final newline
+      - white space and what counts as equal
+    explanation: |-
+      The same algorithm works on any sequence: characters, words or lines. Diff compares whole
+      lines, because people edit text line by line and a line is a meaningful unit of change.
+      That choice has consequences. Two lines are equal only if every byte matches, so one extra
+      space makes the whole line differ. Comparing long lines over and over is slow, so real
+      tools first give each distinct line a number, using a hash, and compare numbers instead.
+      And a last line with no newline after it is not the same as that line with one.
+
+      Real example: a file saved with carriage return and line feed endings differs on every
+      line from the same file saved with line feeds only, unless the tool is told to ignore the
+      carriage returns, as GNU diff does with --strip-trailing-cr.
+
+      Common mistake: splitting the text on newlines and not deciding what the empty piece after
+      the final newline means, so a missing newline at the end of a file is either invented or
+      silently lost.
+    why_here: >-
+      Step 2 moves from characters to lines, and step 4 reads real files and has to split them
+      into lines.
+    origin: step
+    resources:
+      - title: "GNU diffutils manual: Suppressing differences in blank and tab spacing"
+        url: https://www.gnu.org/software/diffutils/manual/html_node/White-Space.html
+      - title: "Newline (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Newline
+
+  - id: myers
+    name: "Myers' algorithm: diff as a shortest path"
+    covers:
+      - the edit graph
+      - cost that grows with the number of differences
+      - why GNU diff and git use it
+      - patience and histogram, tuned for readability
+    explanation: |-
+      Myers' algorithm (1986) turns the problem into a grid. A step right deletes a line of the
+      first file, a step down inserts a line of the second, and where two lines are equal a
+      diagonal step is free. The shortest diff is the path from the top-left corner to the
+      bottom-right one with the fewest steps that aren't diagonal. The algorithm explores paths
+      by their number of edits, first none, then one, then two, keeping only the furthest point
+      reached on each diagonal, and stops when one reaches the corner. Its time grows with the
+      size of the files multiplied by the number of differences, not with the product of the two
+      sizes. Two large files that differ in a few lines are compared almost instantly, and a
+      variant of the algorithm needs memory only in proportion to the file sizes.
+
+      Real example: GNU diff and git both use it by default. Git also offers patience and
+      histogram, which anchor on lines that appear only once in each file. A study of real
+      projects found histogram usually describes code changes better.
+
+      Common mistake: assuming the shortest diff is the best one to show. Shortest only counts
+      operations, while a reader wants changes that follow the structure of the text.
+    why_here: >-
+      The page names it as the algorithm behind git's default diff, and it's the main answer to
+      the optional step's question about large files.
+    origin: beyond
+    resources:
+      - title: "Eugene W. Myers, An O(ND) Difference Algorithm and Its Variations (1986)"
+        url: http://www.xmailserver.org/diff2.pdf
+      - title: "How different are different diff algorithms in Git? (Nugroho, Hata and Matsumoto)"
+        url: https://link.springer.com/article/10.1007/s10664-019-09772-z
+
+  - id: large-inputs
+    name: "Large inputs: memory, time and shortcuts"
+    covers:
+      - the full table at scale
+      - trimming the common start and end
+      - recovering the LCS in linear memory
+      - matching only lines that occur in both files
+      - the worst case, and giving up the shortest diff
+    explanation: |-
+      A full LCS table for two files of 100,000 lines has ten billion cells, so the simple tool
+      runs out of memory long before time becomes the problem. Real tools combine several ideas.
+      Lines shared at the start and at the end are trimmed first, which often leaves a small
+      middle. A line that appears in only one file can't be part of the LCS, so it's set aside.
+      Hirschberg's method recovers an LCS in memory proportional to the file sizes, by finding
+      the middle of the best path and solving each half on its own. The Hunt and Szymanski
+      algorithm, a close relative of the one in the original Unix diff, only looks at pairs of
+      lines that match, which is fast when most lines are distinct and slow when many repeat,
+      such as blank lines.
+
+      Real example: GNU diff and git both stop short of the very shortest diff on hard inputs
+      and accept a good one instead. Each has a --minimal option for when you want the shortest
+      and are willing to wait.
+
+      Common mistake: measuring only small or nearly identical files. The worst case is two large
+      files with little in common, or with many repeated lines.
+    why_here: >-
+      The optional step asks how your tool copes with very large files and what you would change
+      to make it cope better.
+    origin: step
+    resources:
+      - title: "Hirschberg's algorithm (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Hirschberg%27s_algorithm
+      - title: "The Hunt-Szymanski algorithm for LCS (Rolf Fagerberg, University of Southern Denmark)"
+        url: https://imada.sdu.dk/u/rolf/Edu/DM823/E16/HuntSzymanski.pdf
+      - title: "GNU diffutils manual: diff performance tradeoffs"
+        url: https://www.gnu.org/software/diffutils/manual/html_node/diff-Performance.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and download the challenge's sample files, two versions of the same
+      short text.
+    check: >-
+      Both sample files open, and you can point to the lines that differ between them.
+    concepts: []
+
+  - id: s1
+    title: LCS of two strings
+    objective: >-
+      Find a longest common subsequence of two strings, comparing them character by character.
+      Cover identical strings, strings with nothing in common and empty strings, add edge cases
+      of your own, and think about how the time and memory grow with the length of the strings.
+    check: >-
+      Identical strings give the whole string back. Strings with no character in common, or an
+      empty string, give an empty result. Strings that share some characters give those
+      characters in order, and a string whose characters all appear in order inside a longer one
+      comes back whole. Your own edge cases pass too.
+    concepts: [lcs, dynamic-programming]
+
+  - id: s2
+    title: LCS of lines
+    objective: >-
+      Extend the same algorithm to two lists of lines, treating each whole line as one item.
+    check: >-
+      For two short texts that share some lines, the result is exactly the shared lines in their
+      order. A line that differs by a single character is not shared.
+    concepts: [lcs, dynamic-programming, lines-as-units]
+
+  - id: s3
+    title: Generate the differences
+    objective: >-
+      From two lists of lines, produce the list of changes: each line found only in the original
+      is marked with a < sign, and each line found only in the new version with a > sign. Lines
+      in the LCS are left out.
+    check: >-
+      On the sample paragraphs the result has two removed lines and two added lines. The removed
+      lines are exactly the original's lines outside the LCS, and the added lines are exactly the
+      new version's lines outside it.
+    concepts: [edit-script, lcs]
+
+  - id: s4
+    title: The command-line tool
+    objective: >-
+      A command that takes two file paths, reads both files, splits them into lines and prints
+      the differences. Identical files print nothing.
+    check: >-
+      Running it on the two sample files prints the same four lines as step 3, and running it on
+      a file against itself prints nothing.
+    concepts: [lines-as-units, edit-script]
+
+  - id: s5
+    title: Large files
+    objective: >-
+      Find out how your tool behaves as the files grow, then change it so it handles very large
+      files in reasonable time and memory.
+    check: >-
+      On two generated files of many thousands of lines that differ in a few places, the tool
+      finishes quickly without running out of memory, and the lines it reports as removed and
+      added are still exactly the lines that changed.
+    concepts: [large-inputs, myers, dynamic-programming]
+    optional: true

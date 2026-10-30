@@ -1,0 +1,281 @@
+project:
+  slug: cut
+  title: Build your own cut
+  source_url: https://codingchallenges.fyi/challenges/challenge-cut
+  level: beginner
+  summary: >-
+    A command-line program that prints chosen fields from each line of a file, or of whatever is
+    piped into it, and matches the Unix cut tool. Building it teaches how plain text holds a table
+    as records and fields, why splitting on a delimiter stops working once real CSV quoting shows
+    up, and how small tools that handle one line at a time join into pipelines.
+
+concepts:
+  - id: records-and-fields
+    name: Records, fields and delimiters
+    covers:
+      - one line is one record
+      - a delimiter splits a record into fields
+      - fields numbered from 1
+      - empty fields and delimiters in a row
+      - lines with no delimiter
+      - a carriage return stuck to the last field
+    explanation: |-
+      A lot of plain-text data is a table in disguise. Each line is a record, and one chosen
+      character, the delimiter, divides it into fields. Field 1 is everything before the first
+      delimiter, field 2 runs up to the second, and so on. The definition has sharp edges. Two
+      delimiters in a row mean an empty field between them, so cut never merges a run of
+      delimiters into one, unlike awk, which by default treats a run of blanks as one separator.
+      A line with no delimiter at all is printed whole, unless -s asks to drop such lines. A file
+      saved with Windows line endings leaves a carriage return at the end of the last field of
+      every line.
+
+      Real example: the Unix user list, /etc/passwd, has one record per line and seven fields
+      separated by colons. Field 1 with a colon delimiter gives every user name, and an empty
+      field such as a blank comment still holds its position.
+
+      Common mistake: dropping empty fields, or treating several delimiters in a row as one,
+      which moves every later field one position to the left.
+    why_here: >-
+      Every step selects fields by position, so the program needs an exact rule for where one
+      field ends and the next begins, starting with tab-separated lines in step 1.
+    origin: step
+    resources:
+      - title: "POSIX: cut, cut out selected fields of each line of a file"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cut.html
+      - title: "GNU coreutils manual: cut invocation"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/cut-invocation.html
+      - title: "Delimiter-separated values (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Delimiter-separated_values
+
+  - id: quoted-csv
+    name: Why splitting on the delimiter breaks real CSV
+    covers:
+      - the quoting rules in RFC 4180
+      - delimiters and line breaks inside quotes
+      - a doubled quote as an escape
+      - tracking whether you are inside quotes
+    explanation: |-
+      CSV looks like fields separated by commas, but its specification, RFC 4180, lets a field be
+      wrapped in double quotes. Inside the quotes a comma is data, a line break is data, and a
+      double quote is written as two double quotes. So a reader can't find field boundaries by
+      looking at one character at a time. It has to remember whether it is inside quotes, which
+      makes it a small state machine, and one record can even span several lines. Tab-separated
+      values avoid the problem another way: the format simply forbids tabs inside a field.
+
+      Real example: an address column holding "Leeds, UK" in a spreadsheet export. Splitting on
+      every comma turns it into two fields, and every column after it moves one place to the
+      right.
+
+      Common mistake: assuming a file named .csv can be split on commas because the test file
+      worked, then corrupting the first real export that has a comma inside a name.
+    why_here: >-
+      Step 2 runs on a CSV file whose song titles are wrapped in double quotes, and like the real
+      cut, your program treats those quotes as ordinary characters. A title containing a comma
+      would be split in two, and the artist would land in the wrong field.
+    origin: beyond
+    resources:
+      - title: "RFC 4180: Common Format and MIME Type for CSV Files"
+        url: https://www.rfc-editor.org/rfc/rfc4180.html
+      - title: "IANA: text/tab-separated-values"
+        url: https://www.iana.org/assignments/media-types/text/tab-separated-values
+      - title: "Falsehoods Programmers Believe About CSVs (Donat Studios)"
+        url: https://donatstudios.com/Falsehoods-Programmers-Believe-About-CSVs
+
+  - id: line-streaming
+    name: Line-at-a-time streaming in constant memory
+    covers:
+      - one record in memory at a time
+      - lines split across two reads
+      - a last line with no newline
+      - output buffering and flushing
+    explanation: |-
+      cut never needs more than the current line, so it can handle input of any size in the same
+      small amount of memory: read a line, write the selected fields, forget it, repeat. Lines
+      arrive through a fixed-size read buffer, and a line can be longer than the buffer or be
+      split across two reads, so the reader has to carry the unfinished part into the next read.
+      A file may end without a final newline, and that last line is still a record. Output is
+      buffered too. It usually goes out line by line to a terminal but in large blocks into a
+      pipe, so the program has to flush whatever is left before it exits.
+
+      Real example: following a growing web server log with tail -f and cutting out the client
+      address column shows each request as it arrives, because every stage handles one line and
+      moves on.
+
+      Common mistake: reading the whole input into memory and splitting it into lines first. It
+      works on the sample files, fails on a file bigger than memory, and prints nothing at all
+      for input that never ends.
+    why_here: >-
+      Each output line depends only on its own input line, so the program can stream from step 1,
+      and from step 4 its input may be a pipe of unknown length.
+    origin: beyond
+    resources:
+      - title: "Why pipes sometimes get \"stuck\": buffering (Julia Evans)"
+        url: https://jvns.ca/blog/2024/11/29/why-pipes-get-stuck-buffering/
+      - title: "POSIX base definitions: Definitions (see Line and Incomplete Line)"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap03.html
+
+  - id: field-list-grammar
+    name: A field list is a small grammar
+    covers:
+      - single numbers and ranges
+      - commas or blanks as separators
+      - output in input order, each field once
+      - rejecting zero and malformed lists early
+      - an option value attached or separate
+      - shell quoting before the program starts
+    explanation: |-
+      The value of -f is a tiny language. The standard allows single numbers and ranges, where
+      3-5 means three to five, -3 means up to three and 4- means four to the end, separated by
+      commas or by blanks. Parsing it once at the start gives a set of selected positions, and
+      each field is then simply in the set or not. That keeps two rules easy: fields come out in
+      the order they appear in the line, and each one only once, however the list was written.
+      Fields are numbered from 1, so 0 is an error, reported before any input is read. The value
+      may be attached to the flag, as in -f2, or given as the next argument. A list with a blank
+      in it must be quoted, because the shell splits the command line into arguments before the
+      program ever starts.
+
+      Real example: the page-range box in a print dialog, where "1-3, 7" is the same kind of
+      grammar, parsed once and then checked page by page.
+
+      Common mistake: printing fields in the order the list names them, so asking for 3,1 swaps
+      the columns, which the real cut never does.
+    why_here: >-
+      Step 3 turns -f from one number into a list separated by commas or blanks, and step 1
+      already needs the number attached to the flag.
+    origin: step
+    resources:
+      - title: "POSIX: cut, the list option-argument"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cut.html
+      - title: "POSIX base definitions: Utility Conventions (Guidelines 6 to 8)"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html
+      - title: "Bash manual: Quoting"
+        url: https://www.gnu.org/software/bash/manual/html_node/Quoting.html
+
+  - id: filter-contract
+    name: "The filter contract: files, standard input, output and errors"
+    covers:
+      - named files or standard input
+      - the lone dash
+      - data to standard output, messages to standard error
+      - exit codes, and carrying on after a bad file
+    explanation: |-
+      A Unix filter reads the files named on its command line, one after another, or standard
+      input when none is named. A single dash as a file name also means standard input, which
+      lets a pipe be read between two files, and is why a file really called "-" has to be given
+      as ./- instead. Results go to standard output and nothing else does. Errors go to standard
+      error, so they never flow into the next program as data. The exit code tells the caller
+      whether everything worked: the real cut reports a missing file, carries on with the
+      others, and exits with 1 at the end.
+
+      Real example: a script that runs cut on today's export, or, when no file is given, on
+      whatever an earlier command produced, through exactly the same code path.
+
+      Common mistake: trying to open a file called "-", or printing "file not found" to
+      standard output, where the next tool in the pipe treats it as a record.
+    why_here: >-
+      Step 4 reads standard input when no file is named or when the name is a dash, and every
+      step must write only the selected fields to standard output.
+    origin: step
+    resources:
+      - title: "POSIX base definitions: Utility Conventions (Guideline 13)"
+        url: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html
+      - title: "stdin(3), Linux manual page"
+        url: https://man7.org/linux/man-pages/man3/stdin.3.html
+      - title: "Bash manual: Exit Status"
+        url: https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+
+  - id: pipes-and-composition
+    name: Pipes and composing small tools
+    covers:
+      - a pipe joins two running programs
+      - backpressure when the reader is slow
+      - early close and broken pipes
+      - each tool's own contract, such as uniq and adjacent lines
+    explanation: |-
+      A pipe is a small buffer in the kernel that joins one program's standard output to the
+      next one's standard input, and all the programs in a pipeline run at the same time. When
+      the buffer is full the writer waits, so a fast producer can't outrun a slow consumer and
+      nothing piles up in memory. When the reader stops early, as head does after a few lines,
+      the writer's next write fails. By default the system then ends the writer quietly with the
+      SIGPIPE signal. A program that ignores that signal gets a broken pipe error instead, and
+      should stop silently rather than print an error. Composing tools also means knowing what
+      each one promises: uniq only merges repeated lines that sit next to each other, so a count
+      of distinct values needs sort first.
+
+      Real example: the classic way to find the most common values in a column is cut, then
+      sort, then uniq counting each value, then sort by that count, then head.
+
+      Common mistake: piping a column straight into uniq and reading the result as the number of
+      distinct values.
+    why_here: >-
+      Steps 2 and 3 pipe the output into head, which closes the pipe early, and step 5 counts
+      artists with uniq on a file listed by song title rather than grouped by artist.
+    origin: step
+    resources:
+      - title: "pipe(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/pipe.7.html
+      - title: "GNU coreutils manual: uniq invocation"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/uniq-invocation.html
+      - title: "The Art of Unix Programming: Basics of the Unix Philosophy"
+        url: http://www.catb.org/~esr/writings/taoup/html/ch01s06.html
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project, get the challenge's two sample files, one tab-separated and one
+      comma-separated, and make sure the real cut is available to compare against.
+    check: >-
+      Both sample files show one record per line, with tabs between the fields in one and commas
+      in the other, and the real cut runs on both.
+    concepts: []
+
+  - id: s1
+    title: Print one field
+    objective: >-
+      Given -f with one field number and a file name, print that field from every line, using
+      the tab as the delimiter.
+    check: >-
+      Field 2 of every line of the tab-separated sample, header included, matches what the real
+      cut prints for the same file.
+    concepts: [records-and-fields, line-streaming, field-list-grammar]
+
+  - id: s2
+    title: Choose the delimiter
+    objective: >-
+      Add -d to set the delimiter to any single character, and keep the tab as the default when
+      -d is not given.
+    check: >-
+      With a comma as the delimiter, the first column of the CSV sample matches the real cut,
+      quotes included, and without -d the tab-separated sample is still split on tabs. Piping
+      the output into head ends quietly, with no broken pipe error.
+    concepts: [records-and-fields, quoted-csv, pipes-and-composition]
+
+  - id: s3
+    title: Select several fields
+    objective: >-
+      Let -f take a list of field numbers separated by commas or by blanks, and print the
+      selected fields of each line joined by the delimiter.
+    check: >-
+      Fields 1 and 2 of both samples match the real cut, whether the list is written with a
+      comma or with a quoted blank.
+    concepts: [field-list-grammar, records-and-fields]
+
+  - id: s4
+    title: Read standard input
+    objective: >-
+      Read standard input when no file is named, or when the file name is a single dash.
+    check: >-
+      Piping the last few lines of the CSV sample into your program gives the same fields as the
+      real cut, both with no file name and with a dash.
+    concepts: [filter-contract, line-streaming]
+
+  - id: s5
+    title: Build a pipeline
+    objective: >-
+      Use your cut in a pipeline with uniq and wc, ideally your own wc from the earlier
+      challenge, to count the artists in the CSV sample. No new feature is needed.
+    check: >-
+      The pipeline gives the same count with your cut as with the real one, and you can say what
+      uniq needs from its input for that count to mean distinct artists.
+    concepts: [pipes-and-composition]

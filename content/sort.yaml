@@ -1,0 +1,372 @@
+project:
+  slug: sort
+  title: Build your own sort
+  source_url: https://codingchallenges.fyi/challenges/challenge-sort
+  level: beginner
+  summary: >-
+    A command-line program that sorts the lines of a file like the Unix sort tool, drops
+    repeated lines with -u, lets you choose the sorting algorithm, and can put lines in a
+    random order while keeping identical ones together. Building several algorithms behind one
+    interface teaches what sorting really costs, why stability and the choice between byte
+    order and a language's alphabetical order change the output, and how a real sort copes
+    with files bigger than memory.
+
+concepts:
+  - id: comparison-sorting
+    name: Comparison sorting and what it costs
+    covers:
+      - the comparison model
+      - the n log n limit
+      - quadratic sorts and where they break
+      - best, average and worst case
+      - the cost of comparing two lines
+      - extra memory
+    explanation: |-
+      Most sorts learn about order by asking one question: does this line come before that
+      one? A sort built that way has to tell apart every possible order of its input, and each
+      answer rules out at most half of them, so no comparison sort can do better than about
+      n log n comparisons in the worst case. Simple sorts such as insertion sort compare close
+      to every pair. With 10 times more lines they do about 100 times more work, while an
+      n log n sort does a little over 10 times more. Memory is the other cost: some sorts
+      rearrange the lines in place, others need a second buffer as large as the input. And
+      comparing two lines isn't one step. It walks both lines until they differ, so lines with
+      long shared beginnings, like log lines that all start with the same date, make every
+      comparison slow.
+
+      Real example: fast library sorts still use insertion sort for small pieces of the input,
+      because on tiny or nearly sorted input its low overhead wins.
+
+      Common mistake: judging a sort by its average case and never trying the input that
+      triggers its worst case, such as input that is already sorted.
+    why_here: >-
+      Step 1 has to sort every word of a whole book, and step 3 asks you to compare
+      algorithms, which only makes sense once you can say what each one costs as the input
+      grows.
+    origin: step
+    resources:
+      - title: "Comparison sort (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Comparison_sort
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 2.1 Elementary Sorts"
+        url: https://algs4.cs.princeton.edu/21elementary/
+      - title: "Sorting algorithm (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Sorting_algorithm
+
+  - id: merge-quick-heap
+    name: "Merge sort, quicksort and heapsort: the trade-offs"
+    covers:
+      - splitting and merging
+      - partitioning and the choice of pivot
+      - many equal keys and three-way partitioning
+      - the heap kept inside the array
+      - stability
+      - hybrid sorts
+    explanation: |-
+      All three usually take n log n time, and they differ in what they promise. Merge sort
+      splits the lines in half, sorts each half and merges the two. It is always n log n and it
+      is stable, but it needs a second buffer as big as the input. Quicksort picks a pivot and
+      moves smaller lines before it and larger ones after it. It works in place and is often
+      the fastest in practice because it reads memory in order, but bad pivots make it
+      quadratic, and it isn't stable. Heapsort arranges the lines as a heap, a tree stored in
+      the array itself, and keeps taking out the largest. It works in place and is always
+      n log n, but it jumps around memory and isn't stable either. A stable sort keeps lines
+      that compare equal in their input order, which matters as soon as "equal" means the same
+      key rather than the same bytes.
+
+      Real example: sorting a staff list by name and then, with a stable sort, by department
+      leaves each department's names in alphabetical order. Library sorts are often hybrids:
+      introsort is a quicksort that switches to heapsort when it recurses too deep, and Timsort
+      merges the already sorted runs it finds in the input.
+
+      Common mistake: taking the first line as the pivot, which makes already sorted input the
+      worst case, or a partition that sends every line equal to the pivot to the same side,
+      which turns a word list full of repeated words into quadratic work.
+    why_here: >-
+      Step 3 names these algorithms and asks how each one works with -u, and the word list is
+      full of repeated words, the input that hurts a careless quicksort.
+    origin: step
+    resources:
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 2.2 Mergesort"
+        url: https://algs4.cs.princeton.edu/22mergesort/
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 2.3 Quicksort"
+        url: https://algs4.cs.princeton.edu/23quicksort/
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 2.4 Priority Queues and heapsort"
+        url: https://algs4.cs.princeton.edu/24pq/
+
+  - id: radix-sort
+    name: "Radix sort: ordering without comparing"
+    covers:
+      - dealing lines into buckets by one byte
+      - most significant byte first for text
+      - last byte first for fixed-width keys
+      - shorter lines before longer ones
+      - when it beats comparison sorts
+    explanation: |-
+      Radix sort never compares two lines. It deals them into buckets by their first byte, one
+      bucket for each possible byte value, then repeats inside each bucket with the next byte.
+      A line that has run out of bytes goes before every line that continues, so "car" comes
+      before "card". Because it never compares, the n log n limit doesn't apply: the cost grows
+      with the number of bytes it has to look at to tell the lines apart. When all keys have
+      the same width you can start from the last byte instead, as long as every pass is stable.
+      The price is memory for the buckets, overhead when a bucket holds only a few lines, and
+      an order that is fixed by the bytes.
+
+      Real example: IPv4 addresses are 4 bytes each, so 4 stable passes sort millions of them
+      with no comparisons at all. The BSD sort offers radix sort only in the C and POSIX
+      locales, because only there does byte order match the order it must produce.
+
+      Common mistake: keeping hundreds of mostly empty buckets for groups of two or three
+      lines. Good implementations switch to insertion sort once a group gets small.
+    why_here: >-
+      Step 3 lists radix sort next to the comparison sorts, and it shows where the n log n
+      limit comes from and why it only binds sorts that compare.
+    origin: step
+    resources:
+      - title: "Radix sort (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Radix_sort
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 5.1 String Sorts"
+        url: https://algs4.cs.princeton.edu/51radix/
+      - title: "FreeBSD manual: sort(1)"
+        url: https://man.freebsd.org/cgi/man.cgi?query=sort
+
+  - id: byte-order-collation
+    name: Byte order versus collation
+    covers:
+      - lexicographic order
+      - byte order and LC_ALL=C
+      - the locale's collation rules
+      - case, accents and punctuation
+      - sort keys
+    explanation: |-
+      Lexicographic order compares the first position of two lines and looks further only when
+      they match. The question is what you compare at each position. Byte order compares raw
+      byte values. It is fast and gives the same result on every machine, but every capital
+      letter comes before every lowercase one, so "Zebra" sorts before "apple", and "éclair"
+      lands after "zoo" because its first byte in UTF-8 is larger than any ASCII byte.
+      Collation is the order a language's readers expect, and the locale defines it. Case and
+      accents only count when everything else is equal, punctuation is often skipped, and
+      languages disagree: Swedish puts "ö" after "z", German files it with "o". The real sort
+      collates by the locale unless LC_ALL=C is set. Collating is slower, so many tools turn
+      each line once into a sort key whose bytes compare in the right order.
+
+      Real example: the same script sorts a file one way on a laptop set to en_US.UTF-8 and
+      another way on a server with no locale set.
+
+      Common mistake: sorting a file under one locale and then handing it to a tool that
+      expects sorted input, such as join or comm, running under another. They complain that
+      the input isn't sorted, or quietly miss matches.
+    why_here: >-
+      Step 1 asks for lexicographic order, and the page's first words are all in capitals,
+      which is byte order. To compare your output with the real sort you have to run it with
+      LC_ALL=C.
+    origin: step
+    resources:
+      - title: "GNU coreutils FAQ: Sort does not sort in normal order!"
+        url: https://www.gnu.org/software/coreutils/faq/coreutils-faq.html#Sort-does-not-sort-in-normal-order_0021
+      - title: "Unicode Technical Standard #10: Unicode Collation Algorithm"
+        url: https://www.unicode.org/reports/tr10/
+      - title: "GNU coreutils manual: sort invocation"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
+
+  - id: deduplication
+    name: "Removing duplicates: before, during or after sorting"
+    covers:
+      - neighbours after sorting
+      - dropping copies inside the merge or the partition
+      - a hash set before sorting
+      - what counts as equal
+      - which copy is kept
+    explanation: |-
+      Once lines are sorted, every copy sits right next to its twin, so one pass that compares
+      each line with the one before removes them all, with almost no extra memory. That's what
+      uniq does, and why it needs sorted input. You can also drop copies while sorting: when a
+      merge sees the same line at the head of both halves it can output it once, and a
+      three-way partition gathers every copy of the pivot in one place. Or you can drop them
+      before sorting, by putting the lines in a hash set and sorting only what's left. That
+      needs memory for every distinct line, but when most lines are repeats the sort gets much
+      smaller. What counts as equal is a choice too. With -u plus case folding or a key, lines
+      that differ can count as equal, and the real sort keeps the first of them, which is the
+      first in the input only if the sort is stable.
+
+      Real example: counting the distinct visitors in a day of web logs. A hash set is fastest
+      when the distinct values fit in memory, and sort then uniq still works when they don't,
+      because sort can spill to disk.
+
+      Common mistake: checking each new line against every line kept so far, which is
+      quadratic, or running uniq on input that isn't sorted, which only removes repeats that
+      happen to be neighbours.
+    why_here: >-
+      Step 2 adds -u and asks whether to remove duplicates before, during or after sorting, and
+      step 3 asks how each algorithm works with it. The BSD sort won't use quicksort or heapsort
+      with -u, because there -u implies a stable sort.
+    origin: step
+    resources:
+      - title: "GNU coreutils manual: uniq invocation"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/uniq-invocation.html
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 3.4 Hash Tables"
+        url: https://algs4.cs.princeton.edu/34hash/
+      - title: "FreeBSD manual: sort(1)"
+        url: https://man.freebsd.org/cgi/man.cgi?query=sort
+
+  - id: external-sorting
+    name: Sorting data larger than memory
+    covers:
+      - why sort must read everything first
+      - sorted runs in temporary files
+      - merging many runs with a heap
+      - buffer size and merge passes
+    explanation: |-
+      Most text tools work on one line at a time, but a sort can't print its first line until
+      it has read the last one, because the last line might belong first. That's why piping a
+      log that never ends into sort prints nothing at all. So sort has to keep all its input
+      somewhere. When the input is bigger than memory, an external merge sort reads as much as
+      fits, sorts it, writes it to a temporary file as a sorted run, and repeats. Then it merges
+      the runs, keeping the current line of each run in a heap that always hands back the
+      smallest. Memory now depends on the buffer size, not on the input. If there are too many
+      runs to open at once, it merges them in groups and then merges the results. The real sort
+      works this way: -S sets its buffer and -T says where its temporary files go.
+
+      Real example: sorting a 50 GB log on a laptop with 16 GB of memory, or a database sorting
+      query results that don't fit in memory, which it calls spilling to disk.
+
+      Common mistake: reading the whole file into one list, which works on the sample and
+      fails, or slows to a crawl, on the first input bigger than memory.
+    why_here: >-
+      The page's word list fits in memory easily, but the real sort handles files of any size,
+      and this is where it differs most from a textbook sort.
+    origin: beyond
+    resources:
+      - title: "External sorting (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/External_sorting
+      - title: "GNU coreutils manual: sort invocation"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
+
+  - id: random-sort
+    name: Random order that keeps equal lines together
+    covers:
+      - shuffling versus random sort
+      - sorting by a random hash of each line
+      - seeding and repeating a run
+      - breaking ties between different lines
+      - an unbiased shuffle
+    explanation: |-
+      A shuffle, like shuf, gives a random order where two copies of the same line can end up
+      anywhere. A random sort is different. It picks a hash function at random, hashes every
+      line and sorts by the hash. Identical lines get identical hashes, so they come out next to
+      each other, while different lines appear in an order that looks random. The hash function
+      must come from a fresh random seed on every run, or every run gives the same order. The
+      real sort takes --random-source to repeat a run on purpose, which helps tests. If two
+      different lines happen to get the same hash, compare the lines themselves to break the
+      tie, so different lines never mix into one group. A plain shuffle done right walks the
+      list from the end and swaps each line with a randomly chosen line at or before it, which
+      makes every order equally likely.
+
+      Real example: picking test users from a log with a random sort on the user field keeps
+      all of one user's lines together, while the users come out in a random order.
+
+      Common mistake: shuffling by sorting with a comparison that answers at random. Its
+      answers contradict each other, so some orders come out far more often than others, and
+      some sorting algorithms misbehave.
+    why_here: >-
+      Step 4 asks for -R, a random order where identical lines stay together, and combined with
+      -u the output must still change from run to run.
+    origin: step
+    resources:
+      - title: "GNU coreutils manual: sort invocation (see --random-sort)"
+        url: https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html
+      - title: "Fisher–Yates shuffle (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+      - title: "Universal hashing (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Universal_hashing
+
+  - id: sort-correctness
+    name: What makes a sort correct, and how to test it
+    covers:
+      - in order and a permutation of the input
+      - comparing against the real sort
+      - inputs that break sorts
+      - testing output that is random
+    explanation: |-
+      A sort is correct when two things hold: each line is no greater than the next, and the
+      output holds exactly the input's lines, each as many times as it appeared. Checking only
+      the first is a trap, because a program that prints nothing passes it. With several
+      algorithms behind one interface you don't need to know the answer in advance: run them
+      all on the same inputs and compare them with each other and with the real sort under
+      LC_ALL=C. The inputs that break sorts are small and plain: an empty file, one line, two
+      lines, all lines equal, already sorted, reversed, and a last line with no newline, which
+      the real sort quietly adds. Random output can't be compared with a fixed answer, so check
+      its properties: it's a permutation, equal lines are adjacent, two runs differ, and the
+      same random source gives the same run twice.
+
+      Real example: property-based testing tools generate thousands of random inputs, check
+      both properties, and shrink any failure to the smallest input that still fails, often two
+      or three lines.
+
+      Common mistake: testing only on the sample file, which is never empty, never sorted and
+      never all equal, so a sort that crashes on an empty file or crawls on sorted input passes
+      every test.
+    why_here: >-
+      Step 3 gives no expected output and suggests unit tests, every algorithm must print the
+      same thing, and step 4's output changes on every run.
+    origin: step
+    resources:
+      - title: "Differential testing (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Differential_testing
+      - title: "What is property based testing? (Hypothesis)"
+        url: https://hypothesis.works/articles/what-is-property-based-testing/
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project, download the book the page links, and turn it into a word list with
+      one word per line using the page's tr and sed recipe. Make sure the real sort is
+      available to compare against.
+    check: >-
+      The word list has one word per line and no line starts with a digit. The real sort, run
+      on it with LC_ALL=C, gives you output to compare yours with.
+    concepts: []
+
+  - id: s1
+    title: Sort the lines
+    objective: >-
+      Given a file name, read all of its lines and print them in lexicographic order,
+      comparing lines byte by byte.
+    check: >-
+      Under LC_ALL=C the output is the same as the real sort's, line for line, repeats
+      included. Piped through uniq, the first words start with a capital A, because in byte
+      order every capital letter comes before every lowercase one.
+    concepts: [comparison-sorting, byte-order-collation, external-sorting]
+
+  - id: s2
+    title: Unique lines with -u
+    objective: >-
+      With -u, print each distinct line only once. Decide whether to remove duplicates before,
+      during or after sorting, weighing time, memory and how easily the choice extends to
+      later options.
+    check: >-
+      The output with -u is the same as your sorted output piped through uniq, and the same as
+      the real sort -u under LC_ALL=C, so its first five lines match step 1's.
+    concepts: [deduplication]
+
+  - id: s3
+    title: Choose the algorithm
+    objective: >-
+      Let the user choose which algorithm sorts the lines, with options named like the BSD
+      sort's: --radixsort, --mergesort, --qsort and --heapsort. Build as many of them as you
+      like, and decide how each one works with -u.
+    check: >-
+      The page gives no expected output, so your tests are the check. Every algorithm prints
+      exactly the same output as the others and as the real sort under LC_ALL=C, with and
+      without -u, on the word list and on small inputs: an empty file, one line, all lines
+      equal, already sorted and reversed.
+    concepts: [comparison-sorting, merge-quick-heap, radix-sort, deduplication, sort-correctness]
+
+  - id: s4
+    title: Random sort
+    objective: >-
+      With -R or --random-sort, print the lines in a random order that changes on every run,
+      keeping identical lines next to each other. It must also work together with -u.
+    check: >-
+      Two runs with --random-sort and -u print the same lines as -u alone, in different
+      orders. Without -u, all copies of a word sit next to each other.
+    concepts: [random-sort, sort-correctness]

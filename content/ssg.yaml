@@ -1,0 +1,407 @@
+project:
+  slug: ssg
+  title: Build your own static site generator
+  source_url: https://codingchallenges.fyi/challenges/challenge-ssg
+  level: beginner
+  summary: >-
+    A command-line tool in the style of Hugo that sets up a site project, keeps each page as
+    Markdown and the look in a theme, builds them into plain HTML files ready for any web host,
+    and runs a development server that refreshes the browser on every save. Building it teaches
+    why content, presentation and output are kept apart, why a template must escape the text it
+    inserts, what a Markdown converter does underneath, and how a build decides what to redo when
+    one file changes.
+
+concepts:
+  - id: folder-tree-generation
+    name: Generating a folder tree you can safely run twice
+    covers:
+      - creating parent folders before files
+      - joining paths with the system's own rules
+      - never overwriting the user's work
+      - exclusive create instead of check, then write
+      - commands that are safe to run twice
+      - writing a file whole or not at all
+    explanation: |-
+      A scaffolding command turns one name into a small tree of folders and files. Each path is
+      built by joining its parts with the system's own path rules rather than by gluing text
+      together, because separators and rules differ between systems, and a folder has to exist
+      before anything can be created inside it. The real design question is what a second run
+      does. If the project already exists and the user has edited the homepage, running the
+      command again must not replace their work. It can refuse with a clear message, or create
+      only what is missing and leave the rest alone. A command whose second run changes nothing
+      is called idempotent, which makes it safe to run again after a crash or a typo, the way
+      mkdir -p succeeds when the folder already exists while plain mkdir fails. To create a file
+      only if it doesn't exist yet, ask the operating system for exactly that in one call, with
+      its exclusive-create flag, because checking first and writing afterwards leaves a gap in
+      which things can change. A crash can also leave a file half-written, so careful tools write
+      a temporary file next to it and rename it into place, which on POSIX systems replaces the
+      old file in one atomic step.
+
+      Real example: Hugo's command for starting a new project refuses to run in a folder that
+      already has files in it unless you add --force.
+
+      Common mistake: opening the homepage for writing without looking first. Opening a file for
+      writing in the usual mode empties it, so a second run silently wipes the edits the user
+      already made.
+    why_here: >-
+      Step 1 creates the project folder and its homepage. Steps 2 and 3 then add commands that
+      create more folders and files inside a project the user is already editing.
+    origin: beyond
+    resources:
+      - title: "open(2), Linux manual page (O_CREAT and O_EXCL)"
+        url: https://man7.org/linux/man-pages/man2/open.2.html
+      - title: "rename(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/rename.2.html
+      - title: "Hugo: hugo new project"
+        url: https://gohugo.io/commands/hugo_new_project/
+
+  - id: content-presentation-output
+    name: Separating content, presentation and output
+    covers:
+      - "content: what a page says"
+      - "presentation: how every page looks"
+      - "output: generated, never edited by hand"
+      - one layout for many pages
+      - changing one part without touching the others
+      - which files are the source of truth
+    explanation: |-
+      A static site generator rests on keeping three things apart. Content is what each page
+      says, written in a simple format such as Markdown with no layout in it. Presentation is how
+      every page looks, written once in a theme: the HTML around the words, the styles and the
+      navigation. Output is what the generator makes by combining the two, plain HTML files that
+      any web host can serve. Each part has its own reason to change. A writer adds a page
+      without touching any HTML, a designer changes the look of every page by editing one layout,
+      and a different theme gives the same words a new design. The output is a product, not a
+      source. Every file in it can be deleted and made again from the other two, so a change made
+      there by hand is lost at the next build, and many projects keep the output folder out of
+      version control altogether.
+
+      Real example: the CSS Zen Garden shows the idea for a single page. Every design on the site
+      uses the same HTML, and only the stylesheet changes. A generator applies the same split to
+      a whole site, with Markdown files on one side and a theme on the other.
+
+      Common mistake: fixing a typo directly in a generated HTML file and losing the fix at the
+      next build, or putting layout into the content, such as raw HTML for columns inside a
+      Markdown page, so that page no longer changes when the theme does.
+    why_here: >-
+      Step 2 moves the homepage into a theme and step 3 takes its words out into Markdown, which
+      leaves the theme with layout only. From step 4 the output folder is written by the build
+      and by nothing else.
+    origin: step
+    resources:
+      - title: "Separation of content and presentation (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Separation_of_content_and_presentation
+      - title: "Static site generator (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Static_site_generator
+      - title: "CSS Zen Garden"
+        url: https://www.csszengarden.com/
+
+  - id: names-urls-links
+    name: From page names to files, URLs and links
+    covers:
+      - the output tree is the URL tree
+      - index pages as a folder's default
+      - turning a typed name into a safe slug
+      - names that try to leave the folder
+      - case-insensitive file systems
+      - relative, root-relative and absolute links
+      - a site served from a subfolder
+    explanation: |-
+      In a static site the output folder is the website. A file at public/about.html is served
+      at /about.html, and index.html is what a web server returns when a folder itself is
+      requested, which is why content/index.md becomes the home page. So the name of a content
+      file becomes the address of a page, and once people link to an address, changing it breaks
+      their links. A name typed by a person, such as About Us!, becomes a slug made of lower-case
+      letters, digits and hyphens, giving about-us. Cleaning the name also stops one that
+      contains a slash or two dots from creating a file outside the content folder. Case is a
+      trap of its own. The default file systems on Windows and macOS ignore case, so About.md and
+      about.md are the same file there, while most Linux servers treat them as two, and a link
+      that worked on a laptop fails after deployment. Links come in three forms. A relative link
+      such as style.css is resolved against the folder of the current page, so it works from
+      /about.html and breaks from /blog/first.html. A link that starts with a slash, such as
+      /style.css, starts from the top of the host, which breaks when the site lives in a
+      subfolder. An absolute link names the whole address, host included.
+
+      Real example: a project site on GitHub Pages is served under a folder named after its
+      repository, so a theme that links to /style.css asks for a stylesheet at the top of the
+      host, where there is none, and the site shows up unstyled. This is one reason Hugo has a
+      baseURL setting: the full address of the published site, path included.
+
+      Common mistake: using the page name exactly as typed for the file name, so a space turns
+      into %20 in every link, and two pages whose names differ only in case overwrite each other
+      when the site is built on a laptop.
+    why_here: >-
+      Step 3's new page command turns a typed name into a file in the content folder, and from
+      step 4 that file name becomes the page's address. Menus and a sitemap in the optional step
+      need links that work from every page and full addresses.
+    origin: beyond
+    resources:
+      - title: "RFC 3986, section 5: Reference Resolution"
+        url: https://www.rfc-editor.org/rfc/rfc3986.html#section-5
+      - title: "Clean URL (Wikipedia), including slugs"
+        url: https://en.wikipedia.org/wiki/Clean_URL
+      - title: "What is GitHub Pages? (GitHub Docs), types of sites"
+        url: https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages
+
+  - id: templates-and-escaping
+    name: Templates, and why plain substitution needs escaping
+    covers:
+      - a layout with named holes
+      - text versus markup
+      - escaping special characters
+      - the place a value goes decides the escaping
+      - trusted HTML inserted raw on purpose
+      - filling every placeholder in one pass
+      - placeholders left unfilled
+    explanation: |-
+      A template is a page layout with named holes. The generator fills each hole with a value,
+      such as the title or the converted body, and leaves the rest of the layout as written. The
+      obvious way is find and replace, and it breaks in three ways. First, the page is HTML, so
+      characters such as <, > and & in a value are read as markup. A title like Fish & Chips
+      <cheap> loses a word in the browser, and a value that holds a script element runs it in
+      every reader's browser. Escaping fixes this by writing those characters as character
+      references, such as &lt; for < and &amp; for &, plus quotes when the value sits inside an
+      attribute, so the browser shows them as text. Where the value goes decides the rules: text,
+      an attribute, a URL and a script each need their own escaping. Second, some values are
+      already HTML, like the converted body, and must go in unchanged, so the template has to
+      know which values are trusted markup. Third, replacing one placeholder after another also
+      scans the text just inserted, so a page whose body mentions the title placeholder gets the
+      title pasted into its text. A real template engine reads the template once, escapes every
+      value by default, inserts raw HTML only where you ask for it, and reports a placeholder it
+      doesn't know instead of leaving it in the page.
+
+      Real example: Mustache, a template language with versions for many programming languages,
+      escapes every value written in double braces and inserts a value raw only when it is
+      written in triple braces. A static site generator needs both kinds: the title goes in
+      escaped and the converted body goes in raw.
+
+      Common mistake: escaping the converted body as well, so readers see tags such as <p>
+      printed on the page, or escaping nothing because none of the test titles happen to contain
+      a special character.
+    why_here: >-
+      Step 4 fills the theme's title and content placeholders. The title is plain text taken
+      from a heading and the content is HTML from the converter, so the two need opposite
+      treatment.
+    origin: step
+    resources:
+      - title: "OWASP Cross Site Scripting Prevention Cheat Sheet"
+        url: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+      - title: "mustache(5): Logic-less templates"
+        url: https://mustache.github.io/mustache.5.html
+
+  - id: markdown-to-html
+    name: "Converting Markdown to HTML: what a parser does"
+    covers:
+      - block structure first, inline structure second
+      - a tree of blocks and inline elements
+      - rendering the tree as HTML
+      - why line-by-line replacing breaks
+      - CommonMark and the many dialects
+      - raw HTML passing through
+      - the title as a heading's plain text
+    explanation: |-
+      Markdown looks like a few find-and-replace rules: a hash starts a heading, stars mark
+      emphasis. Converters written that way break where rules meet. The CommonMark specification
+      describes parsing in two phases. The first reads the input line by line and builds the
+      block structure: headings, paragraphs, lists, block quotes and code blocks, and which
+      blocks sit inside which. The second parses the text inside each paragraph and heading for
+      inline structure: emphasis, links and code spans. Block structure always wins, so a line
+      inside a code block that starts with a hash is code, not a heading. The result is a tree,
+      and a renderer walks it to write HTML, escaping the text as it goes. Markdown's original
+      description left many cases open, so converters gave different results for the same input
+      until CommonMark pinned the cases down with hundreds of numbered examples. Markdown also
+      lets raw HTML pass through unchanged, which is handy on your own pages and dangerous in
+      text written by strangers.
+
+      Real example: a level-one heading can be written two ways, as a line that starts with one
+      hash and a space, or as a line of text underlined with equals signs. A hash with no space
+      after it, as in #hashtag, is not a heading at all. GitHub's own dialect starts from
+      CommonMark and adds tables, strikethrough and task lists.
+
+      Common mistake: finding the title by searching for the first line that starts with a hash.
+      That misses an underlined heading, can pick up a comment line inside a code block, and
+      keeps any emphasis marks in the title. Take the title from the parsed tree instead, as the
+      heading's plain text.
+    why_here: >-
+      Step 4 converts every page to HTML and uses its first top-level heading as the title,
+      which only works reliably from the parsed structure.
+    origin: step
+    resources:
+      - title: "CommonMark Spec, Appendix A: A parsing strategy"
+        url: https://spec.commonmark.org/0.31.2/#appendix-a-parsing-strategy
+      - title: "Markdown: Syntax (John Gruber)"
+        url: https://daringfireball.net/projects/markdown/syntax
+      - title: "GitHub Flavored Markdown Spec"
+        url: https://github.github.com/gfm/
+
+  - id: build-pipeline
+    name: The build pipeline and deciding what to rebuild
+    covers:
+      - inputs, outputs and the dependencies between them
+      - one page's input versus a shared input
+      - timestamps versus content hashes
+      - dependencies found only while building
+      - outputs left behind by deleted inputs
+      - the same inputs give the same output
+    explanation: |-
+      A build turns inputs into outputs through fixed stages: read each Markdown file, convert
+      it, put it into the template, write the page. Each output depends on certain inputs. A page
+      in public depends on its own Markdown file and on the template, and writing those
+      dependencies down is what lets a tool redo less. A change to one Markdown file makes one
+      page out of date. A change to the template, which every page uses, makes all of them out of
+      date. make decides by comparing modification times and rebuilds an output when any of its
+      inputs is newer. Times are cheap to check but can mislead after a copy or a checkout sets
+      them in a different order from the edits, so some tools compare a hash of each input's
+      content instead. Some dependencies only appear while building: a menu that lists every page
+      makes each page depend on all the others, so adding one page changes them all. Deleting is
+      the case people forget. When about.md goes, public/about.html stays unless the build
+      removes outputs that no input produces any more. Finally, a build should be repeatable: the
+      same inputs give the same bytes, which means a fixed order of processing and nothing like
+      the current time in the output, so comparing two builds shows only real changes.
+
+      Real example: Hugo's documentation says a build does not clear the public folder. Existing
+      files are overwritten but not deleted, so pages from an earlier build can linger, and it
+      offers an option that removes those stale files.
+
+      Common mistake: rebuilding only the page whose Markdown changed when the template was
+      edited, so most of the site still shows the old layout, or never deleting outputs, so a
+      removed page stays online.
+    why_here: >-
+      Step 4 builds every page each time, which is fine for two pages. Step 5 rebuilds while
+      you edit, so the tool has to know which outputs each change affects, including a page
+      that was deleted or renamed.
+    origin: step
+    resources:
+      - title: "GNU make manual: How make Processes a Makefile"
+        url: https://www.gnu.org/software/make/manual/html_node/How-Make-Works.html
+      - title: "Hugo: Basic usage (Build your project)"
+        url: https://gohugo.io/getting-started/usage/
+      - title: "Reproducible Builds: Definitions"
+        url: https://reproducible-builds.org/docs/definition/
+
+  - id: file-watching-live-reload
+    name: Watching files and the live-reload loop
+    covers:
+      - polling versus change notifications
+      - watching folders, not single files
+      - editors that save in several steps
+      - debouncing a burst of events
+      - not watching your own output
+      - pushing a reload to the browser
+      - surviving a failed build
+    explanation: |-
+      The development loop is edit, save, see, and the tool closes it in three moves: notice a
+      change, rebuild, tell the browser. To notice, a program can poll, checking modification
+      times on a timer, which is simple and works everywhere but costs time and reacts late. Or
+      it can ask the operating system to report changes, through inotify on Linux, FSEvents on
+      macOS or ReadDirectoryChangesW on Windows. Those reports are noisy. One save can produce
+      several events, because many editors write a temporary file and rename it over the
+      original, which can also end a watch on the original file, so tools watch folders rather
+      than single files. inotify doesn't cover subfolders, so each one needs its own watch,
+      including folders created later. Rebuilding on every event wastes work and can read a
+      half-written file, so watchers debounce: they wait until events stop for a short moment,
+      then rebuild once. The output folder must not be watched, or each build sets off the next.
+      A browser can't see files change, so the development server adds a small script to every
+      page it serves. The script keeps a connection open to the server, through WebSockets or
+      server-sent events, and reloads the page when told that a build has finished. That script
+      belongs to development only and must never reach the published files. A build that fails
+      halfway through an edit should report the error and keep serving the last good version.
+
+      Real example: Hugo's development server watches the project, rebuilds on each save and
+      reloads open pages through a script it adds while serving. It can also poll instead, which
+      matters on network file systems, where the Linux notifications don't report changes made by
+      other machines.
+
+      Common mistake: watching the public folder along with the sources, so every build sets off
+      another one, or rebuilding once per event, so a single save builds the site several times.
+    why_here: >-
+      Step 5 asks for a server that updates the site in the browser whenever a page or the
+      theme changes, which is exactly this loop.
+    origin: step
+    resources:
+      - title: "inotify(7), Linux manual page"
+        url: https://man7.org/linux/man-pages/man7/inotify.7.html
+      - title: "Debouncing and Throttling Explained Through Examples (CSS-Tricks)"
+        url: https://css-tricks.com/debouncing-throttling-explained-examples/
+      - title: "Using server-sent events (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project for a command-line tool with subcommands. The page calls it ccssg, but
+      the name is yours. Make sure you have a way to serve a folder over HTTP on your own
+      machine, because the last step needs a development server.
+    check: >-
+      The tool runs from the command line and lists its commands, and you can serve a folder of
+      HTML files on a local port and open it in a browser.
+    concepts: []
+
+  - id: s1
+    title: Initialise a project
+    objective: >-
+      Add a command that creates a new project folder, named by the user, holding a homepage
+      with placeholder headings and text that the user can edit. Running it again must not
+      destroy a homepage the user has already changed.
+    check: >-
+      The command creates a project folder that holds just index.html, and that page opens in a
+      browser with its headings and text.
+    concepts: [folder-tree-generation]
+
+  - id: s2
+    title: Create a theme
+    objective: >-
+      Add a new theme command that creates a themes folder inside the project, with one
+      subfolder named after the theme holding an index.html. Move the homepage's content from
+      the project's own index.html into the theme's.
+    check: >-
+      After creating a theme called cc, the project tree shows themes/cc/index.html next to the
+      root index.html, and the theme's page holds the homepage.
+    concepts: []
+
+  - id: s3
+    title: Separate content from the theme
+    objective: >-
+      Stop creating a root index.html. A new project now gets a content folder holding
+      index.md, the homepage written in Markdown, and a new page command adds a Markdown file to
+      that folder, so a page called about becomes about.md.
+    check: >-
+      After creating a project, the cc theme and an about page, the tree holds about.md and
+      index.md in content and index.html in themes/cc, with no index.html at the root.
+    concepts: [content-presentation-output, names-urls-links]
+
+  - id: s4
+    title: Templates and building
+    objective: >-
+      Turn the theme's index.html into a template with a placeholder for the title and one for
+      the content. Add a build command that converts every Markdown file in content to HTML,
+      puts it into the template with the page's first top-level heading as the title, and
+      writes one HTML file per page into a new public folder, ready to upload to a static host.
+    check: >-
+      After a build, public holds about.html and index.html. Each shows its page's converted
+      text with its heading as the title, and no placeholder is left in either file.
+    concepts: [templates-and-escaping, markdown-to-html]
+
+  - id: s5
+    title: Development server with live reload
+    objective: >-
+      Add a command that builds the site, serves it on a local port and keeps watching it. When
+      a page in content or the theme changes, rebuild what the change affects and make an open
+      browser show the new version without a manual refresh.
+    check: >-
+      Fetching a page over HTTP, editing its Markdown and fetching it again returns the new text
+      within a moment. With the page open in a browser, saving a change to the page or the theme
+      shows up without pressing refresh.
+    concepts: [file-watching-live-reload, build-pipeline]
+
+  - id: s6
+    title: Going further
+    objective: >-
+      Add features from Hugo that interest you, such as a blog with posts listed by date, a menu
+      that links to every page, more template placeholders, or a sitemap for search engines.
+    check: >-
+      Each feature shows in the built site. A menu appears on every page and its links work from
+      any page, and a sitemap lists the full address of every page.
+    concepts: [names-urls-links]
+    optional: true

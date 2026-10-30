@@ -1,0 +1,406 @@
+project:
+  slug: webserver
+  title: Build your own web server
+  source_url: https://codingchallenges.fyi/challenges/challenge-webserver
+  level: intermediate
+  summary: >-
+    A small HTTP/1.1 server written directly on sockets that serves files from a folder, answers
+    many clients at once and refuses to hand out anything outside that folder. Building it shows
+    what every web framework hides: how a request arrives as bytes on a connection, how the server
+    knows where it ends, how a URL safely becomes a file, and how one program keeps many slow
+    clients moving.
+
+concepts:
+  - id: socket-lifecycle
+    name: Sockets and the life of a connection
+    covers:
+      - bind and listen
+      - the listening socket versus connected sockets
+      - the queue of waiting connections
+      - blocking reads and the end of the stream
+      - closing cleanly versus a reset
+      - addresses, ports and privileged ports
+    explanation: |-
+      A server socket goes through fixed stages. It binds to an address and a port, then
+      listens, and from that moment the operating system queues incoming connections for it. Each
+      accept takes one connection from that queue and returns a new socket for it, while the
+      listening socket stays open for the next client. On the connected socket the server reads
+      the request, writes the response and closes. A read waits until some data arrives, and a
+      read that returns no bytes at all means the client has closed its side. The address
+      decides who can connect: 127.0.0.1 accepts connections from the same machine only, 0.0.0.0
+      from any network the machine is on. Ports below 1024 need special rights on most Unix-like
+      systems, which is why a server under test takes its port from the environment rather than
+      using port 80.
+
+      Real example: a server restarted straight after stopping often fails with "address already
+      in use", because its recent connections are still in TCP's TIME_WAIT state, which lasts a
+      minute or more. Servers set a socket option that allows reusing the address, so restarts
+      work at once.
+
+      Common mistake: closing the connection while part of the request is still unread. The
+      operating system then resets the connection instead of closing it cleanly, and the client
+      can lose a response that had already been sent.
+    why_here: >-
+      Step 1 builds the accept, read, respond and close cycle by hand, with nothing between your
+      code and the operating system's sockets.
+    origin: step
+    resources:
+      - title: "Beej's Guide to Network Programming"
+        url: https://beej.us/guide/bgnet/
+      - title: "Berkeley sockets (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Berkeley_sockets
+      - title: "accept(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/accept.2.html
+
+  - id: http-message-format
+    name: "The HTTP/1.1 message: lines, headers and framing on a stream"
+    covers:
+      - the request line
+      - header fields and the Host header
+      - CRLF line endings
+      - the empty line that ends the headers
+      - reading until the headers end
+      - Content-Length and the body
+      - persistent connections and Connection close
+    explanation: |-
+      An HTTP/1.1 message is text with a strict layout. A request starts with a request line:
+      the method, the target and the version, separated by single spaces, as in GET /index.html
+      HTTP/1.1. Header fields follow, one per line, each a name, a colon and a value, and names
+      are case-insensitive. HTTP/1.1 requires a Host header in every request. Every line ends with
+      a carriage return and a line feed, called CRLF, and an empty line ends the header section.
+      Anything after it is the body, and its size comes from the Content-Length header, never from
+      where a read happens to stop. TCP delivers a stream of bytes with no message boundaries, so
+      one read can return half the headers, or the headers plus part of the body. The server keeps
+      reading into a buffer until it finds the empty line, and only then parses. A response has the
+      same shape with a status line first. HTTP/1.1 keeps a connection open for further requests
+      by default, so a server that closes after one response says so with a Connection: close
+      header.
+
+      Real example: you can open a raw connection to a web server with a tool such as nc, type a
+      request line, a Host header and an empty line, and the server answers. The protocol is
+      readable text all the way down.
+
+      Common mistake: reading once and parsing whatever arrived. It works on your own machine and
+      fails when a request arrives in pieces over a real network. Another is ending lines with a
+      bare line feed or leaving out the empty line, so the client can't tell where the headers
+      stop.
+    why_here: >-
+      Step 1 has to find the request line in raw bytes, know when the request has fully arrived,
+      and send back a response that a client such as curl can parse.
+    origin: step
+    resources:
+      - title: "RFC 9112: HTTP/1.1"
+        url: https://www.rfc-editor.org/rfc/rfc9112.html
+      - title: "HTTP messages (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages
+      - title: "Connection management in HTTP/1.x (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Connection_management_in_HTTP_1.x
+
+  - id: status-and-headers
+    name: Status codes and the headers a response needs
+    covers:
+      - the status line
+      - status code classes
+      - choosing between 400, 403, 404 and 500
+      - Content-Type and media types
+      - Content-Length in bytes
+      - content sniffing
+    explanation: |-
+      A response starts with a status line: the version, a three-digit code and a short reason
+      phrase. Clients act on the code, not on the phrase, and the first digit gives its class:
+      2xx success, 3xx look elsewhere, 4xx the request was wrong, 5xx the server failed. A file
+      server mostly needs 200 for a file it found, 404 for one it didn't, 400 for a request it
+      can't parse, 403 for a path it refuses to serve, 501 or 405 for a method it doesn't support,
+      and 500 when reading a file fails. The headers then describe the body. Content-Type says
+      what the bytes are, as a media type such as text/html with its character set, which a file
+      server usually picks from the file's extension. Content-Length says how many bytes follow,
+      counted in bytes and not in characters, which differ as soon as the text has accents or
+      other non-ASCII letters. Without a Content-Type, a browser has to guess from the content
+      itself, which is unreliable and a known security risk.
+
+      Real example: a stylesheet served as text/plain is not applied by browsers on a page with a
+      standard doctype, so the page loads with no styling even though the file arrived.
+
+      Common mistake: answering a missing file with 200 and a page that says "not found". Caches,
+      crawlers and scripts all read the code, so they treat the error page as real content.
+    why_here: >-
+      Step 2 answers with either a file or a 404, and a browser only shows the page properly when
+      the response says what it contains. Step 4 adds the choice of how to refuse a request.
+    origin: step
+    resources:
+      - title: "HTTP response status codes (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status
+      - title: "Media types (MIME types) (MDN)"
+        url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types
+      - title: "RFC 9110, section 15: Status Codes"
+        url: https://www.rfc-editor.org/rfc/rfc9110.html#section-15
+
+  - id: url-to-file
+    name: Mapping a URL path to a file
+    covers:
+      - request target versus file path
+      - the document root
+      - query strings
+      - percent-decoding
+      - default index files
+      - folders and trailing slashes
+    explanation: |-
+      The path in a request is part of a URL, not a file name. To find the file, the server takes
+      the path from the request target, drops any query string after a question mark, decodes
+      percent escapes such as %20 for a space, and places the result under the document root, the
+      folder it was told to serve. Some paths name a folder rather than a file, so the server
+      serves a default file such as index.html. Real servers also redirect a folder requested
+      without its trailing slash, so that relative links inside the page resolve against the right
+      folder. Path separators, case sensitivity and allowed characters differ between operating
+      systems, so the same URL can find a file on one machine and miss it on another.
+
+      Real example: Apache calls the folder DocumentRoot and the default file DirectoryIndex, and
+      nginx calls them root and index. The names differ, but the steps and their order are the
+      same.
+
+      Common mistake: using the raw request target as a file name, so /index.html?v=2, or a file
+      whose name contains a space, gives 404 even though the file exists.
+    why_here: >-
+      Step 2 turns request paths into files under www, with / meaning index.html, and step 4 lets
+      the location of that folder be chosen when the server starts.
+    origin: step
+    resources:
+      - title: "Mapping URLs to Filesystem Locations (Apache HTTP Server)"
+        url: https://httpd.apache.org/docs/2.4/urlmapping.html
+      - title: "Percent-encoding (MDN Glossary)"
+        url: https://developer.mozilla.org/en-US/docs/Glossary/Percent-encoding
+      - title: "Serve Static Content (NGINX documentation)"
+        url: https://docs.nginx.com/nginx/admin-guide/web-server/serving-static-content/
+
+  - id: path-traversal
+    name: Path traversal and staying inside the document root
+    covers:
+      - dot-dot segments
+      - encoded and double-encoded separators
+      - absolute paths
+      - symbolic links
+      - resolve first, then check
+      - refusing without giving clues
+    explanation: |-
+      Once a URL path becomes a file path, the client controls part of a path on your disk. A
+      dot-dot segment means the parent folder, so /../../etc/passwd climbs out of the document
+      root unless something stops it. Attackers disguise the dots and slashes: percent-encoded as
+      %2e%2e%2f, encoded twice, written with backslashes on Windows, or sent as an absolute path
+      that some path-joining routines treat as replacing the root instead of extending it. A
+      symbolic link inside the root can also point anywhere on the disk. Filtering the string is a
+      losing game. The reliable defence decodes the path exactly once, joins it to the root,
+      resolves the result to its real, canonical form with every link followed, and then checks
+      that this real path is the root itself or inside it, comparing whole folder names. Anything
+      else is refused, usually with 404 or 403, without explaining why.
+
+      Real example: in 2021 a change to path normalisation in Apache 2.4.49 let requests with an
+      encoded dot, %2e, climb out of the folders it served. On servers with CGI enabled that
+      became running commands remotely, and the first fix still missed a double-encoded form.
+
+      Common mistake: deleting every ../ with a find-and-replace, which turns ....// back into ../,
+      or checking that the resolved path starts with the root as plain text, which lets
+      /srv/www-private pass a check meant for /srv/www.
+    why_here: >-
+      The page asks you to consider the security risk that step 2 creates, and step 4 requires
+      that no request, however it is written, reaches a file outside www.
+    origin: step
+    resources:
+      - title: "Path traversal (PortSwigger Web Security Academy)"
+        url: https://portswigger.net/web-security/file-path-traversal
+      - title: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory (MITRE)"
+        url: https://cwe.mitre.org/data/definitions/22.html
+      - title: "Path traversal attack (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Path_traversal_attack
+
+  - id: concurrency-models
+    name: "Serving many clients: threads, pools and event loops"
+    covers:
+      - blocking calls
+      - a thread per connection
+      - a thread pool and its queue
+      - an event loop and readiness
+      - the cost of each model
+      - shared state and races
+    explanation: |-
+      A plain server handles one connection at a time because accepting, reading and writing all
+      wait: while it waits on one client, nobody else is served. There are three common ways out.
+      A thread per connection is the simplest: the main loop accepts and hands each connection to
+      a new thread. Each thread costs memory for its stack and time for the scheduler, and their
+      number grows with the number of clients, idle ones included. A pool keeps a fixed number of
+      threads taking connections from a queue, so a burst of clients can't create unlimited
+      threads, but a pool full of slow clients stalls everyone behind them. An event loop runs on
+      one thread with non-blocking sockets. It asks the operating system which sockets are ready,
+      through facilities such as epoll on Linux or kqueue on BSD systems, and does a little work
+      for each. It holds thousands of idle connections cheaply, but any step that blocks, such as a
+      slow file read or a sleep, stops every client at once. In every model, state shared between
+      connections, such as a counter or a cache, can be changed by two of them at the same moment
+      and needs a lock or another way to take turns.
+
+      Real example: Apache's classic mode gives each connection a whole process from a pool, while
+      nginx runs a few event loops. That design answered the C10K problem, serving ten thousand
+      clients at once on one machine.
+
+      Common mistake: adding the page's deliberate delay as a blocking sleep inside an event loop.
+      Every client then waits in line, and the test seems to show that the server can't handle
+      clients concurrently.
+    why_here: >-
+      Step 3 asks for many clients at once and names threads and asynchronous code as options,
+      each with its own costs.
+    origin: step
+    resources:
+      - title: "The C10K problem (Dan Kegel)"
+        url: http://www.kegel.com/c10k.html
+      - title: "An overview of parallelism, concurrency, and asynchrony (Coding Challenges)"
+        url: https://codingchallenges.fyi/blog/parallelism-concurrency-asynchrony
+      - title: "Thread pool (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Thread_pool
+
+  - id: resource-limits
+    name: Limits and timeouts for untrusted clients
+    covers:
+      - a cap on the size of the headers
+      - a deadline for the whole request
+      - idle connections
+      - a bound on connections or threads
+      - 408 and 431
+    explanation: |-
+      Every byte on a socket comes from someone you don't control. A server that reads until the
+      empty line with no cap lets one client send endless headers and fill its memory. A server
+      that waits forever lets a client that sends one byte every few seconds hold a thread or a
+      connection slot indefinitely. Robust servers bound everything a client can make them spend:
+      the size of the header section, with 431 when it is too large, a deadline for receiving the
+      whole request, with 408 or a plain close when it passes, a timeout for idle connections, and
+      a limit on how many connections or threads exist at once.
+
+      Real example: the Slowloris attack opens many connections and keeps each one alive by
+      sending a partial header now and then. With little bandwidth it ties up every worker of a
+      server that gives each connection a thread or a process. Apache added a module that sets
+      deadlines for receiving headers and bodies in response.
+
+      Common mistake: setting a timeout on each read instead of on the whole request. A client
+      that sends a single byte just before every timeout keeps the connection open for as long as
+      it likes.
+    why_here: >-
+      Once step 3 serves many clients at once, a few slow or hostile ones can still use up every
+      thread or connection unless the server sets its own limits.
+    origin: beyond
+    resources:
+      - title: "Slowloris (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Slowloris_(cyber_attack)
+      - title: "OWASP Denial of Service Cheat Sheet"
+        url: https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html
+      - title: "mod_reqtimeout (Apache HTTP Server)"
+        url: https://httpd.apache.org/docs/2.4/mod/mod_reqtimeout.html
+
+  - id: cgi
+    name: "CGI: handing a request to another program"
+    covers:
+      - a process per request
+      - request details in environment variables
+      - the body on standard input
+      - the script's headers and body on standard output
+      - which files may run
+      - the cost of starting a process
+    explanation: |-
+      The Common Gateway Interface is the oldest standard way for a web server to answer with a
+      page built by a program. When a request maps to a script, the server starts the script as
+      a new process. It passes the request's details in environment variables, such as
+      REQUEST_METHOD, QUERY_STRING and one variable for each request header, and the request body
+      on standard input. The script writes header lines such as Content-Type or Status, an empty
+      line and then the body to standard output, and the server turns that into the HTTP
+      response. The interface is simple and works with a script in any language, but starting a
+      process for every request is slow, which led to FastCGI and long-running application
+      servers. It is also risky: the script runs with the server's rights on input the client
+      controls, so only files in a folder set aside for scripts may ever be run.
+
+      Real example: in 2014 the Shellshock bug in the Bash shell let attackers run commands on
+      web servers by sending a crafted request header. CGI copied the header into an environment
+      variable, and Bash, starting up to run the script, executed the commands hidden in it.
+
+      Common mistake: running any file under the document root that happens to be executable, or
+      passing request data to a shell command, so a path or a query string becomes a command.
+    why_here: >-
+      The going further section suggests CGI for dynamic content, which turns a server that hands
+      out files into one that runs programs on behalf of whoever sends a request.
+    origin: step
+    resources:
+      - title: "RFC 3875: The Common Gateway Interface (CGI) Version 1.1"
+        url: https://www.rfc-editor.org/rfc/rfc3875.html
+      - title: "Common Gateway Interface (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Common_Gateway_Interface
+      - title: "Shellshock (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Shellshock_(software_bug)
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project for a long-running server that listens on the port given in the PORT
+      environment variable, instead of the page's port 80, which needs special rights on most
+      systems. Keep a www folder next to it with a small index.html like the page's sample.
+    check: >-
+      Started with PORT set to a free port, the program keeps running and accepts a connection on
+      that port.
+    concepts: []
+
+  - id: s1
+    title: A basic HTTP server
+    objective: >-
+      Handle one connection at a time. Accept a connection, read the request until its headers
+      end, take the method, the path and the version from the first line, and answer with a 200
+      status line, an empty line and a body saying which path was requested. Then close the
+      connection and wait for the next one.
+    check: >-
+      A GET for / answers 200 with a body saying the requested path is /, and another path is
+      named back the same way. The server keeps accepting new connections after each one closes.
+    concepts: [socket-lifecycle, http-message-format]
+
+  - id: s2
+    title: Serve HTML files
+    objective: >-
+      Serve files from the www folder. Both / and /index.html return index.html with a 200
+      status, and a path with no matching file returns 404 with a short not-found message. Think
+      about what else on the disk a request could reach.
+    check: >-
+      / and /index.html return the same HTML with 200 and an HTML content type, and a request for
+      a file that doesn't exist returns 404. The page's sample output shows 400 here by mistake,
+      while its text asks for 404.
+    concepts: [url-to-file, status-and-headers]
+
+  - id: s3
+    title: Serve many clients at once
+    objective: >-
+      Let several clients be served at the same time, so that one slow request doesn't hold up
+      the others. Use a thread per connection, a pool of threads or an event loop, and make sure a
+      client that connects and then goes quiet can't hold the server up for ever.
+    check: >-
+      With a deliberate delay of a few seconds added before each response, several clients started
+      together all get their answers after about one delay, not one after another, and the server
+      still answers new clients afterwards.
+    concepts: [concurrency-models, resource-limits]
+
+  - id: s4
+    title: Protect against path traversal
+    objective: >-
+      Make sure every request resolves to a file inside the www folder or one of its subfolders
+      and nowhere else, however the path is written. Let the location of the folder be chosen when
+      the server starts, and design your own tests for the protection.
+    check: >-
+      Requests that try to climb out of the folder, with dot-dot segments, encoded dots or
+      slashes, an absolute path or a symbolic link pointing outside, get a 4xx answer and never
+      the contents of a file planted outside the folder, while files in subfolders are still
+      served.
+    concepts: [path-traversal, url-to-file, status-and-headers]
+
+  - id: s5
+    title: "Going further: dynamic pages with CGI"
+    objective: >-
+      Run programs on the server to build pages on demand, following the Common Gateway
+      Interface. For a request that maps to a script, start it with the request's details in its
+      environment and the body on its standard input, and turn what it prints into the response.
+    check: >-
+      A request for a script in the folder set aside for scripts returns the page that script
+      prints, including the headers it sets, and the query string reaches the script. Files
+      outside that folder are served as plain files and never run.
+    concepts: [cgi, path-traversal]
+    optional: true

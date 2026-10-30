@@ -12,7 +12,10 @@ import { generatedOf, mapOf, maps } from "./helpers";
 describe("project maps", () => {
   it("loads and validates every map in content/", async () => {
     const all = await maps();
-    expect(all.map((m) => m.project.slug).sort()).toEqual(["json-parser", "url-shortener", "wc"]);
+    const slugs = all.map((m) => m.project.slug);
+    expect(slugs).toEqual(expect.arrayContaining(["json-parser", "url-shortener", "wc"]));
+    // Every live project went through the gate, so it has a generated layer that fits its map.
+    for (const slug of slugs) expect((await generatedOf(slug)).slug).toBe(slug);
   });
 
   it("rejects a step that uses an unknown concept", async () => {

@@ -13,11 +13,17 @@ import { reviewStep } from "./reviewer";
 /** Sandbox reviews a guest may start in a day. Each one is a Daytona sandbox and a model call. */
 export const REVIEWS_PER_DAY = 25;
 
-export type ReviewDeps = { sandbox: SandboxFactory; ask: Ask; calls: CallLog[]; onDone?(reviewId: number): void };
+export type ReviewDeps = { sandbox: SandboxFactory; backend?: string; ask: Ask; calls: CallLog[]; onDone?(reviewId: number): void };
+
+/** Where reviews run: Daytona, unless SANDBOX=docker picks the local Docker image (development only). */
+export function sandboxBackend(): "daytona" | "docker" {
+  return process.env.SANDBOX === "docker" ? "docker" : "daytona";
+}
 
 function defaultDeps(): ReviewDeps {
   const calls: CallLog[] = [];
-  return { sandbox: process.env.SANDBOX === "docker" ? dockerSandbox : daytonaSandbox, ask: modelAsk(generateModel(), calls), calls };
+  const backend = sandboxBackend();
+  return { sandbox: backend === "docker" ? dockerSandbox : daytonaSandbox, backend, ask: modelAsk(generateModel(), calls), calls };
 }
 
 /** GitHub only, public, https: https://github.com/owner/repo, with or without .git or a trailing slash. */
@@ -68,6 +74,7 @@ export async function runReview(id: number, enrollmentId: number, stepId: string
   let box: Sandbox | null = null;
   try {
     const { enrollment, map, generated } = await loadState(enrollmentId);
+    console.log(`review ${id} (${stepId}): starting a ${deps.backend ?? "custom"} sandbox`);
     box = await deps.sandbox();
     const head = await prepare(box, enrollment.repoUrl!);
     let buildCmd = enrollment.buildCmd;
@@ -88,7 +95,7 @@ export async function runReview(id: number, enrollmentId: number, stepId: string
         status: "failed",
         headSha: head,
         baseSha: base,
-        result: { build: null, check, diffStat: stat, plan },
+        result: { build: null, check, diffStat: stat, plan, sandbox: deps.backend },
         verdict: {
           passed: false,
           summary: "The sandbox couldn't work out how to run your program.",
@@ -105,7 +112,7 @@ export async function runReview(id: number, enrollmentId: number, stepId: string
     for (const call of deps.calls.slice(before)) {
       await recordUsage({ learnerId: enrollment.learnerId, purpose: "review", model: MODELS.generate, usage: { input_tokens: call.input, output_tokens: call.output } });
     }
-    await finishReview(id, { status: verdict.passed ? "passed" : "failed", headSha: head, baseSha: base, result: { build: built, check, diffStat: stat, plan }, verdict });
+    await finishReview(id, { status: verdict.passed ? "passed" : "failed", headSha: head, baseSha: base, result: { build: built, check, diffStat: stat, plan, sandbox: deps.backend }, verdict });
   } catch (error) {
     console.error("review error", id, error);
     await finishReview(id, { status: "error", error: error instanceof Error ? error.message.slice(0, 500) : "unknown error" }).catch(() => {});

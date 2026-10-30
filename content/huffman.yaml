@@ -1,0 +1,388 @@
+project:
+  slug: huffman
+  title: Build your own compression tool
+  source_url: https://codingchallenges.fyi/challenges/challenge-huffman
+  level: intermediate
+  summary: >-
+    A command-line tool that compresses a file with Huffman coding and decompresses it back to an
+    exact copy. Building it teaches why data whose symbols appear unevenly fits in fewer bits, how
+    a greedy algorithm builds the best prefix-free code for those counts, and how to design a
+    binary file format that packs bits into bytes and carries everything needed to decode it.
+
+concepts:
+  - id: frequency-and-entropy
+    name: Symbol frequencies and entropy
+    covers:
+      - the frequency table as a model of the data
+      - information content of one symbol
+      - entropy as the lower bound
+      - why no compressor shrinks every input
+      - the limit of whole-bit codes
+    explanation: |-
+      A plain file spends 8 bits on every byte, whether that byte is the most common letter or
+      one that appears twice. Information theory measures what a symbol is really worth: a symbol
+      that makes up half of the data carries 1 bit of information, one that makes up a quarter
+      carries 2 bits, and each further halving of its share adds a bit. Entropy is the average of
+      that over the whole file. No code that replaces each symbol on its own, using only these
+      counts, can average fewer bits per symbol, and Huffman always lands within 1 bit of it.
+      Skewed counts mean low entropy and real savings. When all 256 byte values are equally
+      common, entropy is 8 bits and nothing is saved. A counting argument shows the deeper limit:
+      there are fewer short files than long ones, so any lossless compressor that shrinks some
+      inputs must make others bigger.
+
+      Real example: English text shrinks well with Huffman alone, while a photo or a zip file,
+      already compressed, comes out about the same size or larger. Newer compressors such as
+      Zstandard pair Huffman codes with a method that can spend a fraction of a bit on a very
+      common symbol, which whole-bit codes can't.
+
+      Common mistake: expecting a clever enough algorithm to shrink any file, or forgetting that
+      these counts model single symbols only, so the fact that "q" is nearly always followed by
+      "u" goes unused.
+    why_here: >-
+      Step 1 builds the frequency table, and every later saving comes from how uneven it is.
+      The final check, a smaller file, only holds because text is far from random.
+    origin: step
+    resources:
+      - title: "Data Compression Explained (Matt Mahoney): Information theory"
+        url: https://mattmahoney.net/dc/dce.html#Section_1
+      - title: "Entropy (information theory) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Entropy_(information_theory)
+      - title: "A Mathematical Theory of Communication (Claude Shannon, 1948)"
+        url: https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf
+
+  - id: prefix-free-codes
+    name: Prefix-free codes and unambiguous decoding
+    covers:
+      - fixed-length versus variable-length codes
+      - the prefix property
+      - codes as paths to the leaves of a binary tree
+      - the Kraft inequality
+      - decoding by walking the tree
+    explanation: |-
+      A fixed-length code gives every symbol the same number of bits, so a reader always knows
+      where one symbol ends. A variable-length code gives frequent symbols short codes, and then
+      the reader needs another way to find the boundaries, because the bits arrive with no gaps.
+      A prefix-free code solves it: no code is the beginning of another, so as soon as the bits
+      read so far match a code, that code is the answer. Draw the codes as a binary tree where
+      each bit picks left or right, and the prefix property means every symbol sits at a leaf.
+      Decoding is a walk from the root, one bit at a time, back to the root at every leaf. Not
+      every set of lengths can work. The Kraft inequality says how much room short codes use up:
+      give two symbols 1-bit codes and nothing is left for anyone else.
+
+      Real example: telephone country codes are prefix-free, so the network knows where the
+      country code ends without a separator, and UTF-8 is prefix-free for the same reason.
+      Morse code isn't, which is why operators leave a pause between letters.
+
+      Common mistake: choosing codes by hand, such as 0 for one letter and 01 for another. A
+      decoder that has just read a 0 can't tell whether the letter is finished.
+    why_here: >-
+      Step 3 turns the tree into a code table, and step 7 can only decode the packed bits
+      because no code is the start of another.
+    origin: step
+    resources:
+      - title: "Prefix code (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Prefix_code
+      - title: "Kraft-McMillan inequality (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Kraft%E2%80%93McMillan_inequality
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 5.5 Data Compression"
+        url: https://algs4.cs.princeton.edu/55compression/
+
+  - id: greedy-huffman-tree
+    name: Building the tree greedily with a priority queue
+    covers:
+      - joining the two rarest trees
+      - the priority queue and the binary heap
+      - why the greedy choice is optimal
+      - tie-breaking and the same tree on both sides
+      - cost as the alphabet grows
+    explanation: |-
+      Start with one leaf per symbol, weighted by its count. Take the two lightest trees, join
+      them under a new parent whose weight is their sum, put it back, and repeat until one tree
+      is left. A priority queue, usually a binary heap, hands over the lightest tree cheaply, so
+      building costs about n log n for n distinct symbols, which is tiny next to reading the
+      file. Why is this greedy choice safe? Swapping a rarer symbol into a deeper spot and a more
+      common one up never makes the total longer, so some best tree has the two rarest symbols as
+      siblings at the bottom. Joining them
+      first loses nothing, and the joined pair then acts like one symbol in a smaller problem of
+      the same kind. The result is the shortest code possible among codes that give each symbol
+      its own whole number of bits.
+
+      Real example: DEFLATE, the format inside zip, gzip and PNG, can build fresh Huffman codes
+      for each block of data it compresses, so the codes follow the data as it changes.
+
+      Common mistake: sorting the counts once and joining neighbours without putting each joined
+      tree back in order, or breaking ties one way when compressing and another way when
+      decompressing, so that the same counts give two different trees.
+    why_here: >-
+      Step 2 builds this tree from the counts, and step 6 must rebuild exactly the same one
+      from the header.
+    origin: step
+    resources:
+      - title: "OpenDSA: Huffman Coding Trees"
+        url: https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html
+      - title: "Data Compression Explained (Matt Mahoney): Huffman coding"
+        url: https://mattmahoney.net/dc/dce.html#Section_31
+      - title: "Algorithms, 4th edition (Sedgewick and Wayne): 2.4 Priority Queues"
+        url: https://algs4.cs.princeton.edu/24pq/
+
+  - id: bit-packing
+    name: Bit packing and the last byte
+    covers:
+      - files hold whole bytes only
+      - collecting bits in a buffer
+      - the order of bits inside a byte
+      - padding the last byte
+      - telling padding from data
+    explanation: |-
+      Codes are strings of bits of any length, but a file can only hold whole bytes. So the
+      encoder collects bits in a small buffer and writes a byte each time 8 have gathered, and
+      the decoder does the reverse, taking one byte at a time and handing out its bits. Both
+      sides must agree on the order of bits within a byte, most significant first or least
+      significant first, because either works and mixing them garbles everything. At the end the
+      total is rarely a multiple of 8, so the last byte is padded with filler bits. Those bits
+      can look like real codes, so the decoder needs to know where the real data stops.
+
+      Real example: DEFLATE fills each byte starting from its least significant bit, yet writes
+      each Huffman code starting from the code's most significant bit, and the specification
+      spells out both rules so every decoder agrees.
+
+      Common mistake: writing each code as the characters 0 and 1, which makes the output about 8
+      times bigger than the input it was meant to shrink, or decoding the padding as one or two
+      extra symbols at the end of the file.
+    why_here: >-
+      Step 5 asks you to pack the codes into bytes, and step 7 has to unpack them and stop
+      before the padding.
+    origin: step
+    resources:
+      - title: "RFC 1951 (DEFLATE), section 3.1.1: Packing into bytes"
+        url: https://www.rfc-editor.org/rfc/rfc1951.html
+      - title: "Bit numbering (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Bit_numbering
+
+  - id: self-describing-format
+    name: A self-describing file format
+    covers:
+      - storing the model in a header
+      - writing a tree as a walk
+      - where the header ends
+      - where the data ends
+      - magic number and version
+      - canonical codes and header size
+    explanation: |-
+      The decompressor has only the file, so the file must carry everything needed to read it.
+      The header holds the model: either the counts, from which the reader rebuilds the tree,
+      or the tree itself, written as a walk where each step says "branch" or "leaf, and here is
+      its symbol". Then the reader must know where the header ends, either from a length written
+      first or because the structure itself is complete, as a tree walk is once every branch has
+      both children. It must also know where the data ends: store the number of symbols, or the
+      number of real bits in the last byte, or add an end-of-data symbol to the alphabet. A few
+      fixed bytes at the very start, a magic number and a version, let a program reject a file
+      that isn't one of yours. The header is overhead, so on a small file it can cost more than
+      the compression saves.
+
+      Real example: a gzip file starts with the bytes 1f 8b and ends with a checksum and the
+      original size. DEFLATE doesn't store its trees at all. It stores only each symbol's code
+      length, and a canonical rule turns those lengths back into the exact codes.
+
+      Common mistake: ending the header with a special character that can also appear inside the
+      header, or storing each count in too few bytes, so a symbol that appears millions of times
+      overflows.
+    why_here: >-
+      Step 4 designs the header and step 6 reads it back. The challenge leaves the format open,
+      so every decision here is yours.
+    origin: step
+    resources:
+      - title: "RFC 1952: GZIP file format specification"
+        url: https://www.rfc-editor.org/rfc/rfc1952.html
+      - title: "Canonical Huffman code (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Canonical_Huffman_code
+      - title: "List of file signatures (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/List_of_file_signatures
+
+  - id: bytes-versus-characters
+    name: Bytes versus characters
+    covers:
+      - a file is a sequence of bytes
+      - text encodings such as UTF-8
+      - choosing the alphabet of symbols
+      - text mode and line endings
+      - files that aren't text
+    explanation: |-
+      Huffman coding works on any alphabet of symbols, so you choose what a symbol is. Bytes are
+      the simple choice: at most 256 symbols, no decoding step, and the tool works on any file,
+      including images and programs. Characters need the file decoded first, through an encoding
+      such as UTF-8, in which an accented letter like é takes two bytes. Either choice compresses,
+      but the promise is about bytes: the decompressor must write back exactly the bytes the
+      compressor read. Reading a file as text can quietly change it. On some systems text mode
+      turns the two-byte line ending, carriage return plus line feed, into one byte, and a
+      decoder may reject or replace a byte sequence that isn't valid in its encoding.
+
+      Real example: the test text is a French novel, and its title alone, Les Misérables, has an
+      accented letter. Counted as bytes, that letter becomes two symbols that always appear
+      together, and the tool still restores it exactly.
+
+      Common mistake: opening the input as text, then getting a decompressed file that looks the
+      same on screen but differs in its bytes, so the final comparison fails.
+    why_here: >-
+      Step 1 asks you to count characters, which forces this choice, and step 4 has to write
+      whichever kind of symbol you chose into the header.
+    origin: step
+    resources:
+      - title: "The Absolute Minimum Every Software Developer Must Know About Unicode (Joel Spolsky)"
+        url: https://www.joelonsoftware.com/2003/10/08/the-absolute-minimum-every-software-developer-absolutely-positively-must-know-about-unicode-and-character-sets-no-excuses/
+      - title: "UTF-8 (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/UTF-8
+      - title: "Newline (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Newline
+
+  - id: lossless-round-trip
+    name: The lossless round trip and its edge cases
+    covers:
+      - the round trip as a property to test
+      - the empty file
+      - one distinct symbol
+      - every byte value present
+      - inputs that grow
+      - very long codes
+    explanation: |-
+      Lossless means that decompressing gives back exactly the input, byte for byte, for every
+      possible input. That is a property, so test it as one: compress and decompress many inputs,
+      including generated ones, and compare. The small inputs break first. An empty file has no
+      symbols, so there is no tree to build. A file with one distinct symbol gives a tree that is
+      a single leaf, whose code has no bits at all, so the data section is empty and only a
+      stored count can say how many times that symbol repeats. A file that uses all 256 byte
+      values, random bytes that come out bigger, and counts so skewed that one code grows longer
+      than 32 bits each test a different assumption.
+
+      Real example: the DEFLATE specification has a rule for exactly this case. When only one
+      distance code is used, it still gets a 1-bit code rather than 0 bits.
+
+      Common mistake: testing only on the big novel, where none of these edge cases occur.
+    why_here: >-
+      Step 7 ends with the round trip check, and step 2 is where the empty and one-symbol inputs
+      first need a decision.
+    origin: step
+    resources:
+      - title: "What is property-based testing? (Hypothesis)"
+        url: https://hypothesis.works/articles/what-is-property-based-testing/
+      - title: "RFC 1951 (DEFLATE), section 3.2.7: Compression with dynamic Huffman codes"
+        url: https://www.rfc-editor.org/rfc/rfc1951.html
+      - title: "Data Compression Explained (Matt Mahoney): No universal compression"
+        url: https://mattmahoney.net/dc/dce.html#Section_11
+
+  - id: streaming-two-passes
+    name: Streaming the input in two passes
+    covers:
+      - two passes, count then encode
+      - reading in fixed-size blocks
+      - memory that doesn't grow with the file
+      - the cost of one read per byte
+      - flushing buffered output
+      - input that can be read only once
+    explanation: |-
+      The compressor needs every count before it can choose any code, so it reads the input
+      twice: once to count and once to encode. Neither pass needs the whole file in memory.
+      Reading a block of a few kilobytes at a time keeps memory the same whether the file is one
+      page or many gigabytes. Block size matters for speed too. Every read asks the operating
+      system for data, and asking once per byte spends most of the time on the asking, while a
+      buffer of thousands of bytes spreads that cost out. Writing through a buffer helps the same
+      way, as long as the last partial buffer is flushed at the end. Input from a pipe can be
+      read only once, which is why some compressors work one block at a time or adapt their codes
+      as they go.
+
+      Real example: gzip compresses files much larger than memory, because DEFLATE works on one
+      block of input at a time, and each block can carry its own codes.
+
+      Common mistake: loading the whole file into one string, which works on the test novel but
+      fails on a file bigger than memory, or forgetting the final flush, so the end of the output
+      is silently lost.
+    why_here: >-
+      Step 1 reads the whole input to count it, and step 5 reads it again to encode it. The
+      challenge's introduction stresses that buffer sizes decide how fast a tool like this runs.
+    origin: beyond
+    resources:
+      - title: "read(2), Linux manual page"
+        url: https://man7.org/linux/man-pages/man2/read.2.html
+      - title: "The GNU C Library: Stream Buffering"
+        url: https://sourceware.org/glibc/manual/latest/html_node/Stream-Buffering.html
+      - title: "Adaptive Huffman coding (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Adaptive_Huffman_coding
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and download the challenge's test data, the text of a long novel.
+    check: >-
+      Your program runs and can open the test file.
+    concepts: []
+
+  - id: s1
+    title: Count the symbols
+    objective: >-
+      Take a file name, report an error if the file can't be read, and otherwise count how many
+      times each symbol occurs in it.
+    check: >-
+      The counts for the two letters the challenge names match its figures for the test text,
+      and unit tests on small prepared inputs pass.
+    concepts: [frequency-and-entropy, bytes-versus-characters, streaming-two-passes]
+
+  - id: s2
+    title: Build the Huffman tree
+    objective: >-
+      Build the binary tree from the counts by joining the two lightest trees again and again
+      until one is left.
+    check: >-
+      Unit tests built from the OpenDSA examples pass: each symbol ends up at the expected depth,
+      or at least the total of count times depth matches when ties allow another shape.
+    concepts: [greedy-huffman-tree, lossless-round-trip]
+
+  - id: s3
+    title: Make the code table
+    objective: >-
+      Walk the tree to give each symbol its code, one bit for each turn left or right on the way
+      from the root to its leaf.
+    check: >-
+      The codes agree with the OpenDSA examples, no code is the start of another, and a more
+      frequent symbol never gets a longer code than a rarer one.
+    concepts: [prefix-free-codes, frequency-and-entropy]
+
+  - id: s4
+    title: Write the header
+    objective: >-
+      Decide how the user picks compress or decompress, add an option for the output file name,
+      and start the output with a header holding what decoding needs, the tree or the counts,
+      in a form where a reader can tell where the header ends.
+    check: >-
+      Viewed with a hex dump tool such as xxd, the output starts with the header exactly as you
+      designed it, and nothing outside the header is needed to find its end.
+    concepts: [self-describing-format, bytes-versus-characters]
+
+  - id: s5
+    title: Encode and pack the bits
+    objective: >-
+      Replace each symbol of the input with its code, pack the bits into bytes and append them
+      after the header.
+    check: >-
+      The output for the test text is clearly smaller than the input, and its size is the header
+      plus the total number of code bits divided by 8, rounded up to a whole byte.
+    concepts: [bit-packing, streaming-two-passes]
+
+  - id: s6
+    title: Read the header back
+    objective: >-
+      When decompressing, read the header and rebuild the tree and the code table from it.
+    check: >-
+      For the same input, the rebuilt code table matches the one the compressor used, symbol for
+      symbol.
+    concepts: [self-describing-format, greedy-huffman-tree]
+
+  - id: s7
+    title: Decode and restore the file
+    objective: >-
+      Read the packed bits after the header, decode them with the tree, stop at the real end of
+      the data, and write the result to the output file.
+    check: >-
+      Compressing the test text gives a smaller file, and decompressing that gives a file
+      identical to the original, byte for byte.
+    concepts: [prefix-free-codes, bit-packing, lossless-round-trip]

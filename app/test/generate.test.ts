@@ -4,7 +4,7 @@ import type { Generated } from "@/lib/gen/schema";
 import { pageFromHtml } from "@/lib/gen/sources";
 import { reviewPrompt, reviewStep, type Verdict } from "@/lib/review/reviewer";
 import type { StepRun } from "@/lib/sandbox/review";
-import { generatedOf, mapOf } from "./helpers";
+import { generatedOf, mapOf, maps } from "./helpers";
 
 const SLUGS = ["wc", "json-parser", "url-shortener"] as const;
 
@@ -18,8 +18,8 @@ describe("the generated layers, one project of each type", () => {
     ]);
   });
 
-  it("pass every check the generator applies", async () => {
-    for (const slug of SLUGS) {
+  it("pass every check the generator applies, for every live project", async () => {
+    for (const slug of (await maps()).map((m) => m.project.slug)) {
       const [map, g] = [await mapOf(slug), await generatedOf(slug)];
       const page = { url: map.project.source_url, text: "", downloads: g.profile.fixtures.flatMap((f) => (f.source ? [f.source] : [])) };
       expect(profileProblems(map, page, g.profile), slug).toEqual([]);
@@ -56,11 +56,37 @@ describe("the checks in code catch broken generator output", () => {
     expect(checkProblems("http", url.profile, http.slice(1)).join()).toMatch(/has no check/);
   });
 
+  it("in socket and client checks", async () => {
+    const { profile } = await generatedOf("wc");
+    const body = '{"ok":true}';
+    const command = {
+      name: "get",
+      transport: "tcp" as const,
+      replies: [`HTTP/1.1 200 OK\r\nContent-Length: ${body.length + 1}\r\n\r\n${body}`],
+      reply_hex: false,
+      run: "<run> http://{stub}/",
+      expect_exit: 0,
+      stdout_contains: [],
+      output_contains: [],
+      received_contains: [],
+      received_hex_contains: [],
+    };
+    expect(checkProblems("client", profile, [{ step: "s1", commands: [command] } as never]).join()).toMatch(/reply 1: Content-Length 12 doesn.t match the body.s 11 bytes/);
+    expect(checkProblems("client", profile, [{ step: "s1", commands: [{ ...command, run: "<run> http://localhost/" }] } as never]).join()).toMatch(/doesn't point the program at the stub/);
+    const many = { name: "many", transport: "udp" as const, clients: 3, restart_before: false, messages: [{ send: "hi", split: true, wait_ms: 0, expect: "hi", compare: "exact" as const }] };
+    const socket = checkProblems("socket", profile, [{ step: "s1", start_args: [], env: [{ name: "LIMIT", value: "5" }], conversations: [many] } as never]).join();
+    expect(socket).toMatch(/a UDP datagram can't be split/);
+    expect(socket).toMatch(/env LIMIT is not a setting in the contract/);
+  });
+
   it("pick the runner from how the program runs and where the right answer comes from", () => {
     expect(runnerFor({ runs_as: "cli", oracle: "real-tool" })).toBe("cli");
     expect(runnerFor({ runs_as: "cli", oracle: "case-files" })).toBe("case-files");
     expect(runnerFor({ runs_as: "http-server", oracle: "spec" })).toBe("http");
     expect(runnerFor({ runs_as: "interactive", oracle: "none" })).toBe("none");
+    expect(runnerFor({ runs_as: "tcp-server", oracle: "spec" })).toBe("socket");
+    expect(runnerFor({ runs_as: "client", oracle: "stub" })).toBe("client");
+    expect(runnerFor({ runs_as: "cli", oracle: "real-tool", learns: "algorithms-and-data-structures" })).toBe("script");
   });
 
   it("read a challenge page's text and its download links", () => {

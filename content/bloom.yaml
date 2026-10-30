@@ -1,0 +1,380 @@
+project:
+  slug: bloom
+  title: Build your own spell checker using a Bloom filter
+  source_url: https://codingchallenges.fyi/challenges/challenge-bloom
+  level: beginner
+  summary: >-
+    A command-line spell checker that builds a Bloom filter from a dictionary, saves it as a
+    compact binary file, and loads it again to report the words that are probably misspelt.
+    Building it teaches how a set can answer membership questions in a few bits per item by
+    accepting rare false positives but never a false negative, how to size the filter for the
+    error rate you can live with, and how to design a binary file format that another run of the
+    program can trust.
+
+concepts:
+  - id: probabilistic-membership
+    name: "Probabilistic membership: definitely not, or probably yes"
+    covers:
+      - a set that keeps bits, not items
+      - no false negatives
+      - false positives from shared bits
+      - why an item can't be removed
+      - counting filters that allow deletion
+    explanation: |-
+      A Bloom filter answers one question about a set, whether an item is in it, without keeping
+      the items. It is an array of bits, all zero at the start. Adding an item runs it through
+      several hash functions, each picking one position, and sets those bits to one. A query
+      looks at the same positions. If any of them is zero, the item was never added, because
+      adding it would have set that bit, so a no is always right. If all of them are one, the
+      item was probably added, but other items may have set those bits between them. That is a
+      false positive. The error only goes one way: no false negatives, and a few false positives.
+      The same sharing is why an item can't be taken out. Clearing its bits would also clear bits
+      that other items rely on, and they would start to look absent. Variants that allow
+      deletion, such as counting filters, keep a small counter in each position instead of one
+      bit.
+
+      Real example: early Unix spell checkers kept their dictionary as a Bloom filter when memory
+      was scarce. Now and then a misspelt word slipped through, but a correct word was never
+      flagged.
+
+      Common mistake: treating probably present as a firm yes where certainty matters, or
+      removing an item by clearing its bits, which quietly creates false negatives for other
+      items.
+    why_here: >-
+      The dictionary is the set. No false negatives means a correct word is never reported as
+      wrong, and a false positive means a typo occasionally passes, which you build in step 1
+      and see for yourself in step 5.
+    origin: step
+    resources:
+      - title: "Bloom filter (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Bloom_filter
+      - title: "Bloom Filters by Example, an interactive tutorial"
+        url: https://llimllib.github.io/bloomfilter-tutorial/
+      - title: "Bloom Filters, an interactive demonstration (Jason Davies)"
+        url: https://www.jasondavies.com/bloomfilter/
+
+  - id: filter-sizing
+    name: Sizing the filter from the item count and the error rate
+    covers:
+      - items, bits and hash functions
+      - the chance that a bit is still zero
+      - the false-positive rate as the filter fills
+      - the best number of hash functions
+      - bits per item for a target rate
+      - adding more items than planned
+    explanation: |-
+      Three numbers describe a filter: how many items it will hold, how many bits it has, and how
+      many hash functions each item uses. Every insertion sets a few bits, so the share of ones
+      grows as items go in. A query for an absent item is fooled only if all of its positions
+      land on ones, and that chance is roughly the share of ones multiplied by itself once for
+      each hash function. More hash functions make each query stricter but fill the array
+      faster, so the best number lies in between, at about 0.7 times the bits per item. At that
+      point about half the bits are one. Working backwards from a target rate gives the size: a
+      1 percent rate needs about 9.6 bits per item and 7 hash functions, and each tenfold drop in
+      the rate costs about 4.8 more bits per item. None of this depends on how long the items
+      are.
+
+      Real example: LevelDB, a storage library from Google, asks its user only for a number of
+      bits per key. It derives the number of hash functions from that, about 0.69 times the
+      bits per key, rounded down to save a little work on every lookup.
+
+      Common mistake: sizing the filter for today's word list and then adding far more words.
+      The error rate doesn't grow gently. Once most bits are one, nearly every query answers
+      probably present.
+    why_here: >-
+      Step 1 asks you to derive the number of bits and hash functions from the expected item
+      count and the rate you can accept, and step 2 applies that to the real dictionary.
+    origin: step
+    resources:
+      - title: "Bloom filter (Wikipedia): Optimal number of hash functions"
+        url: https://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions
+      - title: "Bloom filter calculator (Thomas Hurst)"
+        url: https://hur.st/bloomfilter/
+      - title: "Network Applications of Bloom Filters: A Survey (Broder and Mitzenmacher), section 2"
+        url: https://www.eecs.harvard.edu/~michaelm/postscripts/im2005b.pdf
+
+  - id: hash-functions
+    name: "Hash functions for a filter: spread out, independent and stable"
+    covers:
+      - spreading items evenly over the positions
+      - many positions from two hashes, by double hashing
+      - turning a hash into a position
+      - fast hashes such as FNV that aren't cryptographic
+      - the same positions on every run and every machine
+    explanation: |-
+      Every position a filter checks comes from a hash function, and the sizing formulas assume
+      the positions are spread evenly and unrelated to each other, as if picked at random.
+      Computing many separate hashes for each word is slow, and it isn't needed. Kirsch and
+      Mitzenmacher showed that two hashes are enough: position number i is the first hash plus i
+      times the second, taken modulo the number of bits, with no real loss in the false-positive
+      rate. The hash doesn't have to be cryptographic. Speed and an even spread are what count,
+      which is why simple hashes such as FNV, which mixes in one byte at a time with an XOR and a
+      multiplication, are popular here. The hash must also be stable. A filter saved today is
+      read by another run tomorrow, perhaps on another machine, and it only works if every word
+      lands on exactly the same bits.
+
+      Real example: LevelDB computes one hash per key, makes a second by rotating its bits, and
+      steps through the positions by adding that second value each time. Its source cites the
+      Kirsch and Mitzenmacher analysis.
+
+      Common mistake: using a built-in string hash that some languages seed randomly at every
+      start, as a defence against crafted collisions, so a saved filter gives different answers
+      after a restart. Another is making the extra positions the first hash plus one, plus two
+      and so on. Two words that share the first position then share them all, which is no
+      better than one hash.
+    why_here: >-
+      Step 1 needs several positions per word, and the page suggests writing two FNV variants.
+      Step 4 loads the filter in a new run, which only works if the hashes give exactly the
+      positions they gave at build time.
+    origin: step
+    resources:
+      - title: "Fowler-Noll-Vo hash function (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+      - title: "Less Hashing, Same Performance: Building a Better Bloom Filter (Kirsch and Mitzenmacher)"
+        url: https://www.eecs.harvard.edu/~michaelm/postscripts/rsa2008.pdf
+      - title: "LevelDB source: util/bloom.cc"
+        url: https://github.com/google/leveldb/blob/main/util/bloom.cc
+
+  - id: bit-arrays
+    name: "Bit arrays: packing bits into bytes"
+    covers:
+      - one bit per position, eight per byte
+      - finding the byte and the bit within it
+      - setting and testing a bit with a mask
+      - the order of bits inside a byte
+      - rounding up to whole bytes
+    explanation: |-
+      A filter needs one yes or no per position, and a byte holds eight of them. Position p lives
+      in byte p divided by 8, rounded down, at bit p modulo 8 inside that byte. Setting it means
+      combining the byte with a mask that has only that bit on, using OR. Testing it means
+      combining the byte with the same mask using AND and seeing whether anything is left. Two
+      decisions are made once and kept for good. The first is which end of the byte counts as
+      bit 0, the most significant bit or the least. Either works, but a file written one way and
+      read the other is nonsense. The second is size: m bits need m divided by 8 bytes, rounded
+      up, and the spare bits at the end of the last byte stay zero.
+
+      Real example: LevelDB fills each byte of its filters starting from the least significant
+      bit, while Redis numbers the bits of its bitmaps starting from the most significant bit of
+      the first byte. Both work because each documents its choice.
+
+      Common mistake: keeping a whole byte, or a full true or false value, for each position. The
+      answers are the same, but the filter takes at least eight times the memory, and the file no
+      longer matches the format.
+    why_here: >-
+      Step 3 writes the bit array after the header and step 4 reads it back. The page fixes the
+      byte order of the header but not the order of bits inside each byte, so your format has to
+      decide it.
+    origin: step
+    resources:
+      - title: "Bit array (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Bit_array
+      - title: "Bit numbering (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Bit_numbering
+      - title: "Mask (computing) (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Mask_(computing)
+
+  - id: binary-file-format
+    name: Designing a binary file format
+    covers:
+      - a magic number to recognise the file
+      - a version number for change
+      - fixed-width fields and the ceilings they set
+      - big-endian byte order
+      - a header, then the payload, and the expected length
+      - checking a file before trusting it
+    explanation: |-
+      A binary format is a contract between the program that writes a file and every program
+      that will ever read it. It usually opens with a magic number, a few fixed bytes such as
+      the letters CCBF here, so a reader can reject a file that isn't one of its own straight
+      away. A version number comes next, so the format can change later and an old reader can
+      refuse what it doesn't understand. Then come fixed-width fields, each with a stated size
+      and byte order. Big-endian means the most significant byte comes first, the way numbers
+      are written on paper. Most processors today keep numbers in memory the other way round, so
+      copying a number straight from memory gives the wrong order. A width is also a ceiling:
+      four bytes count to about four billion, and the original ZIP format hit exactly that limit
+      until ZIP64 widened its fields. Last, a reader checks before it trusts: the identifier and
+      the version must match, and the file must be exactly as long as the header implies.
+
+      Real example: every PNG file starts with the same eight bytes, chosen to catch damage in
+      transit. The first has its high bit set, which catches channels that strip that bit, and a
+      carriage return and line feed pair catches tools that convert line endings. Every number
+      after that is big-endian.
+
+      Common mistake: changing the hash functions or the bit order without changing the version.
+      Old files still load cleanly, but every word now lands on different bits, so the filter
+      starts reporting correct words as wrong, the one error it promised never to make.
+    why_here: >-
+      Steps 3 and 4 write and read a fixed header in big-endian order. The header records how
+      many hash functions and bits there are, but not which hash functions or bit order, so the
+      version number has to stand for those.
+    origin: step
+    resources:
+      - title: "Endianness (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Endianness
+      - title: "PNG (Wikipedia): File header"
+        url: https://en.wikipedia.org/wiki/PNG#File_header
+      - title: "List of file signatures (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/List_of_file_signatures
+
+  - id: canonical-words
+    name: What counts as the same word
+    covers:
+      - a filter matches exact bytes
+      - line endings and stray spaces in the word list
+      - upper and lower case
+      - Unicode normalisation
+      - one rule for building and for checking
+      - the word list as the only definition of correct
+    explanation: |-
+      A filter knows nothing about words. It hashes bytes, so two strings that differ by one byte
+      land on different bits, however alike they look. Before a word goes in, and before one is
+      checked, it has to be turned into one canonical form by the same rule both times. Lines
+      read from a word list may carry a carriage return or trailing spaces. Case needs a
+      decision, since word lists often include capitalised names while people type ordinary
+      words with a capital at the start of a sentence. Unicode adds a subtler trap. An accented
+      letter such as é can be stored as one code point or as a plain e followed by a combining
+      accent, and only normalising both to one form makes them equal. Finally, the word list is
+      the only definition of correct the checker has. Some lists hold only base forms, so a
+      plural is reported as misspelt however good the filter is.
+
+      Real example: Apple's older HFS Plus file system stored accented letters in file names
+      taken apart into a letter and a combining mark, so a name read from disk could fail to
+      match the same name typed by a user unless both were normalised first.
+
+      Common mistake: building from a word list with Windows line endings without stripping
+      them. Every word in the filter then ends with an invisible carriage return, nothing typed
+      ever matches, and every word is reported as wrong.
+    why_here: >-
+      Step 2 reads words from a file and step 5 reads them from the command line, so the same
+      word arrives by two routes and has to become the same bytes both times.
+    origin: beyond
+    resources:
+      - title: "Unicode Standard Annex #15: Unicode Normalization Forms"
+        url: https://www.unicode.org/reports/tr15/
+      - title: "Unicode equivalence (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Unicode_equivalence
+      - title: "Newline (Wikipedia)"
+        url: https://en.wikipedia.org/wiki/Newline
+
+  - id: space-accuracy-tradeoff
+    name: Space versus accuracy, and where Bloom filters earn their place
+    covers:
+      - bits per item, whatever the item's length
+      - an exact set as the alternative
+      - a cheap filter in front of a costly exact check
+      - choosing the rate from the cost of a false positive
+      - storage engines, caches and password lists
+      - newer filters that allow deletion
+    explanation: |-
+      An exact set has to store every item, so it grows with the items' lengths plus the
+      overhead of the structure, often tens of bytes per word. A Bloom filter needs about 10 bits
+      per item for a 1 percent error rate, whether the item is a short word or a long web
+      address, and that is within a factor of about 1.44 of the least space any structure with
+      the same error rate can use. The price is the false positives, so the right rate depends on
+      what one costs. The classic pattern puts the filter in front of something expensive. A no
+      means the expensive step is skipped. A probably means the exact check runs, and a false
+      positive costs only one wasted check. Bloom's own example in 1970 was a hyphenation program
+      that kept, in a filter, the small share of words that needed a slow dictionary lookup.
+      Newer structures such as cuckoo filters allow deletion and can be smaller at low error
+      rates.
+
+      Real example: storage engines such as Bigtable, Cassandra and RocksDB keep a filter for
+      each data file on disk, so a read skips every file that certainly lacks the key. Cassandra
+      lets each table set its own false-positive chance, so a system with plenty of memory and
+      slow disks can trade memory for fewer wasted reads.
+
+      Common mistake: using a filter on its own where a false positive is costly and nothing
+      checks behind it, or demanding a tiny error rate out of habit and paying memory for
+      accuracy the application doesn't need.
+    why_here: >-
+      The file from step 3 is much smaller than the dictionary it stands for, and step 5 shows
+      the price, a rare typo that goes unreported. The optional step turns the trade-off around:
+      a false positive rejects a good password, which is a small annoyance, while no listed
+      password ever gets through.
+    origin: beyond
+    resources:
+      - title: "Network Applications of Bloom Filters: A Survey (Broder and Mitzenmacher)"
+        url: https://www.eecs.harvard.edu/~michaelm/postscripts/im2005b.pdf
+      - title: "Apache Cassandra documentation: Bloom Filters"
+        url: https://cassandra.apache.org/doc/latest/cassandra/managing/operating/bloom_filters.html
+      - title: "Cuckoo Filter: Practically Better Than Bloom (Fan, Andersen, Kaminsky and Mitzenmacher)"
+        url: https://www.cs.cmu.edu/~dga/papers/cuckoo-conext2014.pdf
+
+steps:
+  - id: s0
+    title: Set up
+    objective: >-
+      Create the project and get a dictionary to build from, one word per line: the system word
+      list on a Unix-like machine, or a downloaded English word list elsewhere.
+    check: >-
+      The dictionary file opens, it holds one word per line, and you know roughly how many words
+      it has, since that count sizes the filter later.
+    concepts: []
+
+  - id: s1
+    title: The Bloom filter
+    objective: >-
+      From the number of items you expect and the false-positive rate you can accept, work out
+      how many bits and how many hash functions the filter needs. Start with every bit at zero.
+      Adding an item sets the bit each hash function picks, and a query answers definitely absent
+      if any of those bits is zero and probably present if all are one. Write or choose the hash
+      functions yourself, for example two variants of FNV.
+    check: >-
+      Your tests show that every item you added is reported present, and that among many items
+      you never added, the share reported present stays close to the rate you chose.
+    concepts: [probabilistic-membership, filter-sizing, hash-functions]
+
+  - id: s2
+    title: Build from the dictionary
+    objective: >-
+      Given -build and a dictionary file, read every word, add it to a filter sized for that
+      many words, and write the filter to a file.
+    check: >-
+      Running the build on the dictionary creates the filter file, and the filter reports every
+      word of the dictionary as present.
+    concepts: [filter-sizing, canonical-words]
+
+  - id: s3
+    title: Save to disk
+    objective: >-
+      Write the filter as a 12-byte header followed by the bit array. The header holds, all in
+      big-endian order, the four-letter identifier CCBF, a 2-byte version, a 2-byte count of
+      hash functions and a 4-byte count of bits.
+    check: >-
+      A hex dump of the start of the file (xxd or od) shows the identifier, the version, the hash
+      count and the bit count as you wrote them, most significant byte first. Compared with du,
+      the filter file is much smaller than the dictionary.
+    concepts: [binary-file-format, bit-arrays]
+
+  - id: s4
+    title: Load from disk
+    objective: >-
+      Read a filter file back: check the identifier and the version before trusting anything
+      else, then read the hash count, the bit count and the bit array.
+    check: >-
+      A filter loaded in a fresh run reports every dictionary word present, as it did when it was
+      built, and a file with the wrong identifier or an unknown version is rejected with a clear
+      error instead of being used.
+    concepts: [binary-file-format, hash-functions]
+
+  - id: s5
+    title: Check words
+    objective: >-
+      Take words from the command line, test each one against the loaded filter, and print one
+      line listing the words that are probably misspelt.
+    check: >-
+      Words from the dictionary are never listed, made-up words are, and across a large batch of
+      made-up words only about the share you designed for slips through unreported.
+    concepts: [probabilistic-membership, canonical-words, space-accuracy-tradeoff]
+
+  - id: s6
+    title: Going further
+    objective: >-
+      Build a small filter of common passwords that a sign-up page can download, so the browser
+      can turn down a common password before it is ever sent. Choose its size and error rate for
+      a file that has to download quickly.
+    check: >-
+      Every password on the list is turned down, strong random passwords almost never are, and
+      the filter file is small enough to download with the page.
+    concepts: [space-accuracy-tradeoff, filter-sizing]
+    optional: true

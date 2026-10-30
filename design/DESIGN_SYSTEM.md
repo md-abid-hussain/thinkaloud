@@ -81,7 +81,7 @@ The craft comes from editorial and technical manuals:
 | Section h2 (`.h2`) | Bricolage 700, `clamp(2rem, 4.4vw, 3.2rem)` |
 | Body | Newsreader 18px / 1.6. Intro paragraphs 20px |
 | Labels (`.label`) | Plex Mono 12px uppercase, 0.1em tracking, `--muted`, with an optional `<b>` in `--accent` |
-| Mentor voice | Newsreader italic |
+| Mentor voice | Newsreader italic for short voiced lines (questions, review verdicts, demo replies). Long chat replies are upright for readability (30 Oct, after the design critique) |
 
 **Copy:**
 - Sentence case and plain words.

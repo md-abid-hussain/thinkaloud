@@ -4,49 +4,62 @@ import { LANGUAGES, stepLabel } from "@/lib/progress";
 import type { Review } from "@/lib/repo";
 import type { ChatView } from "@/lib/view";
 
-/** The progress rail: stage 0, setup, each step with its review and questions, the concepts, and Export. */
-export function Panel({ slug, view }: { slug: string; view: ChatView }) {
+const REVIEW_CHIP: Record<Review["status"], [string, string]> = {
+  running: ["run", "Reviewing"],
+  passed: ["ok", "Reviewed"],
+  failed: ["soft", "Not yet"],
+  error: ["soft", "Review failed"],
+};
+
+/**
+ * The progress rail: stage 0, setup, each step with its review and questions, the concepts, and Export.
+ * A row jumps to its card in the chat.
+ */
+export function Panel({ slug, view, onJump }: { slug: string; view: ChatView; onJump: (cardId: string) => void }) {
   const { map, progress, repo, language } = view;
   const lastReview = (step: string): Review | undefined => [...view.reviews].reverse().find((r) => r.stepId === step);
   const setup = map.steps[0];
+  const stage0Answered = progress.stage0.questions.filter((q) => q.answered).length;
   return (
-    <aside id="progress-panel" className="rail" aria-label="Your progress">
+    <aside id="panel-progress" className="rail" aria-label="Your progress">
       <section>
         <h2 className="label">Stages</h2>
         <ol className="stages">
           <li className={progress.stage0.done ? "is-done" : progress.next.kind === "stage0" ? "is-current" : ""}>
-            <span className="snum">0</span>
-            <span className="stitle">Understand the problem</span>
-            <span className="marks" aria-label={`${progress.stage0.questions.filter((q) => q.answered).length} of ${progress.stage0.questions.length} answered`}>
-              {progress.stage0.questions.map((q) => (
-                <i key={q.id} className={q.answered ? "on" : ""} title={`${q.kind}: ${q.answered ? "answered" : "open"}`} />
-              ))}
-            </span>
+            <button type="button" className="srow" onClick={() => onJump("card-stage0")}>
+              <span className="snum">0</span>
+              <span className="stitle">Understand the problem</span>
+              <span className="chips">
+                <span className={`chip-s ${stage0Answered === progress.stage0.questions.length ? "ok" : ""}`}>
+                  Questions {stage0Answered}/{progress.stage0.questions.length}
+                </span>
+              </span>
+            </button>
           </li>
           {progress.steps.map((s) => {
             const review = lastReview(s.id);
+            const [tone, word] = review ? REVIEW_CHIP[review.status] : s.built ? REVIEW_CHIP.passed : ["", ""];
             const answered = s.questions.filter((q) => q.answered).length;
             return (
               <li key={s.id} className={`${s.done ? "is-done" : ""}${s.current ? " is-current" : ""}${s.optional ? " is-optional" : ""}`}>
-                <span className="snum">{s.optional ? "+" : stepLabel(map, s.id).replace("Step ", "")}</span>
-                <span className="stitle">{s.title}</span>
-                <span className="sstate">
-                  <span className={`rv rv-${review?.status ?? (s.built ? "passed" : "none")}`} title="Review">
-                    {review?.status === "running" ? "reviewing" : s.built ? "review ✓" : review?.status === "failed" ? "review ✗" : review?.status === "error" ? "review !" : "review"}
-                  </span>
-                  {s.questions.length > 0 && (
-                    <span className={answered === s.questions.length ? "qs on" : "qs"}>
-                      q {answered}/{s.questions.length}
+                <button type="button" className="srow" onClick={() => onJump(`card-${s.id}`)} aria-current={s.current ? "step" : undefined}>
+                  <span className="snum">{s.optional ? "+" : stepLabel(map, s.id).replace("Step ", "")}</span>
+                  <span className="stitle">{s.title}</span>
+                  {(word || s.questions.length > 0) && (
+                    <span className="chips">
+                      {word && <span className={`chip-s ${tone}`}>{word}</span>}
+                      {s.questions.length > 0 && (
+                        <span className={`chip-s ${answered === s.questions.length ? "ok" : ""}`}>
+                          Questions {answered}/{s.questions.length}
+                        </span>
+                      )}
                     </span>
                   )}
-                </span>
+                </button>
                 {s.id === setup?.id && repo.url && (
-                  <span className="sdetail">
-                    <a href={repo.url} target="_blank" rel="noreferrer">
-                      {repo.url.replace("https://github.com/", "")}
-                    </a>
-                    {repo.run && <code title={repo.run}>{repo.run}</code>}
-                  </span>
+                  <a className="sdetail" href={repo.url} target="_blank" rel="noreferrer" title={repo.run ? `Runs as: ${repo.run}` : undefined}>
+                    {repo.url.replace("https://github.com/", "")} ↗
+                  </a>
                 )}
               </li>
             );
@@ -65,6 +78,7 @@ export function Panel({ slug, view }: { slug: string; view: ChatView }) {
                   <summary>
                     <i aria-hidden="true" />
                     <span>{c.name}</span>
+                    <span className="sr">{c.explained ? ", explained" : ", not explained yet"}</span>
                     {c.optional && <span className="opt">optional</span>}
                   </summary>
                   <ul className="reads">

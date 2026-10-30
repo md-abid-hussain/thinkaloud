@@ -26,8 +26,9 @@ export type ChatView = {
 export async function chatView(learnerId: string, slug: string): Promise<ChatView> {
   const enrollment = await getOrCreateEnrollment(learnerId, slug);
   // A review that finished since the last turn may have moved the next step on; its card belongs in the chat now.
-  await syncCards(enrollment.id);
-  const state = await loadState(enrollment.id);
+  // The state is loaded once, and again only when a card was added.
+  let state = await loadState(enrollment.id);
+  if (await syncCards(enrollment.id, state)) state = await loadState(enrollment.id);
   let layer = state.enrollment.language ? await getLayer(slug, state.enrollment.language) : null;
   // A language without study notes (never built, or the last build failed) starts a build in the background.
   if (state.enrollment.language && (!layer || layer.status === "failed")) {

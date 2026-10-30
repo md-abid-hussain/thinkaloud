@@ -62,15 +62,18 @@ export function WelcomeCard({ map, language, onPickLanguage }: { map: ProjectMap
   );
 }
 
+/** Stored questions as a checklist: what each one is about, the question, and whether it's answered. */
 function QuestionList({ questions, answered, label }: { questions: Question[]; answered: Set<string>; label: (q: Question) => string }) {
   if (!questions.length) return null;
   return (
     <ol className="qlist">
       {questions.map((q) => (
         <li key={q.id} className={answered.has(q.id) ? "is-answered" : ""}>
-          <span className="qk">{label(q)}</span>
+          <span className="qk">
+            {label(q)}
+            {answered.has(q.id) && <span className="pill ok">Answered</span>}
+          </span>
           <span className="qp">{q.prompt}</span>
-          {answered.has(q.id) && <span className="pill ok">Answered</span>}
         </li>
       ))}
     </ol>
@@ -164,10 +167,12 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
           </div>
         )}
       </dl>
-      <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={() => "Explain"} />
+      <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={(q) => conceptName(view.map, q.concept)} />
     </article>
   );
 }
+
+const conceptName = (map: ProjectMap, id: string | null) => map.concepts.find((c) => c.id === id)?.name.split(":")[0] ?? "Explain";
 
 const CHECKED_BY = {
   auto: "The sandbox runs your code and checks it",
@@ -237,7 +242,7 @@ export function StepCard({
       {status && status.questions.length > 0 && (
         <>
           <h3 className="label qhead">Explain in your own words</h3>
-          <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={() => "Explain"} />
+          <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={(q) => conceptName(map, q.concept)} />
         </>
       )}
       {!status?.done && (
@@ -258,11 +263,15 @@ export function StepCard({
   );
 }
 
+/** A concept folded to one line (its name and why it's here); the parts, links, language notes and note open on demand. */
 function ConceptBlock({ concept, notes, language }: { concept: Concept; notes: LanguageLayer["concepts"][number] | null; language: Language | null }) {
   return (
-    <div className="concept">
-      <h4>{concept.name}</h4>
-      <p className="why">{concept.why_here}</p>
+    <details className="concept">
+      <summary>
+        <h4>{concept.name}</h4>
+        <span className="why">{concept.why_here}</span>
+      </summary>
+      <div className="concept-body">
       {concept.covers.length > 0 && (
         <p className="covers">
           {concept.covers.map((part) => (
@@ -306,15 +315,13 @@ function ConceptBlock({ concept, notes, language }: { concept: Concept; notes: L
           )}
         </div>
       )}
-      <details className="note">
-        <summary>Read the short note</summary>
-        <div className="note-body">
-          {concept.explanation.split(/\n\s*\n/).map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      </details>
-    </div>
+      <div className="note-body">
+        {concept.explanation.split(/\n\s*\n/).map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </div>
+      </div>
+    </details>
   );
 }
 

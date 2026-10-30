@@ -118,3 +118,15 @@ describe("spend caps", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("cards", () => {
+  it("appear once each, even when syncs race", async () => {
+    const e = await getOrCreateEnrollment(LEARNER, "url-shortener");
+    await setLanguage(e.id, "node");
+    const before = await loadState(e.id);
+    // Two syncs that both saw the same state, as a page poll and the end of a turn can.
+    await Promise.all([syncCards(e.id, before), syncCards(e.id, before), syncCards(e.id, before)]);
+    const kinds = (await loadState(e.id)).messages.filter((m) => m.role === "card").map((m) => m.meta.card?.kind);
+    expect(kinds).toEqual(["welcome", "stage0"]);
+  });
+});

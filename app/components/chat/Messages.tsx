@@ -12,9 +12,9 @@ function clock(iso: string | null): string {
 }
 
 /** One transcript row: a time column, then the turn. Cards use it too, with no speaker label. */
-export function Row({ at, children, kind }: { at: string | null; children: ReactNode; kind: string }) {
+export function Row({ at, children, kind, id }: { at: string | null; children: ReactNode; kind: string; id?: string }) {
   return (
-    <div className={`tx-row tx-${kind}`}>
+    <div className={`tx-row tx-${kind}`} id={id}>
       <time className="tx-t" dateTime={at ?? undefined}>
         {clock(at)}
       </time>
@@ -52,7 +52,8 @@ export function MentorMessage({
 }) {
   return (
     <Row at={at} kind={`mentor ${status}`}>
-      <div aria-live={status === "pending" ? "polite" : undefined}>
+      {/* Busy while streaming, so a screen reader reads the finished reply once instead of every fragment. */}
+      <div aria-live={status === "pending" ? "polite" : undefined} aria-busy={status === "pending"}>
         <p className="who">
           <span className="label">Mentor</span>
         </p>

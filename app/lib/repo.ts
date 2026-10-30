@@ -347,15 +347,19 @@ export async function loadState(enrollmentId: number): Promise<EnrollmentState> 
 
 /**
  * Keeps the cards in step with progress: once a language is chosen, stage 0; then setup (once stage 0 is answered or
- * a repo is linked); then the current step; and the completion card. Safe to call after every turn and review.
+ * a repo is linked); then the current step; and the completion card. Safe to call after every turn, review and poll:
+ * a unique index keeps each card once, even when two calls race. Pass the state when it's already loaded.
  */
-export async function syncCards(enrollmentId: number): Promise<boolean> {
-  const state = await loadState(enrollmentId);
+export async function syncCards(enrollmentId: number, loaded?: EnrollmentState): Promise<boolean> {
+  const state = loaded ?? (await loadState(enrollmentId));
   const hasCard = (match: (c: CardMeta) => boolean) =>
     state.messages.some((m) => m.role === "card" && m.meta.card && match(m.meta.card));
   const add = async (card: CardMeta) => {
-    await insertMessage(enrollmentId, { role: "card", meta: { card } });
-    added = true;
+    const result = await pool().query(
+      "insert into message (enrollment_id, role, meta) values ($1, 'card', $2) on conflict do nothing",
+      [enrollmentId, JSON.stringify({ card })],
+    );
+    if (result.rowCount) added = true;
   };
   let added = false;
   const { enrollment, progress, map } = state;

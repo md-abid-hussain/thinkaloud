@@ -20,7 +20,7 @@ The craft comes from editorial and technical manuals:
 
 ## 2. Rules (do not break)
 
-- **Never copy another company's identity.** That includes Wispr Flow's palette and type and the AI Engineering from Scratch look. Use them for inspiration about craft only.
+- **Never copy another company's identity.** That includes the AI Engineering from Scratch look; use such sites for inspiration about craft only. The one exception is the landing page's Wispr Flow section, built for the No Hands hackathon that Wispr Flow runs. It wears Wispr Flow's own colours: lilac Dawn `#F0D7FF` in light mode, deep green Fathom `#034F46` in dark mode. It also uses their official logo from wisprflow.ai/media-kit, dark on light and light on dark, as their kit requires. The rest of the product stays in Paper & Ink.
 - **Credit Coding Challenges by John Crickett** near the top and next to projects: https://codingchallenges.fyi/ and https://x.com/johncrickett. roadmap.sh is not in v1.
 - **Wispr Flow:**
   - Name it with the referral link https://wisprflow.ai/r?MD13753 ("Referral link: sign up through it for a 30-day free trial of Flow Pro. Flow also has a free plan.").

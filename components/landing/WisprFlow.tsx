@@ -1,7 +1,9 @@
 "use client";
 
-// "With Wispr Flow": shortcut keys by OS (Mac fn, Windows Ctrl + Win, auto-detected), then the
-// hold-to-talk and hands-free demos in turn while the demo is on screen.
+// "With Wispr Flow": the official Wispr Flow logo and colours (for the hackathon), shortcut keys for the visitor's OS
+// (Mac fn, Windows Ctrl + Win, read from the browser), then the hold-to-talk and hands-free demos in turn while the
+// demo is on screen.
+import Image from "next/image";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 type OS = "mac" | "win";
@@ -82,7 +84,12 @@ export default function WisprFlow() {
       <div className="flow-in">
         <div className="sec-split">
           <div>
-            <p className="label kick"><b>With Wispr Flow</b></p>
+            <p className="label kick flow-brand">
+              <b>With</b>
+              {/* Both load at once (they're small), so switching theme never shows a gap while the other one loads. */}
+              <Image className="wf-logo wf-logo-dark" src="/brand/wispr-flow-logo-dark.svg" alt="Wispr Flow" width={807} height={131} loading="eager" unoptimized />
+              <Image className="wf-logo wf-logo-light" src="/brand/wispr-flow-logo-light.png" alt="Wispr Flow" width={2420} height={391} loading="eager" unoptimized />
+            </p>
             <h2 className="h2" id="flow-title">Think out loud. Literally.</h2>
           </div>
           <p className="intro">Explain by speaking instead of typing. Wispr Flow turns your voice into clean text in any app, including your answers here.</p>
@@ -93,16 +100,18 @@ export default function WisprFlow() {
               <li id="mode-hold"><h3>Hold to talk</h3><p>Hold the shortcut, explain, let go. The text lands in the chat box.</p><span className="keys"><Keys os={os} /></span></li>
               <li id="mode-free"><h3>Hands-free</h3><p>Double-tap the shortcut and Flow keeps listening until you tap it again.</p><span className="keys"><Keys os={os} dbl /></span></li>
             </ul>
-            <div className="os">
-              <div className="seg" role="group" aria-label="Show shortcuts for">
-                <button type="button" aria-pressed={os === "mac"} onClick={() => setOs("mac")}>Mac</button>
-                <button type="button" aria-pressed={os === "win"} onClick={() => setOs("win")}>Windows</button>
-              </div>
-              <span className="fine">Default shortcut. You can change it in Flow&apos;s settings.</span>
-            </div>
+            <p className="fine">Shortcuts: Ctrl + Win on Windows, fn on a Mac. You can change them in Flow&apos;s settings.</p>
             <div className="cta">
               <a className="btn btn-primary" href="https://wisprflow.ai/r?MD13753" rel="sponsored noopener">Get Wispr Flow</a>
               <span className="fine">Referral link: sign up through it for a 30-day free trial of Flow Pro. Flow also has a free plan.</span>
+            </div>
+            <div className="flow-proof">
+              <dl>
+                <div><dt>Words dictated</dt><dd>24,977</dd></div>
+                <div><dt>Words per minute</dt><dd>114</dd></div>
+                <div><dt>Day streak</dt><dd>3</dd></div>
+              </dl>
+              <p>ThinkAloud was built by voice: these are its maker&apos;s Flow stats from building it with Claude Code.</p>
             </div>
           </div>
           <div className="mic-demo" id="mic-demo" ref={demoRef} aria-hidden="true">

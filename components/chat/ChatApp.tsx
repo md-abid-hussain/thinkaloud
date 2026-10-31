@@ -223,6 +223,8 @@ export function ChatApp({ slug, title, sourceUrl }: { slug: string; title: strin
         const pending: Message = { id: data.mentorId, role: "mentor", intent: null, text: "", status: "pending", meta: {}, createdAt: new Date().toISOString() };
         setView((cur) => (cur ? { ...cur, messages: [...cur.messages, data.learner as Message, pending], pending: data.mentorId } : cur));
         setDraft("");
+        // The box grew with the message; an empty box goes back to one line.
+        if (input.current) input.current.style.height = "";
         follow(data.mentorId);
       } catch (error) {
         setSendError(error instanceof Error ? error.message : "Couldn't send your message.");
@@ -445,8 +447,9 @@ export function ChatApp({ slug, title, sourceUrl }: { slug: string; title: strin
                   placeholder={busy ? "The mentor is replying…" : ((narrow && PLACEHOLDER_NARROW[next?.kind ?? "build"]) || PLACEHOLDER[next?.kind ?? "build"])}
                   onChange={(e) => {
                     setDraft(e.target.value);
+                    // Grows with the text; the CSS max-height stops it at 4 lines, and the box scrolls after that.
                     e.target.style.height = "auto";
-                    e.target.style.height = `${Math.min(e.target.scrollHeight, 220)}px`;
+                    e.target.style.height = `${e.target.scrollHeight}px`;
                   }}
                   onKeyDown={onKeyDown}
                 />

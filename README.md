@@ -3,9 +3,10 @@
 **Fundamentals still matter, even when AI writes the code.** ThinkAloud uses AI to teach them, not to skip them: you
 build real tools yourself, an agent reviews your code in a sandbox, and you explain each concept out loud.
 
-**Try it:** https://app-2b25-3000.prg1.zerops.app · Built for the No Hands hackathon by WeMakeDevs and Wispr Flow.
+**Try it:** https://app-2b25-3000.prg1.zerops.app · **Watch the demo:** https://youtu.be/icBje-4CetM · Built for the
+No Hands hackathon by WeMakeDevs and Wispr Flow.
 
-![The ThinkAloud home page, in light and dark mode](docs/images/thinkaloud-home.webp)
+[![The ThinkAloud demo video on YouTube: build it yourself, explain it out loud](docs/images/demo-video.jpg)](https://youtu.be/icBje-4CetM)
 
 ## Why I built it
 
@@ -19,6 +20,8 @@ build real tools yourself, an agent reviews your code in a sandbox, and you expl
   whenever you ask, even with code, but you still explain the idea yourself.
 
 ## How it works
+
+![The ThinkAloud home page, in light and dark mode](docs/images/thinkaloud-home.webp)
 
 1. Pick one of 21 projects from Coding Challenges, from wc to a Redis server and a DNS resolver.
 2. Show you understand the problem before writing any code.

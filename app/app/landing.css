@@ -176,7 +176,7 @@
 /* With Wispr Flow (dark band) */
 .pg-landing .flow { background: var(--band); color: var(--on-band); margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding-inline: max(16px, env(safe-area-inset-left, 0px)); border-top: 0; }
 .pg-landing .flow .label, .pg-landing .flow .fine { color: var(--on-band-muted); }
-.pg-landing .flow .label b { color: var(--fill); }
+.pg-landing .flow .label b { color: var(--wave); }
 .pg-landing .flow-in { max-width: var(--maxw); margin: 0 auto; padding-inline: var(--gut); }
 .pg-landing .flow-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(24px, 4vw, 56px); margin-top: 40px; align-items: stretch; }
 @media (max-width: 1100px) {
@@ -184,10 +184,11 @@
 }
 .pg-landing .flow-left { display: flex; flex-direction: column; gap: 20px; }
 .pg-landing .flow .intro { color: var(--on-band); }
-.pg-landing .flow .btn-primary { box-shadow: 3px 3px 0 var(--on-band); border-color: var(--on-band); }
+/* The voice band keeps the amber: buttons, live badge and waveform use --wave, so ink blue never sits on the dark band. */
+.pg-landing .flow .btn-primary { background: var(--wave); border-color: var(--wave); color: #2A1700; }
 .pg-landing .modes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 .pg-landing .modes li { border: 1px solid #39414A; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color 240ms var(--ease), background-color 240ms var(--ease); }
-.pg-landing .modes li.on { border-color: var(--fill); background: rgba(245, 185, 90, 0.08); }
+.pg-landing .modes li.on { border-color: var(--wave); background: rgba(245, 185, 90, 0.08); }
 .pg-landing .modes h3 { font: 600 19px/1.2 var(--f-display); color: var(--on-band); }
 .pg-landing .modes p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--on-band); }
 .pg-landing .keys { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font: 400 13px/1 var(--f-mono); color: var(--on-band-muted); }
@@ -200,9 +201,9 @@
 .pg-landing .mic-demo { border: 1.5px solid #39414A; border-radius: 14px; padding: 22px; display: flex; flex-direction: column; justify-content: center; gap: 16px; min-width: 0; }
 .pg-landing .mic-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .pg-landing .mode-badge { font: 500 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 8px; border-radius: 4px; background: #262C33; color: var(--on-band-muted); transition: background-color 200ms var(--ease), color 200ms var(--ease); }
-.pg-landing .mode-badge.live { background: var(--fill); color: var(--on-fill); }
+.pg-landing .mode-badge.live { background: var(--wave); color: #2A1700; }
 .pg-landing .bigwave { display: flex; align-items: center; gap: 3px; height: 36px; flex: 1; min-width: 120px; }
-.pg-landing .bigwave i { display: block; width: 4px; height: 4px; border-radius: 2px; background: var(--fill); transition: height 110ms linear; }
+.pg-landing .bigwave i { display: block; width: 4px; height: 4px; border-radius: 2px; background: var(--wave); transition: height 110ms linear; }
 .pg-landing .field { background: #FFFFFF; color: #15191D; border-radius: 8px; padding: 14px 16px; font-size: 17px; line-height: 1.5; min-height: 6.4em; }
 .pg-landing .field .lbl { font: 500 11px/1.4 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #6B5A3E; display: block; margin-bottom: 4px; }
 .pg-landing .field span.ph { transition: opacity 240ms var(--ease); }

@@ -8,27 +8,45 @@ import type { ChatView } from "@/lib/view";
 
 const KIND_LABEL = { what: "What", why: "Why", how: "How" } as const;
 
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** A long summary reads better as two paragraphs: split at the sentence boundary nearest the middle. */
+function paragraphs(text: string): string[] {
+  if (text.length < 420) return [text];
+  const sentences = text.match(/[^.!?]+[.!?]+(\s+|$)/g) ?? [text];
+  let length = 0;
+  const cut = sentences.findIndex((s) => (length += s.length) >= text.length / 2) + 1;
+  if (cut <= 0 || cut >= sentences.length) return [text];
+  return [sentences.slice(0, cut).join("").trim(), sentences.slice(cut).join("").trim()];
+}
+
+function host(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 /** The first card: what the project is, what you'll learn, how it works, and the first thing to do. */
 export function WelcomeCard({ map, language, onPickLanguage }: { map: ProjectMap; language: Language | null; onPickLanguage: (language: Language) => void }) {
   return (
-    <article className="card-msg welcome" aria-label="About this project">
-      <p className="label">
-        Your project · <b>{map.project.level}</b>
-      </p>
-      <h2>{map.project.title}</h2>
-      <p className="summary">{map.project.summary}</p>
+    <article className="page-card welcome" aria-label="About this project">
+      <p className="eyebrow">Your project · {capital(map.project.level)}</p>
+      <h2 className="ctitle">{map.project.title}</h2>
+      <p className="lede">{map.project.summary}</p>
       <div className="cols">
         <section>
-          <h3 className="label">What you&apos;ll learn</h3>
-          <ul className="concept-names">
+          <h3 className="h3">What you&apos;ll learn</h3>
+          <ul className="plain-list">
             {map.concepts.map((c) => (
               <li key={c.id}>{c.name}</li>
             ))}
           </ul>
         </section>
         <section>
-          <h3 className="label">How it works</h3>
-          <ol className="howto">
+          <h3 className="h3">How it works</h3>
+          <ol className="plain-list">
             <li>Understand the problem: read it, then answer three questions.</li>
             <li>Set up a public GitHub repo. The sandbox builds and runs it.</li>
             <li>For each step: build it, push, ask for a review, and answer its questions in your own words.</li>
@@ -62,44 +80,60 @@ export function WelcomeCard({ map, language, onPickLanguage }: { map: ProjectMap
   );
 }
 
-/** Stored questions as a checklist: what each one is about, the question, and whether it's answered. */
-function QuestionList({ questions, answered, label }: { questions: Question[]; answered: Set<string>; label: (q: Question) => string }) {
+/** Stored questions: what each one is about, whether it's answered, and the question itself. */
+function QuestionList({
+  questions,
+  answered,
+  label,
+  tag,
+  done,
+}: {
+  questions: Question[];
+  answered: Set<string>;
+  label: (q: Question) => string;
+  tag?: boolean;
+  done: string;
+}) {
   if (!questions.length) return null;
   return (
-    <ol className="qlist">
+    <ol className="qs">
       {questions.map((q) => (
-        <li key={q.id} className={answered.has(q.id) ? "is-answered" : ""}>
-          <span className="qk">
-            {label(q)}
-            {answered.has(q.id) && <span className="pill ok">Answered</span>}
-          </span>
-          <span className="qp">{q.prompt}</span>
+        <li key={q.id} className={`q${answered.has(q.id) ? " is-answered" : ""}`}>
+          <div className="q-top">
+            <span className={tag ? "q-tag" : "q-c"}>{label(q)}</span>
+            <span className="q-state">{answered.has(q.id) ? done : "Not yet"}</span>
+          </div>
+          <p>{q.prompt}</p>
         </li>
       ))}
     </ol>
   );
 }
 
-/** Stage 0: the problem in our words and three questions that show the learner read and understood it. */
+/** Before you build: the problem in our words and three questions that show the learner read and understood it. */
 export function Stage0Card({ view, onSend }: { view: ChatView; onSend: (text: string) => void }) {
   const answered = new Set(view.answers.map((a) => a.questionId));
   const questions = view.questions.filter((q) => q.kind);
   const done = questions.every((q) => answered.has(q.id));
   return (
-    <article className="card-msg stage0" aria-label="Understand the problem">
+    <article className="page-card stage0" aria-label="Understand the problem">
       <div className="card-head">
-        <p className="label">
-          Stage 0 · <b>understand the problem</b>
-        </p>
+        <p className="eyebrow">Before you build</p>
         {done && <span className="pill ok">Done</span>}
       </div>
-      <h2>What you&apos;re building</h2>
-      <p className="summary">{view.stage0Summary}</p>
-      <h3 className="label">Answer in your own words</h3>
-      <QuestionList questions={questions} answered={answered} label={(q) => KIND_LABEL[q.kind!]} />
+      <h2 className="ctitle">What you&apos;re building</h2>
+      {view.stage0Summary && (
+        <div className="summary">
+          {paragraphs(view.stage0Summary).map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </div>
+      )}
+      <h3 className="h3">Answer in your own words</h3>
+      <QuestionList questions={questions} answered={answered} label={(q) => KIND_LABEL[q.kind!]} tag done="Answered" />
       {!done && (
         <div className="card-actions">
-          <button type="button" className="btn btn-sm btn-ghost" onClick={() => onSend("I've read it. Ask me the questions about the problem.")}>
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => onSend("I've read it. Ask me the questions about the problem.")}>
             Ask me these
           </button>
           <span className="fine">Or go straight to setup. You can answer later.</span>
@@ -115,19 +149,18 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
   const status = view.progress.steps.find((s) => s.id === step.id);
   const c = view.contract;
   return (
-    <article className="card-msg step" aria-label="Set up">
+    <article className="page-card step" aria-label="Set up">
       <div className="card-head">
-        <p className="label">{stepLabel(view.map, step.id)} · set up</p>
+        <p className="eyebrow">
+          {stepLabel(view.map, step.id)} of {view.progress.counts.stepsRequired}
+        </p>
         {status?.built && <span className="pill ok">Runs in the sandbox</span>}
       </div>
-      <h2>{step.title}</h2>
-      <dl className="rows">
+      <h2 className="ctitle">{step.title}</h2>
+      <p className="lede">{step.objective}</p>
+      <dl className="facts-box">
         <div>
-          <dt className="label">Build</dt>
-          <dd>{step.objective}</dd>
-        </div>
-        <div>
-          <dt className="label">Repo</dt>
+          <dt className="k">Repo</dt>
           <dd>
             {view.repo.url ? (
               <a href={view.repo.url} target="_blank" rel="noreferrer" className="mono">
@@ -140,7 +173,7 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
         </div>
         {c && (
           <div>
-            <dt className="label">Sandbox</dt>
+            <dt className="k">The sandbox runs</dt>
             <dd>
               <code className="cmd">{c.run}</code>
               {c.settings.length > 0 && (
@@ -153,7 +186,7 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
         )}
         {view.repo.run && (
           <div>
-            <dt className="label">Runs as</dt>
+            <dt className="k">Your commands</dt>
             <dd>
               {view.repo.build && (
                 <>
@@ -167,7 +200,7 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
           </div>
         )}
       </dl>
-      <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={(q) => conceptName(view.map, q.concept)} />
+      <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={(q) => conceptName(view.map, q.concept)} done="Explained" />
     </article>
   );
 }
@@ -175,35 +208,35 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
 const conceptName = (map: ProjectMap, id: string | null) => map.concepts.find((c) => c.id === id)?.name.split(":")[0] ?? "Explain";
 
 const CHECKED_BY = {
-  auto: "The sandbox runs your code and checks it",
-  partly: "The sandbox checks part of it; the reviewer reads the rest",
-  manual: "The reviewer reads your changes",
+  auto: "The sandbox runs your code and checks it.",
+  partly: "The sandbox checks part of it; the reviewer reads the rest.",
+  manual: "The reviewer reads your changes.",
 } as const;
 
-/** A step: what to build, how it's checked, its concepts with links and language notes, and its questions. */
+/**
+ * A step, as a page to read: what to build and when it works, its concepts (with links and language notes), and its
+ * questions. The actions live in the box at the bottom, so the card doesn't repeat them.
+ */
 export function StepCard({
   view,
   step,
   layer,
   language,
-  onSend,
 }: {
   view: ChatView;
   step: Step;
   layer: { status: LayerStatus; data: LanguageLayer | null } | null;
   language: Language | null;
-  onSend: (text: string) => void;
 }) {
   const { map, progress } = view;
   const status = progress.steps.find((s) => s.id === step.id);
   const concepts = step.concepts.map((id) => map.concepts.find((c) => c.id === id)).filter((c): c is Concept => !!c);
   const answered = new Set(view.answers.map((a) => a.questionId));
-  const label = stepLabel(map, step.id);
   return (
-    <article className="card-msg step" aria-label={`Step: ${step.title}`}>
+    <article className="page-card step" aria-label={`Step: ${step.title}`}>
       <div className="card-head">
-        <p className="label">
-          {label}
+        <p className="eyebrow">
+          {stepLabel(map, step.id)}
           {!step.optional && ` of ${progress.counts.stepsRequired}`}
         </p>
         <span className="pills">
@@ -211,27 +244,21 @@ export function StepCard({
           {status?.understood && status.questions.length > 0 && <span className="pill ok">Questions answered</span>}
         </span>
       </div>
-      <h2>{step.title}</h2>
-      <dl className="rows">
-        <div>
-          <dt className="label">Build</dt>
-          <dd>{step.objective}</dd>
-        </div>
-        <div>
-          <dt className="label">Works when</dt>
-          <dd>{step.check}</dd>
-        </div>
-        <div>
-          <dt className="label">Checked</dt>
-          <dd>{CHECKED_BY[status?.check ?? "manual"]}</dd>
-        </div>
-      </dl>
+      <h2 className="ctitle">{step.title}</h2>
+      <p className="lede">{step.objective}</p>
+      <div className="works">
+        <p className="k">Works when</p>
+        <p>{step.check}</p>
+        <p className="fine">{CHECKED_BY[status?.check ?? "manual"]}</p>
+      </div>
       {concepts.length > 0 && (
-        <section className="concepts">
-          <h3 className="label">Concepts in this step</h3>
-          {concepts.map((c) => (
-            <ConceptBlock key={c.id} concept={c} notes={layer?.data?.concepts.find((n) => n.concept === c.id) ?? null} language={language} />
-          ))}
+        <section className="concepts" aria-label="Concepts in this step">
+          <h3 className="h3">Concepts in this step</h3>
+          <div className="concept-list">
+            {concepts.map((c) => (
+              <ConceptBlock key={c.id} concept={c} notes={layer?.data?.concepts.find((n) => n.concept === c.id) ?? null} language={language} />
+            ))}
+          </div>
         </section>
       )}
       {language && layer && layer.status !== "ready" && (
@@ -241,111 +268,121 @@ export function StepCard({
       )}
       {status && status.questions.length > 0 && (
         <>
-          <h3 className="label qhead">Explain in your own words</h3>
-          <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={(q) => conceptName(map, q.concept)} />
+          <h3 className="h3">Explain in your own words</h3>
+          <QuestionList questions={view.questions.filter((q) => q.step === step.id)} answered={answered} label={(q) => conceptName(map, q.concept)} done="Explained" />
         </>
-      )}
-      {!status?.done && (
-        <div className="card-actions">
-          {!status?.built && (
-            <button type="button" className="btn btn-sm btn-primary" disabled={view.reviewing} onClick={() => onSend(`I pushed ${label}. Please review it.`)}>
-              Review my code
-            </button>
-          )}
-          {status && !status.understood && (
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => onSend(`Ask me ${label}'s questions.`)}>
-              Ask me the questions
-            </button>
-          )}
-        </div>
       )}
     </article>
   );
 }
 
-/** A concept folded to one line (its name and why it's here); the parts, links, language notes and note open on demand. */
+/** A concept folded to its name and why it's here. Open, it reads: the idea, its parts, the language notes, then links. */
 function ConceptBlock({ concept, notes, language }: { concept: Concept; notes: LanguageLayer["concepts"][number] | null; language: Language | null }) {
   return (
     <details className="concept">
       <summary>
         <h4>{concept.name}</h4>
+        <span className="chev" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+        </span>
         <span className="why">{concept.why_here}</span>
       </summary>
       <div className="concept-body">
-      {concept.covers.length > 0 && (
-        <p className="covers">
-          {concept.covers.map((part) => (
-            <span key={part} className="chip">
-              {part}
-            </span>
+        <div className="note-body">
+          {concept.explanation.split(/\n\s*\n/).map((p, i) => (
+            <p key={i}>{p}</p>
           ))}
-        </p>
-      )}
-      <ul className="reads">
-        {concept.resources.map((r) => (
-          <li key={r.url}>
-            <a href={r.url} target="_blank" rel="noreferrer">
-              {r.title}
-            </a>
-          </li>
-        ))}
-      </ul>
-      {notes && language && (
-        <div className="in-lang">
-          <p className="label">In {LANGUAGES[language]}</p>
-          <p>{notes.in_this_language}</p>
-          {(notes.study.length > 0 || notes.guides.length > 0) && (
-            <ul className="api">
-              {notes.study.map((item) => (
-                <li key={item.url + item.name}>
-                  <a href={item.url} target="_blank" rel="noreferrer">
-                    <code>{item.name}</code>
-                  </a>{" "}
-                  {item.why}
-                </li>
-              ))}
-              {notes.guides.map((g) => (
-                <li key={g.url}>
-                  <a href={g.url} target="_blank" rel="noreferrer">
-                    {g.title}
+        </div>
+        {concept.covers.length > 0 && (
+          <p className="covers">
+            {concept.covers.map((part) => (
+              <span key={part}>{part}</span>
+            ))}
+          </p>
+        )}
+        {notes && language && (
+          <div className="in-lang">
+            <p className="k">In {LANGUAGES[language]}</p>
+            <p>{notes.in_this_language}</p>
+            {(notes.study.length > 0 || notes.guides.length > 0) && (
+              <ul className="api">
+                {notes.study.map((item) => (
+                  <li key={item.url + item.name}>
+                    <a href={item.url} target="_blank" rel="noreferrer">
+                      <code>{item.name}</code>
+                    </a>{" "}
+                    {item.why}
+                  </li>
+                ))}
+                {notes.guides.map((g) => (
+                  <li key={g.url}>
+                    <a href={g.url} target="_blank" rel="noreferrer">
+                      {g.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {concept.resources.length > 0 && (
+          <div>
+            <p className="k">Read more</p>
+            <ul className="reads">
+              {concept.resources.map((r) => (
+                <li key={r.url}>
+                  <a href={r.url} target="_blank" rel="noreferrer">
+                    {r.title}
                   </a>
+                  <span className="src">{host(r.url)}</span>
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-      )}
-      <div className="note-body">
-        {concept.explanation.split(/\n\s*\n/).map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
-      </div>
+          </div>
+        )}
       </div>
     </details>
   );
 }
 
-const REVIEW_PILL = {
+const REVIEW_BADGE = {
   running: ["plain", "Running"],
   passed: ["ok", "Passed"],
-  failed: ["soft", "Not yet"],
+  failed: ["warn", "Not yet"],
   error: ["plain", "Couldn't run"],
 } as const;
 
-/** A sandbox review: the reviewer's verdict in words, the checks, and what to fix. */
+const Tick = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2.5 6.2 5 8.5l4.5-5" />
+  </svg>
+);
+const Cross = () => (
+  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M3.5 3.5l5 5M8.5 3.5l-5 5" />
+  </svg>
+);
+
+/** A sandbox review: the verdict in words, the checks with the failed ones first, and what to fix. */
 export function ReviewCard({ map, review }: { map: ProjectMap; review: Review }) {
-  const [tone, word] = REVIEW_PILL[review.status];
+  const [tone, word] = REVIEW_BADGE[review.status];
   const cases = review.result?.check.cases ?? [];
   const passed = cases.filter((c) => c.passed).length;
+  const shown = [...cases].sort((a, b) => Number(a.passed) - Number(b.passed)).slice(0, 12);
   const plan = review.result?.plan;
+  const changed = review.result?.diffStat?.split("\n").at(-1)?.trim();
   return (
-    <article className={`card-msg review is-${review.status}`} aria-label={`Review of ${stepLabel(map, review.stepId)}`}>
-      <div className="card-head">
-        <p className="label">
-          Review · {stepLabel(map, review.stepId)}
-          {review.headSha && <span className="mono"> · {review.headSha.slice(0, 7)}</span>}
-        </p>
-        <span className={`pill ${tone}`}>{word}</span>
+    <article className={`review is-${review.status}`} aria-label={`Review of ${stepLabel(map, review.stepId)}`}>
+      <div className="r-head">
+        <span className={`badge ${tone}`}>{word}</span>
+        <h3 className="r-title">Review of {stepLabel(map, review.stepId).toLowerCase()}</h3>
+        {cases.length > 0 && (
+          <span className="r-meta">
+            {passed} of {cases.length} checks passed
+          </span>
+        )}
       </div>
       {review.verdict && <p className="verdict">{review.verdict.summary}</p>}
       {review.status === "error" && <p className="verdict">The sandbox couldn&apos;t finish this review ({review.error}). Ask for it again.</p>}
@@ -355,25 +392,28 @@ export function ReviewCard({ map, review }: { map: ProjectMap; review: Review })
           <pre className="log">{review.result.build.log}</pre>
         </details>
       )}
-      {cases.length > 0 && (
-        <>
-          <p className="label">
-            Checks · {passed} of {cases.length}
-          </p>
-          <ul className="points">
-            {cases.slice(0, 12).map((c) => (
-              <li key={c.name} className={c.passed ? "met" : "missed"}>
-                <span className="pname">{c.name}</span>
-                {!c.passed && <span className="pdetail">{c.detail}</span>}
-              </li>
-            ))}
-            {cases.length > 12 && <li className="more">{cases.length - 12} more, {cases.slice(12).filter((c) => !c.passed).length} not passed</li>}
-          </ul>
-        </>
+      {shown.length > 0 && (
+        <ul className="checks">
+          {shown.map((c) => (
+            <li key={c.name} className={c.passed ? "pass" : "fail"}>
+              <span className="ck">{c.passed ? <Tick /> : <Cross />}</span>
+              <span className="cname">
+                <span className="sr">{c.passed ? "Passed: " : "Not passed: "}</span>
+                {c.name}
+                {!c.passed && c.detail && <span className="detail">{c.detail}</span>}
+              </span>
+            </li>
+          ))}
+          {cases.length > 12 && (
+            <li className="more">
+              {cases.length - 12} more, {cases.slice(12).filter((c) => !c.passed).length} not passed
+            </li>
+          )}
+        </ul>
       )}
       {review.verdict && review.verdict.problems.length > 0 && (
-        <>
-          <p className="label">To fix</p>
+        <div>
+          <p className="k">To fix</p>
           <ol className="problems">
             {review.verdict.problems.map((p, i) => (
               <li key={i}>
@@ -382,25 +422,28 @@ export function ReviewCard({ map, review }: { map: ProjectMap; review: Review })
               </li>
             ))}
           </ol>
-        </>
+        </div>
       )}
       {plan?.run && (
         <p className="fine plan">
           Built with <code>{plan.build ?? "no build step"}</code>, ran with <code>{plan.run}</code>. Not right? Tell the mentor the commands.
         </p>
       )}
-      {review.result?.diffStat && <p className="fine">{review.result.diffStat.split("\n").at(-1)?.trim()}{review.baseSha ? ` since ${review.baseSha.slice(0, 7)}` : " (first review)"}</p>}
+      {changed && (
+        <p className="fine">
+          {changed}
+          {review.baseSha ? " since your last approved review" : " (first review)"}
+        </p>
+      )}
     </article>
   );
 }
 
 export function CompleteCard({ slug, progress }: { slug: string; progress: Progress }) {
   return (
-    <article className="card-msg complete" aria-label="Project complete">
-      <p className="label">
-        <b>Done</b>
-      </p>
-      <h2>Project complete</h2>
+    <article className="page-card complete" aria-label="Project complete">
+      <p className="eyebrow">Done</p>
+      <h2 className="ctitle">Project complete</h2>
       <p>
         All {progress.counts.stepsRequired} steps passed their reviews, and you answered all {progress.counts.questionsRequired} questions in your own words. Your
         learning log has every answer, the links you learned from, and the help you used.

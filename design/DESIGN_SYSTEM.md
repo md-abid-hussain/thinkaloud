@@ -17,8 +17,8 @@ The product is about explaining your thinking out loud. The page reads like an i
 The craft comes from editorial and technical manuals:
 - labels that carry true information (never decorative numbering)
 - a serif reading voice
-- hard 1.5px ink edges with offset shadows
-- one warm accent
+- hard 1.5px ink edges with offset shadows on the landing page's cards; inner pages stay flat and calm for reading (30 Oct)
+- ink blue for actions and links, amber kept for voice (palette "Paper & Ink", section 3)
 - figures that explain the project and can be "broken"
 
 ## 2. Rules the user set (do not break)
@@ -36,13 +36,16 @@ The craft comes from editorial and technical manuals:
 - **Tagline:** "Learn the part AI can't fake for you." Headline: "Build it yourself. Explain it out loud."
 - **The user reviews through comments on the published artifact.** Read them with the ArtifactComments tool, and screenshot real breakpoints before claiming a fix.
 
-## 3. Tokens (copy this block exactly)
+## 3. Tokens: palette "Paper & Ink" (chosen 30 Oct 2026; copy this block exactly)
+
+The user picked this palette from three options on the redesign canvas, https://claude.ai/artifact/35meR5Vep7UVNtSyyp4Kb4. It replaced the cool grey and amber palette, whose amber fills went muddy, especially in dark mode. `app/app/globals.css` holds the live values.
 
 ```css
 :root {
-  --bg: #EDEFF1; --surface: #FFFFFF; --ink: #15191D; --muted: #525A63; --rule: #C5CBD1;
-  --accent: #8F4F00; --fill: #F5B95A; --on-fill: #2A1700; --wave: #C9801A; --soft: #FBE9CF;
-  --hl: #FFE2A8; --hl-ink: #3D2600; --ok: #1F6B44; --ok-bg: #E1F1E8; --band: #15191D; --on-band: #EDEFF1; --on-band-muted: #A9B1BA;
+  --bg: #F8F7F4; --surface: #FFFFFF; --sunk: #F0EEE9; --ink: #1C1B19; --muted: #5E5B55; --rule: #DDD9D1;
+  --accent: #1F4FA3; --fill: #1F4FA3; --on-fill: #FFFFFF; --wave: #C9801A; --soft: #E9EEF8;
+  --hl: #FBE6A6; --hl-ink: #3D2600; --ok: #1E6B45; --ok-bg: #E2F0E7; --warn: #8A4B00; --warn-bg: #FAEBD5;
+  --band: #1C1B19; --on-band: #F8F7F4; --on-band-muted: #ABA79F; --fig-fill: #C9D8F5;
   --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Newsreader", Georgia, "Times New Roman", serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -51,19 +54,24 @@ The craft comes from editorial and technical manuals:
   --seen: #2F6DB5; --applied: #7A4BC2;   /* concept states (dark: #6FA6E8, #B08CF0) */
 }
 /* Dark: same values under @media (prefers-color-scheme: dark) :root:not([data-theme="light"]) AND :root[data-theme="dark"] */
---bg: #14171B; --surface: #1C2026; --ink: #E6E9EC; --muted: #9BA3AC; --rule: #343B44;
---accent: #F2B25C; --fill: #E89A2C; --on-fill: #2A1700; --wave: #E89A2C; --soft: #3A2A12;
---hl: #5A3F0E; --hl-ink: #FFE9C2; --ok: #6CD29C; --ok-bg: #173826; --band: #0C0E11; --on-band: #E6E9EC; --on-band-muted: #9BA3AC;
+--bg: #141517; --surface: #1C1D20; --sunk: #24262A; --ink: #ECEAE5; --muted: #A39F98; --rule: #313337;
+--accent: #9DBDF5; --fill: #8FB3F2; --on-fill: #0D1A33; --wave: #E89A2C; --soft: #1E293C;
+--hl: #4E3B0F; --hl-ink: #FFE9C2; --ok: #6FD3A0; --ok-bg: #16352A; --warn: #F2B25C; --warn-bg: #3A2A12;
+--band: #0C0D0F; --on-band: #ECEAE5; --on-band-muted: #A39F98; --fig-fill: #2B3E63;
 ```
 
 **Fonts:** Google Fonts `Bricolage Grotesque` (400/600/700, opsz), `Newsreader` (400/500, italic), `IBM Plex Mono` (400/500).
 
 **What each colour is for:**
-- **Amber** (`--fill`) is for actions and the current item.
-- **`--wave`** is for voice and waveforms.
-- **`--hl`** is for grader evidence.
-- **`--ok`** means covered or met.
+- **Ink blue** (`--fill`, `--accent`) is for actions, links and the current item. `--soft` is its light tint for the current row and selected things.
+- **Amber** (`--wave`) is for voice only: the logo, waveforms, the mentor's avatar and the Wispr Flow band. Ink blue never sits on the dark band.
+- **`--hl`** is for grader evidence, the learner's accepted words.
+- **`--ok`** means covered or met. **`--warn`** means "not yet": a failed check or review.
+- **`--sunk`** is the slightly darker paper for learner messages, "Works when" boxes and inline code.
+- **`--fig-fill`** is the highlighted block in figures, with ink text.
 - The dark `--band` is used once per page at most, as Wispr Flow's section uses it.
+
+**Buttons** are flat and rounded (12px), with no ink edge or offset shadow. A primary button is filled with `--fill`. The landing page's cards keep their ink edges and offset shadows.
 
 **Concept states:**
 | State | Colour |
@@ -268,3 +276,15 @@ The main screen. Plain classes and the tokens above, so the CSS can move into th
 
 **"This grade looks wrong" dialog** (`.dlg` > `.box`): lists the points marked missed as checkboxes, an optional reason, "It's logged and a person reviews it. Your grade doesn't change on its own.", Cancel and Send. A sheet on phones. Focus goes to Close, stays inside, and returns to the link.
 
+
+## 11. Learn page, built for reading (30 Oct 2026)
+
+Designed on the canvas https://claude.ai/artifact/35meR5Vep7UVNtSyyp4Kb4 and built in `app/components/chat/`. The aim is to read well and feel less crowded, with fewer IDs on screen.
+
+- **One header:** the wordmark, the project title, the position in words ("Before you build", "Step 2 of 7", "All steps done") with a small bar for the required steps, and "Original challenge". The old Now strip and the Chat/Progress tabs are gone.
+- **Outline on the left** (280px, its own scroll): "Your path" as dots joined by a line (done is a green check, current is a blue ring on a `--soft` row, to do is a hollow ring). No step numbers. Only the current stop has a detail line ("Review: not yet · 1 of 2 explained"). Below it come the concepts as a bar and "N of M explained · See all", then the language, the repo and Export. Below 1000px the outline opens from a header button instead.
+- **One reading column**, 720px wide. A "Today" divider names the day once, and there's no time column (the time shows on hover). Everything before the current card folds behind "Show the earlier conversation".
+- **Cards are pages:** a white card with a 1px rule and 18px radius, a blue sentence-case eyebrow, a Bricolage title, a 20px serif lede, and a `--sunk` "Works when" box. A step card has no buttons of its own: the box at the bottom carries them. Concepts open in reading order: the idea, its parts, "In Java", then "Read more" with each link's site.
+- **Turns:** the learner's turn is a `--sunk` bubble on the right, with the intent ("Explaining") and evidence highlighted. The mentor has an amber waveform avatar and replies in 19px upright serif. Its tool steps fold into one line ("Read the review results + 1 more").
+- **Review card:** a status badge, "Review of step 2", "2 of 4 checks passed", the verdict in italics, failed checks first in a two-column grid with expected and got in mono, then "To fix". There are no commit hashes.
+- **The box at the bottom:** a "Next" pill with the next action in words, at most two suggestion buttons (the first is primary), then the message box with a round send button. On phones the box and the send button share one row.

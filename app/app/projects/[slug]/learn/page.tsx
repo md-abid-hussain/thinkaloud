@@ -20,5 +20,5 @@ async function Project({ params }: { params: PageProps<"/projects/[slug]/learn">
   const { slug } = await params;
   const map = (await catalog()).find((m) => m.project.slug === slug);
   if (!map) notFound();
-  return <ChatApp slug={slug} title={map.project.title} level={map.project.level} sourceUrl={map.project.source_url} />;
+  return <ChatApp slug={slug} title={map.project.title} sourceUrl={map.project.source_url} />;
 }

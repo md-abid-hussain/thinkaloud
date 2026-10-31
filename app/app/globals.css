@@ -1,9 +1,11 @@
 /* ThinkAloud shared styles. Copied from design/landing.html, catalogue.html and overview.html.
    Page-only rules live in each page's own CSS file, scoped under its .pg-* class. */
+/* Palette "Paper & Ink" (chosen 30 Oct 2026): paper ground, ink-blue actions and links, amber kept for voice and evidence. */
 :root {
-  --bg: #EDEFF1; --surface: #FFFFFF; --ink: #15191D; --muted: #525A63; --rule: #C5CBD1;
-  --accent: #8F4F00; --fill: #F5B95A; --on-fill: #2A1700; --wave: #C9801A; --soft: #FBE9CF;
-  --hl: #FFE2A8; --hl-ink: #3D2600; --ok: #1F6B44; --ok-bg: #E1F1E8; --band: #15191D; --on-band: #EDEFF1; --on-band-muted: #A9B1BA;
+  --bg: #F8F7F4; --surface: #FFFFFF; --sunk: #F0EEE9; --ink: #1C1B19; --muted: #5E5B55; --rule: #DDD9D1;
+  --accent: #1F4FA3; --fill: #1F4FA3; --on-fill: #FFFFFF; --wave: #C9801A; --soft: #E9EEF8;
+  --hl: #FBE6A6; --hl-ink: #3D2600; --ok: #1E6B45; --ok-bg: #E2F0E7; --warn: #8A4B00; --warn-bg: #FAEBD5;
+  --band: #1C1B19; --on-band: #F8F7F4; --on-band-muted: #ABA79F; --fig-fill: #C9D8F5;
   --seen: #2F6DB5; --applied: #7A4BC2;
   --f-display: "Bricolage Grotesque Variable", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Newsreader Variable", Georgia, "Times New Roman", serif;
@@ -15,17 +17,19 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #14171B; --surface: #1C2026; --ink: #E6E9EC; --muted: #9BA3AC; --rule: #343B44;
-    --accent: #F2B25C; --fill: #E89A2C; --on-fill: #2A1700; --wave: #E89A2C; --soft: #3A2A12;
-    --hl: #5A3F0E; --hl-ink: #FFE9C2; --ok: #6CD29C; --ok-bg: #173826; --band: #0C0E11; --on-band: #E6E9EC; --on-band-muted: #9BA3AC;
+    --bg: #141517; --surface: #1C1D20; --sunk: #24262A; --ink: #ECEAE5; --muted: #A39F98; --rule: #313337;
+    --accent: #9DBDF5; --fill: #8FB3F2; --on-fill: #0D1A33; --wave: #E89A2C; --soft: #1E293C;
+    --hl: #4E3B0F; --hl-ink: #FFE9C2; --ok: #6FD3A0; --ok-bg: #16352A; --warn: #F2B25C; --warn-bg: #3A2A12;
+    --band: #0C0D0F; --on-band: #ECEAE5; --on-band-muted: #A39F98; --fig-fill: #2B3E63;
     --seen: #6FA6E8; --applied: #B08CF0;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #14171B; --surface: #1C2026; --ink: #E6E9EC; --muted: #9BA3AC; --rule: #343B44;
-  --accent: #F2B25C; --fill: #E89A2C; --on-fill: #2A1700; --wave: #E89A2C; --soft: #3A2A12;
-  --hl: #5A3F0E; --hl-ink: #FFE9C2; --ok: #6CD29C; --ok-bg: #173826; --band: #0C0E11; --on-band: #E6E9EC; --on-band-muted: #9BA3AC;
+  --bg: #141517; --surface: #1C1D20; --sunk: #24262A; --ink: #ECEAE5; --muted: #A39F98; --rule: #313337;
+  --accent: #9DBDF5; --fill: #8FB3F2; --on-fill: #0D1A33; --wave: #E89A2C; --soft: #1E293C;
+  --hl: #4E3B0F; --hl-ink: #FFE9C2; --ok: #6FD3A0; --ok-bg: #16352A; --warn: #F2B25C; --warn-bg: #3A2A12;
+  --band: #0C0D0F; --on-band: #ECEAE5; --on-band-muted: #A39F98; --fig-fill: #2B3E63;
   --seen: #6FA6E8; --applied: #B08CF0;
   color-scheme: dark;
 }
@@ -49,14 +53,14 @@ h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 500 16px/1 var(--f-body); min-height: 46px; padding: 0 20px; border-radius: 6px; border: 1.5px solid var(--ink); text-decoration: none; cursor: pointer; white-space: nowrap; transition: transform 160ms var(--ease), box-shadow 160ms var(--ease); }
-.btn-primary { background: var(--fill); color: var(--on-fill); box-shadow: 3px 3px 0 var(--ink); }
-.btn-primary:hover { color: var(--on-fill); }
-.btn-ghost { background: transparent; color: var(--ink); }
-.btn-ghost:hover { color: var(--ink); background: var(--surface); }
-.btn:active { transform: translate(2px, 2px); box-shadow: none; }
-.btn-sm { min-height: 38px; font-size: 15px; padding: 0 14px; box-shadow: 2px 2px 0 var(--ink); }
-.btn-ghost.btn-sm { box-shadow: none; }
+/* Flat, rounded buttons (Paper & Ink): the fill carries the action, no ink edge or offset shadow. */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 16px/1 var(--f-display); min-height: 46px; padding: 0 20px; border-radius: 12px; border: 1px solid var(--rule); text-decoration: none; cursor: pointer; white-space: nowrap; transition: transform 160ms var(--ease), background-color 160ms var(--ease), border-color 160ms var(--ease); }
+.btn-primary { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
+.btn-primary:hover { color: var(--on-fill); background: color-mix(in srgb, var(--fill) 86%, var(--ink)); }
+.btn-ghost { background: var(--surface); color: var(--ink); }
+.btn-ghost:hover { color: var(--ink); border-color: var(--muted); }
+.btn:active { transform: translateY(1px); }
+.btn-sm { min-height: 40px; font-size: 15px; padding: 0 14px; }
 .btn[disabled] { cursor: progress; opacity: 0.7; }
 
 /* Header */
@@ -128,14 +132,14 @@ mark.ev { background: var(--hl); color: var(--hl-ink); border-radius: 2px; paddi
 /* Figures (viewBox 0 0 280 112), drawn by components/Figure.tsx */
 .k-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
 .k-soft { fill: var(--soft); stroke: var(--ink); stroke-width: 1.5; }
-.k-fill { fill: var(--fill); stroke: var(--ink); stroke-width: 1.5; }
+.k-fill { fill: var(--fig-fill); stroke: var(--ink); stroke-width: 1.5; }
 .k-dot { fill: var(--wave); }
 .k-ink { stroke: var(--ink); stroke-width: 1.5; fill: none; }
 .k-arrow { stroke: var(--ink); stroke-width: 1.5; fill: none; marker-end: url(#ta-ah); }
 .k-dash { stroke: var(--muted); stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; }
 .k-head { fill: var(--ink); }
 .k-t { fill: var(--ink); font: 500 11px var(--f-mono); }
-.k-tf { fill: var(--on-fill); font: 500 11px var(--f-mono); }
+.k-tf { fill: var(--ink); font: 500 11px var(--f-mono); }
 .k-m { fill: var(--muted); font: 400 10px var(--f-mono); }
 [data-anim] { transform-box: fill-box; transform-origin: center; }
 @keyframes ta-blink { 0%, 100% { opacity: 0.2; } 45%, 60% { opacity: 1; } }
@@ -158,6 +162,6 @@ mark.ev { background: var(--hl); color: var(--hl-ink); border-radius: 2px; paddi
 .btn-small { min-height: 36px; padding: 0 12px; font-size: 14px; }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; transform: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-code { font-family: var(--f-mono); font-size: 0.86em; background: var(--soft); color: var(--ink); padding: 0.08em 0.32em; border-radius: 4px; }
+code { font-family: var(--f-mono); font-size: 0.84em; background: var(--sunk); color: var(--ink); padding: 0.1em 0.36em; border-radius: 6px; }
 pre { font-family: var(--f-mono); font-size: 14px; line-height: 1.5; background: var(--band); color: var(--on-band); padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 0; }
 pre code { background: none; color: inherit; padding: 0; font-size: inherit; }

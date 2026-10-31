@@ -111,7 +111,7 @@ async function Overview({ params }: { params: PageProps<"/projects/[slug]">["par
                       </h3>
                       <p className="obj">{s.objective}</p>
                       <p className="check">
-                        <span className="label"><b>Check</b></span>
+                        <span className="label"><b>Works when</b></span>
                         <span>{s.check}</span>
                       </p>
                       {uses.length > 0 && <p className="fine uses">Concepts: {uses.map(inSentence).join(" · ")}</p>}

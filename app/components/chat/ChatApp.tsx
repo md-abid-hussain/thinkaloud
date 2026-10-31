@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { TurnEvent } from "@/lib/agent/bus";
 import { LANGUAGES, stepLabel, type Language } from "@/lib/progress";
-import type { Intent, Message, Review, ToolLine } from "@/lib/repo";
+import type { Intent, Message, ToolLine } from "@/lib/repo";
 import type { ChatView } from "@/lib/view";
 import { Mark } from "../Mark";
 import { CompleteCard, ReviewCard, SetupCard, Stage0Card, StepCard, WelcomeCard } from "./Cards";
-import { LearnerMessage, MentorMessage, Row } from "./Messages";
+import { DayDivider, LearnerMessage, MentorMessage } from "./Messages";
 import { Panel } from "./Panel";
 
 type Live = { id: number; text: string; tools: ToolLine[]; intent: Intent | null };
@@ -18,33 +18,72 @@ const PLACEHOLDER: Record<string, string> = {
   "link-repo": "Paste your GitHub repo link…",
   answer: "Answer in your own words…",
   reviewing: "Ask while it runs…",
-  build: "Ask the mentor anything…",
+  build: "Ask the mentor, or explain in your own words…",
   questions: "Ask, or say “ask me”…",
   complete: "Ask anything…",
 };
 
-/** The one action the Now strip offers: it sends a message, focuses the box with a start, or links. */
-type NowAction = { label: string; send?: string; prefill?: string; href?: string };
+/** A suggestion above the box: it sends a message, focuses the box with a start, or links. */
+type Suggestion = { label: string; send?: string; prefill?: string; href?: string };
 
-function nowAction(view: ChatView, slug: string): NowAction | null {
+/** The one thing to do now, and at most one other useful move. */
+function suggestions(view: ChatView, slug: string): Suggestion[] {
   const next = view.progress.next;
   const label = "step" in next ? stepLabel(view.map, next.step) : "";
   switch (next.kind) {
     case "stage0":
-      return { label: "Ask me the questions", send: "I've read it. Ask me the questions about the problem." };
+      return [{ label: "Ask me the questions", send: "I've read it. Ask me the questions about the problem." }];
     case "link-repo":
-      return { label: "Paste my repo link", prefill: "My repo is https://github.com/" };
-    case "build":
-      return { label: `Review ${label}`, send: `I pushed ${label}. Please review it.` };
+      return [{ label: "Paste my repo link", prefill: "My repo is https://github.com/" }];
+    case "build": {
+      const step = view.progress.steps.find((s) => s.id === next.step);
+      const open = step?.questions.some((q) => !q.answered);
+      return [
+        { label: "Review my code", send: `I pushed ${label}. Please review it.` },
+        ...(open ? [{ label: "Ask me the questions", send: `Ask me ${label}'s questions.` }] : []),
+      ];
+    }
     case "questions":
-      return { label: `Ask me ${label}'s questions`, send: `Ask me ${label}'s questions.` };
+      return [{ label: "Ask me the questions", send: `Ask me ${label}'s questions.` }];
     case "answer":
-      return { label: "Answer", prefill: "" };
+      return [{ label: "Answer the question", prefill: "" }];
     case "complete":
-      return { label: "Export learning log", href: `/api/p/${slug}/export` };
+      return [{ label: "Export learning log", href: `/api/p/${slug}/export` }];
     default:
-      return null;
+      return [];
   }
+}
+
+/** Where the learner is, in a few words, for the header: "Before you build", "Step 2 of 7" or "All steps done". */
+function position(view: ChatView): string {
+  const { progress, map } = view;
+  if (progress.complete) return "All steps done";
+  const current = progress.currentStep;
+  const before = progress.next.kind === "choose-language" || (progress.next.kind === "stage0" && !progress.steps.some((s) => s.done));
+  if (!current || before) return "Before you build";
+  const label = stepLabel(map, current.id);
+  return current.optional ? label : `${label} of ${progress.counts.stepsRequired}`;
+}
+
+/**
+ * The card for where the learner is now. Everything before it folds behind "Show earlier", so the page opens on the
+ * current step instead of the whole history.
+ */
+function currentCardIndex(view: ChatView): number {
+  const { messages, progress, map } = view;
+  const kind = progress.next.kind;
+  if (kind === "choose-language") return 0;
+  const current = progress.currentStep?.id;
+  const matches = (m: Message) => {
+    const card = m.meta.card;
+    if (m.role !== "card" || !card) return false;
+    if (kind === "complete") return card.kind === "complete";
+    if (kind === "stage0") return card.kind === "stage0";
+    if (current && current === map.steps[0]?.id) return card.kind === "setup";
+    return card.kind === "step" && card.step === current;
+  };
+  for (let i = messages.length - 1; i >= 0; i--) if (matches(messages[i])) return i;
+  return 0;
 }
 
 async function loadView(slug: string): Promise<ChatView> {
@@ -53,20 +92,7 @@ async function loadView(slug: string): Promise<ChatView> {
   return (await response.json()) as ChatView;
 }
 
-/** The review the Now strip reports: the running one, or the latest finished one for the current step. */
-function reviewStatus(view: ChatView): { review: Review; text: string; tone: string } | null {
-  const running = view.reviews.find((r) => r.status === "running");
-  const current = view.progress.currentStep?.id;
-  const review = running ?? [...view.reviews].reverse().find((r) => r.stepId === current);
-  if (!review) return null;
-  const label = stepLabel(view.map, review.stepId);
-  if (review.status === "running") return { review, text: `Reviewing ${label}`, tone: "running" };
-  if (review.status === "passed") return { review, text: `${label} review passed`, tone: "ok" };
-  if (review.status === "failed") return { review, text: `${label} review: not yet`, tone: "soft" };
-  return { review, text: `${label} review couldn't run`, tone: "plain" };
-}
-
-export function ChatApp({ slug, title, level, sourceUrl }: { slug: string; title: string; level: string; sourceUrl: string }) {
+export function ChatApp({ slug, title, sourceUrl }: { slug: string; title: string; sourceUrl: string }) {
   const [view, setView] = useState<ChatView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [live, setLive] = useState<Live | null>(null);
@@ -74,6 +100,7 @@ export function ChatApp({ slug, title, level, sourceUrl }: { slug: string; title
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [tab, setTab] = useState<"chat" | "progress">("chat");
+  const [showEarlier, setShowEarlier] = useState(false);
   const following = useRef<EventSource | null>(null);
   const thread = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -199,86 +226,75 @@ export function ChatApp({ slug, title, level, sourceUrl }: { slug: string; title
 
   const busy = sending || !!view?.pending || !!live;
   const next = view?.progress.next;
-  const status = view ? reviewStatus(view) : null;
-  const action = view ? nowAction(view, slug) : null;
+  const moves = view ? suggestions(view, slug) : [];
+  const reviewing = !!view?.reviewing;
+  const where = view ? position(view) : "";
+  const anchor = view ? currentCardIndex(view) : 0;
+  // Fold only when there's more than one earlier message to hide.
+  const folded = !showEarlier && anchor > 1;
 
-  const runAction = (a: NowAction) => {
-    if (a.send) return void send(a.send);
+  const runMove = (m: Suggestion) => {
+    if (m.send) return void send(m.send);
     setTab("chat");
-    if (a.prefill !== undefined && !draft) setDraft(a.prefill);
+    if (m.prefill !== undefined && !draft) setDraft(m.prefill);
     requestAnimationFrame(() => input.current?.focus());
   };
 
-  /** From the rail: show the chat and scroll its card into view, if it's there yet. */
+  /** From the outline: show the chat, unfold the history if the card is in it, and scroll the card into view. */
   const jump = (cardId: string) => {
     setTab("chat");
+    setShowEarlier(true);
     stick.current = false;
     // Only the conversation scrolls; scrollIntoView would also move the page under the sticky header.
     requestAnimationFrame(() => {
       const card = document.getElementById(cardId);
-      if (card && thread.current) thread.current.scrollTo({ top: card.offsetTop - 16, behavior: "smooth" });
+      if (card && thread.current) thread.current.scrollTo({ top: card.offsetTop - 24, behavior: "smooth" });
     });
   };
 
-  const tabKeys = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    const to = tab === "chat" ? "progress" : "chat";
-    setTab(to);
-    document.getElementById(`tab-${to}`)?.focus();
-  };
+  // The messages that open a new day get a divider above them.
+  const dayStarts = new Set<number>();
+  view?.messages.forEach((m, index) => {
+    if (folded && index < anchor) return;
+    const previous = index > (folded ? anchor : 0) ? view.messages[index - 1] : null;
+    if (!previous || new Date(previous.createdAt).toDateString() !== new Date(m.createdAt).toDateString()) dayStarts.add(m.id);
+  });
 
   return (
     <div className={`chat-page tab-${tab}`}>
       <header className="chat-top">
         <Mark />
-        <div className="project-id">
-          <h1 className="ptitle-top">{title}</h1>
-          <span className="pill plain">{level}</span>
-        </div>
-        <nav aria-label="Project">
-          <a href={sourceUrl} target="_blank" rel="noreferrer" className="hide-sm">
+        <h1 className="ptitle-top">{title}</h1>
+        <div className="top-end">
+          {view && (
+            <div className="meter">
+              <span>{where}</span>
+              <span className="segs" aria-hidden="true">
+                {view.progress.steps
+                  .filter((s) => !s.optional)
+                  .map((s) => (
+                    <i key={s.id} className={s.done ? "d" : s.current && where !== "Before you build" ? "n" : ""} />
+                  ))}
+              </span>
+            </div>
+          )}
+          <a href={sourceUrl} target="_blank" rel="noreferrer" className="toplink">
             Original challenge ↗
           </a>
-        </nav>
+          {view && (
+            <button type="button" className="pathbtn" aria-controls="panel-progress" aria-expanded={tab === "progress"} onClick={() => setTab(tab === "chat" ? "progress" : "chat")}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                <path d={tab === "chat" ? "M3 4h10M3 8h10M3 12h6" : "M4 4l8 8M12 4l-8 8"} />
+              </svg>
+              {tab === "chat" ? where : "Back to the chat"}
+            </button>
+          )}
+        </div>
       </header>
 
-      <div className="now-bar">
-        <p className="now" aria-live="polite">
-          <span className="label">
-            <b>Now</b>
-          </span>
-          <span className="now-text">{next?.text ?? "Opening the project"}</span>
-        </p>
-        <div className="now-side">
-          {status && (
-            <span className={`rstatus rs-${status.tone}`}>
-              {status.tone === "running" && <i className="dot" aria-hidden="true" />}
-              {status.text}
-            </span>
-          )}
-          {action &&
-            (action.href ? (
-              <a className="btn btn-sm btn-primary" href={action.href}>
-                {action.label}
-              </a>
-            ) : (
-              <button type="button" className="btn btn-sm btn-primary" disabled={!!action.send && busy} onClick={() => runAction(action)}>
-                {action.label}
-              </button>
-            ))}
-        </div>
-      </div>
-
-      <div className="tabs" role="tablist" aria-label="View" onKeyDown={tabKeys}>
-        <button type="button" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected={tab === "chat"} tabIndex={tab === "chat" ? 0 : -1} onClick={() => setTab("chat")}>
-          Chat
-        </button>
-        <button type="button" role="tab" id="tab-progress" aria-controls="panel-progress" aria-selected={tab === "progress"} tabIndex={tab === "progress" ? 0 : -1} onClick={() => setTab("progress")}>
-          Progress {view ? `${view.progress.counts.stepsDone}/${view.progress.counts.stepsRequired}` : ""}
-        </button>
-      </div>
-
       <main className="chat-main">
+        {view && <Panel slug={slug} view={view} onJump={jump} />}
+
         <div className="thread-col" id="panel-chat" aria-label="Conversation">
           <div
             className="thread"
@@ -298,69 +314,98 @@ export function ChatApp({ slug, title, level, sourceUrl }: { slug: string; title
                   </button>
                 </div>
               )}
+              {folded && (
+                <button type="button" className="earlier" onClick={() => setShowEarlier(true)}>
+                  Show the earlier conversation
+                </button>
+              )}
               {view?.messages.map((m, index) => {
+                if (folded && index < anchor) return null;
+                let body: ReactNode = null;
                 if (m.role === "card") {
                   const card = m.meta.card;
-                  let body: ReactNode = null;
+                  let content: ReactNode = null;
                   if (card?.kind === "welcome") {
-                    body = <WelcomeCard map={view.map} language={view.language} onPickLanguage={(l: Language) => void send(`I'm building it in ${LANGUAGES[l]}.`)} />;
+                    content = <WelcomeCard map={view.map} language={view.language} onPickLanguage={(l: Language) => void send(`I'm building it in ${LANGUAGES[l]}.`)} />;
                   } else if (card?.kind === "stage0") {
-                    body = <Stage0Card view={view} onSend={(t) => void send(t)} />;
+                    content = <Stage0Card view={view} onSend={(t) => void send(t)} />;
                   } else if (card?.kind === "setup") {
-                    body = view.map.steps[0] ? <SetupCard view={view} step={view.map.steps[0]} /> : null;
+                    content = view.map.steps[0] ? <SetupCard view={view} step={view.map.steps[0]} /> : null;
                   } else if (card?.kind === "step") {
                     const step = view.map.steps.find((s) => s.id === card.step);
-                    body = step ? <StepCard view={view} step={step} language={view.language} layer={view.layer} onSend={(t) => void send(t)} /> : null;
+                    content = step ? <StepCard view={view} step={step} language={view.language} layer={view.layer} /> : null;
                   } else if (card?.kind === "review") {
                     const review = view.reviews.find((r) => r.id === card.review);
-                    body = review ? <ReviewCard map={view.map} review={review} /> : null;
+                    content = review ? <ReviewCard map={view.map} review={review} /> : null;
                   } else if (card?.kind === "complete") {
-                    body = <CompleteCard slug={slug} progress={view.progress} />;
+                    content = <CompleteCard slug={slug} progress={view.progress} />;
                   }
-                  // Anchors for the rail: stage 0, setup (the first step) and each step card.
-                  const anchor =
+                  // Anchors for the outline: stage 0, setup (the first step) and each step card.
+                  const id =
                     card?.kind === "stage0" ? "card-stage0" : card?.kind === "setup" ? `card-${view.map.steps[0]?.id}` : card?.kind === "step" ? `card-${card.step}` : undefined;
-                  return body ? (
-                    <Row key={m.id} at={m.createdAt} kind="card" id={anchor}>
-                      {body}
-                    </Row>
+                  body = content ? (
+                    <div className="turn card" id={id}>
+                      {content}
+                    </div>
                   ) : null;
-                }
-                if (m.role === "learner") {
+                } else if (m.role === "learner") {
                   const nextMessage = view.messages[index + 1];
                   const liveIntent = live && nextMessage?.id === live.id ? live.intent : null;
-                  return (
-                    <LearnerMessage
-                      key={m.id}
-                      message={m}
-                      intent={m.intent ?? liveIntent}
-                      quotes={view.answers.filter((a) => a.messageId === m.id).map((a) => a.quote)}
+                  body = (
+                    <LearnerMessage message={m} intent={m.intent ?? liveIntent} quotes={view.answers.filter((a) => a.messageId === m.id).map((a) => a.quote)} />
+                  );
+                } else {
+                  const isLive = live?.id === m.id;
+                  const previous = view.messages[index - 1];
+                  body = (
+                    <MentorMessage
+                      at={m.createdAt}
+                      text={isLive ? live.text : m.text}
+                      tools={isLive ? live.tools : (m.meta.tools ?? [])}
+                      status={isLive ? "pending" : m.status}
+                      onRetry={m.status === "failed" && previous?.role === "learner" && !busy ? () => void send(previous.text) : undefined}
                     />
                   );
                 }
-                const isLive = live?.id === m.id;
-                const previous = view.messages[index - 1];
-                return (
-                  <MentorMessage
-                    key={m.id}
-                    at={m.createdAt}
-                    text={isLive ? live.text : m.text}
-                    tools={isLive ? live.tools : (m.meta.tools ?? [])}
-                    status={isLive ? "pending" : m.status}
-                    onRetry={m.status === "failed" && previous?.role === "learner" && !busy ? () => void send(previous.text) : undefined}
-                  />
-                );
+                return body ? (
+                  <Fragment key={m.id}>
+                    {dayStarts.has(m.id) && <DayDivider at={m.createdAt} />}
+                    {body}
+                  </Fragment>
+                ) : null;
               })}
-              {view?.reviewing && (
-                <Row at={null} kind="card">
-                  <p className="quiet loading review-wait">The sandbox is building and checking your code</p>
-                </Row>
-              )}
+              {reviewing && <p className="quiet loading review-wait">The sandbox is building and checking your code</p>}
             </div>
           </div>
 
           <div className="dock">
             <div className="dock-inner">
+              {next && (
+                <div className="next">
+                  <p className="next-line" aria-live="polite">
+                    <span className={`next-l${reviewing ? " is-running" : ""}`}>
+                      {reviewing && <i className="dot" aria-hidden="true" />}
+                      {reviewing ? "Reviewing" : "Next"}
+                    </span>
+                    <span className="next-t">{next.text}</span>
+                  </p>
+                  {moves.length > 0 && (
+                    <div className="sugs">
+                      {moves.map((m, i) =>
+                        m.href ? (
+                          <a key={m.label} className={`sug${i === 0 ? " primary" : ""}`} href={m.href}>
+                            {m.label}
+                          </a>
+                        ) : (
+                          <button key={m.label} type="button" className={`sug${i === 0 ? " primary" : ""}`} disabled={!!m.send && busy} onClick={() => runMove(m)}>
+                            {m.label}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {sendError && (
                 <p className="send-error" role="alert">
                   {sendError}
@@ -384,16 +429,18 @@ export function ChatApp({ slug, title, level, sourceUrl }: { slug: string; title
                   }}
                   onKeyDown={onKeyDown}
                 />
-                <button type="submit" className="btn btn-primary" disabled={busy || !draft.trim()}>
-                  Send
-                </button>
+                <div className="c-bar">
+                  <span className="keys-hint">Enter sends · Shift + Enter for a new line</span>
+                  <button type="submit" className="send" aria-label="Send" disabled={busy || !draft.trim()}>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 14V4M4.5 8.5 9 4l4.5 4.5" />
+                    </svg>
+                  </button>
+                </div>
               </form>
-              <p className="keys-hint">Enter sends · Shift + Enter for a new line</p>
             </div>
           </div>
         </div>
-
-        {view && <Panel slug={slug} view={view} onJump={jump} />}
       </main>
     </div>
   );

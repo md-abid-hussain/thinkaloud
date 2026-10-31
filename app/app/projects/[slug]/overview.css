@@ -150,3 +150,15 @@
   .pg-overview .step { grid-template-columns: 30px minmax(0, 1fr); }
   .pg-overview .step .check { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Paper & Ink (30 Oct 2026): quieter rules, sentence-case kickers, and each step's check as a "Works when" box, as on
+   the learn page. The layout is unchanged. */
+.pg-overview .sec, .pg-overview .end { border-top: 1px solid var(--rule); }
+.pg-overview .mile-row { border-bottom: 1px solid var(--rule); }
+.pg-overview .sec-h .label { font: 600 14px/1.3 var(--f-display); letter-spacing: 0; text-transform: none; }
+.pg-overview .sec-h .label b { font-weight: 600; }
+.pg-overview .step .check { background: var(--sunk); border: 0; border-radius: 12px; padding: 12px 16px; }
+.pg-overview .step .check .label { font: 600 13px/1.6 var(--f-display); letter-spacing: 0; text-transform: none; }
+.pg-overview .step .check .label b { color: var(--muted); font-weight: 600; }
+.pg-overview .start { border: 1px solid var(--rule); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14); }
+.pg-overview .start-head, .pg-overview .start-foot { border-color: var(--rule); }

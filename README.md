@@ -5,6 +5,8 @@ build real tools yourself, an agent reviews your code in a sandbox, and you expl
 
 **Try it:** https://app-2b25-3000.prg1.zerops.app · Built for the No Hands hackathon by WeMakeDevs and Wispr Flow.
 
+![The ThinkAloud home page, in light and dark mode](docs/images/thinkaloud-home.webp)
+
 ## Why I built it
 
 - **AI writes much of our code now, but understanding it is still our job.** The fundamentals underneath are what let

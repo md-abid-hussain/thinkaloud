@@ -1,7 +1,7 @@
 # Playbooks
 
 A playbook tells the generators how to write content for one **type** of project, where the type is what the learner
-learns (HANDOFF.md section 3). The type list came from reading all 21 challenge pages, and Abid confirmed it on 30 Oct.
+learns. The type list came from reading all 21 challenge pages.
 
 | File | Type | Projects (ours in bold) |
 |---|---|---|

@@ -1,0 +1,164 @@
+/* Overview rules, scoped under .pg-overview. */
+/* Page frame: one centred reading width for this page */
+.pg-overview .page { max-width: 1080px; margin: 0 auto; }
+/* Head: title, facts, Start */
+.pg-overview .head { padding-block: 32px 36px; }
+.pg-overview .crumb { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.pg-overview .crumb a { color: var(--muted); text-decoration: none; }
+.pg-overview .crumb a:hover { color: var(--ink); }
+.pg-overview .head h1 { font-weight: 700; font-size: clamp(2.2rem, 4vw, 3.2rem); line-height: 1.04; letter-spacing: -0.03em; margin: 12px 0 12px; }
+.pg-overview .head .lede { margin: 0; font-size: 19px; line-height: 1.55; max-width: 40em; }
+.pg-overview .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 16px 0 0; padding: 0; list-style: none; font: 400 13px/1.5 var(--f-mono); color: var(--muted); }
+.pg-overview .facts li { display: flex; align-items: center; gap: 14px; }
+.pg-overview .facts li + li::before { content: ""; width: 4px; height: 4px; border-radius: 99px; background: var(--muted); }
+.pg-overview .go { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 24px; }
+.pg-overview .go .choice { font-size: 16px; color: var(--muted); }
+.pg-overview .go .choice b { font-weight: 500; color: var(--ink); }
+.pg-overview .linkbtn { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.pg-overview .linkbtn:hover { color: var(--accent); }
+/* Sections */
+.pg-overview .sec { border-top: 1.5px solid var(--ink); padding-block: 40px 44px; }
+.pg-overview .sec-h { margin-bottom: 22px; }
+.pg-overview .sec-h h2 { font-weight: 700; font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.1; letter-spacing: -0.02em; margin-top: 8px; }
+.pg-overview .sec-h .fine { margin-top: 8px; }
+.pg-overview .rows { margin: 0; max-width: 60em; }
+.pg-overview .rows div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 20px; padding: 14px 0; border-top: 1px solid var(--rule); }
+.pg-overview .rows div:first-child { border-top: 0; padding-top: 4px; }
+.pg-overview .rows dt { padding-top: 4px; }
+.pg-overview .rows dd { margin: 0; max-width: 38em; }
+@media (max-width: 600px) {
+  .pg-overview .rows div { grid-template-columns: minmax(0, 1fr); }
+}
+/* The ideas: one numbered path, divided by the stored milestones */
+.pg-overview .track { margin: 0; padding: 0; list-style: none; }
+.pg-overview .mile-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding: 22px 0 10px; border-bottom: 1.5px solid var(--ink); }
+.pg-overview .track > li:first-child .mile-row { padding-top: 0; }
+.pg-overview .mile-row h3 { font-weight: 600; font-size: 20px; line-height: 1.25; }
+.pg-overview .ideas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
+@media (max-width: 860px) {
+  .pg-overview .ideas { grid-template-columns: minmax(0, 1fr); }
+}
+.pg-overview .idea { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--rule); }
+.pg-overview .idea .n { font: 500 13px/1.6 var(--f-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+.pg-overview .idea .nm { font: 600 18px/1.3 var(--f-display); }
+.pg-overview .idea .br { grid-column: 2 / -1; margin: 0; font-size: 16px; line-height: 1.5; color: var(--muted); }
+.pg-overview .st { font: 500 12px/1.3 var(--f-mono); white-space: nowrap; color: var(--muted); padding: 4px 8px; border-radius: 4px; background: var(--bg); }
+.pg-overview .st.explained { color: var(--ok); background: var(--ok-bg); }
+.pg-overview .st.seen { color: var(--seen); background: var(--bg); }
+@media (max-width: 480px) {
+  .pg-overview .idea { grid-template-columns: 28px minmax(0, 1fr); }
+  .pg-overview .idea .st { grid-column: 2; justify-self: start; }
+}
+.pg-overview .sq { width: 10px; height: 10px; border-radius: 3px; flex: none; background: var(--ok); }
+/* The code */
+.pg-overview .reqs { list-style: none; margin: 0; padding: 0; counter-reset: r; max-width: 42em; }
+.pg-overview .reqs li { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.pg-overview .reqs li:last-child { border-bottom: 1px solid var(--rule); }
+.pg-overview .reqs li::before { counter-increment: r; content: counter(r); font: 500 13px/1.9 var(--f-mono); color: var(--accent); }
+.pg-overview .code-note { margin: 18px 0 0; max-width: 42em; color: var(--muted); font-size: 17px; }
+.pg-overview .end { border-top: 1.5px solid var(--ink); padding-block: 36px 48px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; }
+.pg-overview .end h2 { font-weight: 700; font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.1; letter-spacing: -0.02em; }
+/* Start dialog: centred on wide screens, a sheet from the bottom on phones */
+.pg-overview .dlg { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pg-overview .dlg .scrim { position: absolute; inset: 0; background: rgba(12, 14, 17, 0.45); }
+.pg-overview .start { position: relative; width: min(520px, 100%); max-height: calc(100% - 16px); background: var(--surface); border: 1.5px solid var(--ink); border-radius: 12px; box-shadow: 6px 6px 0 var(--ink); display: flex; flex-direction: column; }
+@media (max-width: 640px) {
+  .pg-overview .dlg { align-items: flex-end; padding: 0; padding-top: calc(32px + env(safe-area-inset-top, 0px)); }
+  .pg-overview .start { width: 100%; max-height: 100%; border-radius: 14px 14px 0 0; border-bottom: 0; box-shadow: none; }
+  .pg-overview .start-foot { padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pg-overview .dlg.opening .scrim { animation: fade-in 220ms var(--ease); }
+  .pg-overview .dlg.opening .start { animation: pop-in 240ms var(--ease); }
+}
+@media (prefers-reduced-motion: no-preference) and (max-width: 640px) {
+  .pg-overview .dlg.opening .start { animation: sheet-up 320ms var(--ease); }
+}
+@keyframes pop-in { from { opacity: 0; transform: translateY(12px); } }
+.pg-overview .start-head { padding: 16px 20px 14px; border-bottom: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pg-overview .start-head h2 { font-weight: 700; font-size: 24px; }
+.pg-overview .start-body { padding: 4px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+.pg-overview .field { border: 0; margin: 0; padding: 14px 0; border-bottom: 1px dashed var(--rule); min-width: 0; }
+.pg-overview .field:last-child { border-bottom: 0; }
+.pg-overview .field legend { padding: 0; margin-bottom: 10px; }
+.pg-overview .field legend span { text-transform: none; letter-spacing: 0; }
+.pg-overview .levels { display: flex; flex-direction: column; gap: 8px; }
+.pg-overview .opt { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 0 10px; align-items: baseline; border: 1px solid var(--rule); border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+.pg-overview .opt:hover { border-color: var(--ink); }
+.pg-overview .opt input { margin: 0; accent-color: var(--ink); width: 16px; height: 16px; transform: translateY(2px); }
+.pg-overview .opt b { font: 600 17px/1.3 var(--f-display); }
+.pg-overview .opt span { grid-column: 2; font-size: 14px; line-height: 1.4; color: var(--muted); }
+.pg-overview .opt:has(input:checked) { border: 1.5px solid var(--ink); background: var(--soft); }
+.pg-overview .opt:has(input:checked) span { color: var(--ink); }
+.pg-overview .langs { display: flex; flex-wrap: wrap; gap: 8px; }
+.pg-overview .langs label { position: relative; }
+.pg-overview .langs input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.pg-overview .langs span { display: inline-flex; align-items: center; font: 400 13px/1 var(--f-mono); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; min-height: 36px; padding: 0 12px; white-space: nowrap; }
+.pg-overview .langs label:hover span { border-color: var(--ink); }
+.pg-overview .langs input:checked + span { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pg-overview .langs input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pg-overview .text-in { width: 100%; font: 400 16px/1.2 var(--f-body); color: var(--ink); background: var(--bg); border: 1.5px solid var(--ink); border-radius: 6px; min-height: 42px; padding: 0 12px; margin-top: 10px; }
+.pg-overview .text-in::placeholder { color: var(--muted); opacity: 1; }
+.pg-overview .note { margin-top: 8px; }
+.pg-overview .save summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.pg-overview .save summary::-webkit-details-marker { display: none; }
+.pg-overview .save summary .fine { margin-right: auto; }
+.pg-overview .save summary::after { content: "+"; font: 400 20px/1 var(--f-mono); color: var(--muted); }
+.pg-overview .save[open] summary::after { content: "−"; }
+.pg-overview .save label { display: block; font: 500 12px/1.4 var(--f-mono); color: var(--muted); margin-top: 12px; }
+.pg-overview .save label .text-in { margin-top: 4px; }
+.pg-overview .start-foot { padding: 14px 20px 18px; border-top: 1.5px solid var(--ink); background: var(--bg); border-radius: 0 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.pg-overview .start-foot .btn { width: 100%; }
+.pg-overview .start-foot .known { display: flex; align-items: center; gap: 8px; color: var(--ok); }
+.pg-overview .start-foot .known .sq { background: var(--ok); }
+@media (max-width: 640px) {
+  .pg-overview .start-foot { border-radius: 0; }
+}
+
+/* Fixes from the design review */
+/* The Applied status word: --applied text on --bg, like the seen state */
+.pg-overview .st.applied { color: var(--applied); background: var(--bg); }
+/* An odd last idea in the two-column grid spans both columns, so its rule doesn't stop halfway */
+@media (min-width: 861px) {
+  .pg-overview .ideas > .idea:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .pg-overview .ideas > .idea:last-child:nth-child(odd) .br { max-width: 40em; }
+}
+/* Primer rows: a little more air, and a label column that fits "Why it matters" on one line */
+.pg-overview .rows div { grid-template-columns: 160px minmax(0, 1fr); gap: 6px 24px; padding: 16px 0; }
+@media (max-width: 600px) { .pg-overview .rows div { grid-template-columns: minmax(0, 1fr); } }
+/* The credit line in the head, as on the catalogue */
+.pg-overview .head .src { margin: 8px 0 0; font-size: 16px; color: var(--muted); }
+.pg-overview .head .src a { color: var(--ink); }
+/* An error from Start, shown inside the dialog */
+.pg-overview .start-foot .err { color: var(--ink); background: var(--soft); border-radius: 4px; padding: 8px 10px; margin: 0; }
+/* v1.2 additions: concept parts and links, and each step's check. */
+.pg-overview .idea .covers, .pg-overview .idea .reads { grid-column: 2 / -1; margin-top: 6px; }
+.pg-overview .idea .reads a { color: var(--ink); }
+.pg-overview .go .fine { margin-top: 10px; }
+
+/* Steps: number, title, what to build, a check box, and the concepts the step uses. */
+.pg-overview .steps { list-style: none; margin: 0; padding: 0; max-width: 46em; }
+.pg-overview .step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 14px; padding: 22px 0; border-top: 1px solid var(--rule); }
+.pg-overview .step:last-child { border-bottom: 1px solid var(--rule); }
+.pg-overview .step .n { font: 500 13px/2 var(--f-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+.pg-overview .step h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font: 600 20px/1.3 var(--f-display); margin: 0; }
+.pg-overview .step .obj { margin: 6px 0 0; font-size: 17px; line-height: 1.55; }
+.pg-overview .step .check { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 4px 12px; margin: 12px 0 0; padding: 10px 14px; background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--ok); border-radius: 0 8px 8px 0; font-size: 16px; line-height: 1.5; }
+.pg-overview .step .check .label b { color: var(--ok); }
+.pg-overview .step .uses { margin-top: 10px; }
+@media (max-width: 560px) {
+  .pg-overview .step { grid-template-columns: 30px minmax(0, 1fr); }
+  .pg-overview .step .check { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Paper & Ink (30 Oct 2026): quieter rules, sentence-case kickers, and each step's check as a "Works when" box, as on
+   the learn page. The layout is unchanged. */
+.pg-overview .sec, .pg-overview .end { border-top: 1px solid var(--rule); }
+.pg-overview .mile-row { border-bottom: 1px solid var(--rule); }
+.pg-overview .sec-h .label { font: 600 14px/1.3 var(--f-display); letter-spacing: 0; text-transform: none; }
+.pg-overview .sec-h .label b { font-weight: 600; }
+.pg-overview .step .check { background: var(--sunk); border: 0; border-radius: 12px; padding: 12px 16px; }
+.pg-overview .step .check .label { font: 600 13px/1.6 var(--f-display); letter-spacing: 0; text-transform: none; }
+.pg-overview .step .check .label b { color: var(--muted); font-weight: 600; }
+.pg-overview .start { border: 1px solid var(--rule); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14); }
+.pg-overview .start-head, .pg-overview .start-foot { border-color: var(--rule); }

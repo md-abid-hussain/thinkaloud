@@ -10,8 +10,21 @@ out/
 build/
 coverage/
 *.tsbuildinfo
+next-env.d.ts
 
-# Local database and caches
+# Written by `next dev` for coding agents
+AGENTS.md
+
+# Local work that isn't part of the project: notes, maps waiting for their checks, the generated review page
+notes/
+content/staging/
+content/generated/review.html
+
+# Local tools, caches and logs
+.claude/worktrees/
 .data/
+__pycache__/
 *.log
+*.pem
 .DS_Store
+.vercel

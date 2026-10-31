@@ -1,0 +1,6 @@
+# Store and export text with LF line endings on every platform, so deploys (zcli push, git archive) and the sandbox
+# harness get the same files whatever the developer's machine uses.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary

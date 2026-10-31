@@ -11,7 +11,8 @@ export async function readPlaybooks(contentDir: string): Promise<{ rules: string
   const rules = await readFile(path.join(dir, "_rules.md"), "utf8");
   const playbooks = new Map<ProjectType, Playbook>();
   for (const file of (await readdir(dir)).filter((f) => f.endsWith(".md") && !f.startsWith("_") && f !== "README.md")) {
-    const raw = await readFile(path.join(dir, file), "utf8");
+    // A checkout on Windows can have CRLF line endings.
+    const raw = (await readFile(path.join(dir, file), "utf8")).replace(/\r\n/g, "\n");
     const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
     if (!match) throw new Error(`${file}: missing front matter`);
     const head = parse(match[1]) as Record<string, string>;

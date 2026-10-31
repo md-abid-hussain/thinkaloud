@@ -16,9 +16,9 @@ const PLACEHOLDER: Record<string, string> = {
   "choose-language": "Your language…",
   stage0: "Ask about the problem…",
   "link-repo": "Paste your GitHub repo link…",
-  answer: "Answer in your own words…",
+  answer: "Answer in your own words, or speak it with Wispr Flow…",
   reviewing: "Ask while it runs…",
-  build: "Ask the mentor, or explain in your own words…",
+  build: "Ask the mentor, or explain out loud with Wispr Flow…",
   questions: "Ask, or say “ask me”…",
   complete: "Ask anything…",
 };

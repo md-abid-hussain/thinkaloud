@@ -178,20 +178,20 @@
    logo on the light lilac, the light logo on the dark green. Dark mode stays dark, so scrolling never flashes. */
 .pg-landing .flow {
   --fl-bg: #F0D7FF; --fl-ink: #1A1A1A; --fl-muted: #4D4A42; --fl-line: rgba(26, 26, 26, 0.18);
-  --fl-accent: #034F46; --fl-on-accent: #FFFFEB; --fl-tint: rgba(3, 79, 70, 0.08); --fl-badge: rgba(26, 26, 26, 0.08);
+  --fl-accent: #034F46; --fl-on-accent: #FFFFEB; --fl-badge: rgba(26, 26, 26, 0.08);
   background: var(--fl-bg); color: var(--fl-ink); margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding-inline: max(16px, env(safe-area-inset-left, 0px)); border-top: 0;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .pg-landing .flow {
     --fl-bg: #034F46; --fl-ink: #FFFFEB; --fl-muted: #B8CEBD; --fl-line: rgba(255, 255, 235, 0.22);
-    --fl-accent: #F0D7FF; --fl-on-accent: #1A1A1A; --fl-tint: rgba(240, 215, 255, 0.1); --fl-badge: rgba(255, 255, 235, 0.12);
+    --fl-accent: #F0D7FF; --fl-on-accent: #1A1A1A; --fl-badge: rgba(255, 255, 235, 0.12);
   }
   :root:not([data-theme="light"]) .pg-landing .flow .wf-logo-dark { display: none; }
   :root:not([data-theme="light"]) .pg-landing .flow .wf-logo-light { display: block; }
 }
 :root[data-theme="dark"] .pg-landing .flow {
   --fl-bg: #034F46; --fl-ink: #FFFFEB; --fl-muted: #B8CEBD; --fl-line: rgba(255, 255, 235, 0.22);
-  --fl-accent: #F0D7FF; --fl-on-accent: #1A1A1A; --fl-tint: rgba(240, 215, 255, 0.1); --fl-badge: rgba(255, 255, 235, 0.12);
+  --fl-accent: #F0D7FF; --fl-on-accent: #1A1A1A; --fl-badge: rgba(255, 255, 235, 0.12);
 }
 :root[data-theme="dark"] .pg-landing .flow .wf-logo-dark { display: none; }
 :root[data-theme="dark"] .pg-landing .flow .wf-logo-light { display: block; }
@@ -200,29 +200,18 @@
 .pg-landing .flow-brand { display: flex; align-items: center; gap: 12px; }
 .pg-landing .flow .wf-logo { height: 26px; width: auto; display: block; }
 .pg-landing .flow .wf-logo-light { display: none; }
-.pg-landing .flow-proof { border-top: 1px solid var(--fl-line); padding-top: 18px; display: flex; flex-direction: column; gap: 10px; }
-.pg-landing .flow-proof dl { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.pg-landing .flow-proof dl div { display: flex; flex-direction: column-reverse; gap: 4px; }
-.pg-landing .flow-proof dd { margin: 0; font: 700 28px/1.1 var(--f-display); color: var(--fl-ink); }
-.pg-landing .flow-proof dt { font: 500 12px/1.3 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fl-muted); }
-.pg-landing .flow-proof p { margin: 0; font-size: 16px; line-height: 1.45; font-style: italic; color: var(--fl-ink); }
 .pg-landing .flow-in { max-width: var(--maxw); margin: 0 auto; padding-inline: var(--gut); }
-.pg-landing .flow-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(24px, 4vw, 56px); margin-top: 40px; align-items: stretch; }
+.pg-landing .flow-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(24px, 4vw, 56px); margin-top: 40px; align-items: start; }
 @media (max-width: 1100px) {
   .pg-landing .flow-body { grid-template-columns: minmax(0, 1fr); margin-top: 28px; }
 }
 .pg-landing .flow-left { display: flex; flex-direction: column; gap: 20px; }
 .pg-landing .flow .intro { color: var(--fl-ink); }
 .pg-landing .flow .btn-primary { background: var(--fl-accent); border-color: var(--fl-accent); color: var(--fl-on-accent); box-shadow: none; }
-.pg-landing .modes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-.pg-landing .modes li { border: 1px solid var(--fl-line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color 240ms var(--ease), background-color 240ms var(--ease); }
-.pg-landing .modes li.on { border-color: var(--fl-accent); background: var(--fl-tint); }
-.pg-landing .modes h3 { font: 600 19px/1.2 var(--f-display); color: var(--fl-ink); }
-.pg-landing .modes p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--fl-ink); }
-.pg-landing .keys { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font: 400 13px/1 var(--f-mono); color: var(--fl-muted); }
-.pg-landing .kc { font: 500 13px/1 var(--f-mono); color: var(--fl-ink); border: 1.5px solid var(--fl-ink); border-radius: 6px; padding: 7px 9px; box-shadow: 0 3px 0 var(--fl-muted); min-width: 30px; text-align: center; transition: transform 110ms var(--ease), box-shadow 110ms var(--ease); }
-.pg-landing .kc.down { transform: translateY(2px); box-shadow: 0 1px 0 var(--fl-muted); }
-.pg-landing .mic-demo { border: 1.5px solid var(--fl-line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; justify-content: center; gap: 16px; min-width: 0; }
+.pg-landing .flow-why { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pg-landing .flow-why li { position: relative; padding-left: 26px; font-size: 18px; line-height: 1.5; color: var(--fl-ink); }
+.pg-landing .flow-why li::before { content: ""; position: absolute; left: 0; top: 0.75em; width: 14px; height: 2px; border-radius: 1px; background: var(--fl-accent); }
+.pg-landing .mic-demo { border: 1.5px solid var(--fl-line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .pg-landing .mic-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .pg-landing .mode-badge { font: 500 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 8px; border-radius: 4px; background: var(--fl-badge); color: var(--fl-muted); transition: background-color 200ms var(--ease), color 200ms var(--ease); }
 .pg-landing .mode-badge.live { background: var(--fl-accent); color: var(--fl-on-accent); }

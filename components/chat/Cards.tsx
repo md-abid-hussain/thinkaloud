@@ -71,7 +71,7 @@ export function WelcomeCard({ map, language, onPickLanguage }: { map: ProjectMap
       )}
       <p className="source">
         Original challenge:{" "}
-        <a href={map.project.source_url} target="_blank" rel="noreferrer">
+        <a href={map.project.source_url} target="_blank" rel="noopener noreferrer">
           {map.project.source_url.replace(/^https:\/\//, "")}
         </a>{" "}
         by John Crickett
@@ -163,7 +163,7 @@ export function SetupCard({ view, step }: { view: ChatView; step: Step }) {
           <dt className="k">Repo</dt>
           <dd>
             {view.repo.url ? (
-              <a href={view.repo.url} target="_blank" rel="noreferrer" className="mono">
+              <a href={view.repo.url} target="_blank" rel="noopener noreferrer" className="mono">
                 {view.repo.url.replace("https://github.com/", "")}
               </a>
             ) : (
@@ -310,7 +310,7 @@ function ConceptBlock({ concept, notes, language }: { concept: Concept; notes: L
               <ul className="api">
                 {notes.study.map((item) => (
                   <li key={item.url + item.name}>
-                    <a href={item.url} target="_blank" rel="noreferrer">
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
                       <code>{item.name}</code>
                     </a>{" "}
                     {item.why}
@@ -318,7 +318,7 @@ function ConceptBlock({ concept, notes, language }: { concept: Concept; notes: L
                 ))}
                 {notes.guides.map((g) => (
                   <li key={g.url}>
-                    <a href={g.url} target="_blank" rel="noreferrer">
+                    <a href={g.url} target="_blank" rel="noopener noreferrer">
                       {g.title}
                     </a>
                   </li>
@@ -333,7 +333,7 @@ function ConceptBlock({ concept, notes, language }: { concept: Concept; notes: L
             <ul className="reads">
               {concept.resources.map((r) => (
                 <li key={r.url}>
-                  <a href={r.url} target="_blank" rel="noreferrer">
+                  <a href={r.url} target="_blank" rel="noopener noreferrer">
                     {r.title}
                   </a>
                   <span className="src">{host(r.url)}</span>

@@ -66,8 +66,8 @@ function inline(text: string): ReactNode {
     if (part.startsWith("`") && part.endsWith("`")) return <code key={n}>{part.slice(1, -1)}</code>;
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={n}>{part.slice(2, -2)}</strong>;
     const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
-    if (link) return <a key={n} href={link[2]} target="_blank" rel="noreferrer">{link[1]}</a>;
-    if (/^https?:\/\//.test(part)) return <a key={n} href={part} target="_blank" rel="noreferrer">{part}</a>;
+    if (link) return <a key={n} href={link[2]} target="_blank" rel="noopener noreferrer">{link[1]}</a>;
+    if (/^https?:\/\//.test(part)) return <a key={n} href={part} target="_blank" rel="noopener noreferrer">{part}</a>;
     return <Fragment key={n}>{part}</Fragment>;
   });
 }

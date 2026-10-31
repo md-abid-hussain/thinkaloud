@@ -3,7 +3,7 @@ export default function Footer({ left }: { left?: React.ReactNode }) {
   return (
     <footer className="foot">
       <p className="fine">{left ?? "ThinkAloud · 2026"}</p>
-      <p className="fine">Projects from <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett</p>
+      <p className="fine">Projects from <a href="https://codingchallenges.fyi/" target="_blank" rel="noopener noreferrer">Coding Challenges</a> by John Crickett</p>
     </footer>
   );
 }

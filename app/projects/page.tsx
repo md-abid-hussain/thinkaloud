@@ -27,7 +27,7 @@ export default async function Catalogue() {
             <p className="label"><b>Projects</b> · {cards.length} ready</p>
             <h1 id="page-title">Pick a project to build.</h1>
             <p className="lede">Each one is a real tool, built step by step in your own editor and language. Each step comes with the concepts it teaches and the best places to learn them.</p>
-            <p className="src">From <a href="https://codingchallenges.fyi/">Coding Challenges</a> by <a href="https://x.com/johncrickett">John Crickett</a></p>
+            <p className="src">From <a href="https://codingchallenges.fyi/" target="_blank" rel="noopener noreferrer">Coding Challenges</a> by <a href="https://x.com/johncrickett" target="_blank" rel="noopener noreferrer">John Crickett</a></p>
           </section>
 
           <CatalogueBrowser projects={cards} paths={paths} areas={levels} />
@@ -42,7 +42,7 @@ export default async function Catalogue() {
               <ul className="examples" aria-label="Some of the other challenges">
                 <li>Rate Limiter</li><li>Web Server</li><li>Redis Server</li><li>Shell</li><li>Git</li><li>Docker</li>
               </ul>
-              <a className="btn btn-ghost" href="https://codingchallenges.fyi/challenges/intro">Browse all 109 challenges ↗</a>
+              <a className="btn btn-ghost" href="https://codingchallenges.fyi/challenges/intro" target="_blank" rel="noopener noreferrer">Browse all 109 challenges ↗</a>
             </div>
           </section>
         </main>

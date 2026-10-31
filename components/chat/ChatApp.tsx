@@ -301,7 +301,7 @@ export function ChatApp({ slug, title, sourceUrl }: { slug: string; title: strin
               </span>
             </div>
           )}
-          <a href={sourceUrl} target="_blank" rel="noreferrer" className="toplink">
+          <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="toplink">
             Original challenge ↗
           </a>
           {view && (

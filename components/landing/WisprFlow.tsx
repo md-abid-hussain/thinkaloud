@@ -72,7 +72,7 @@ export default function WisprFlow() {
               <li>Flow cleans up the pauses and restarts, so the mentor reads what you meant.</li>
             </ul>
             <div className="cta">
-              <a className="btn btn-primary" href="https://wisprflow.ai/r?MD13753" rel="sponsored noopener">Get Wispr Flow</a>
+              <a className="btn btn-primary" href="https://wisprflow.ai/r?MD13753" target="_blank" rel="sponsored noopener noreferrer">Get Wispr Flow</a>
               <span className="fine">Referral link: sign up through it for a 30-day free trial of Flow Pro. Flow also has a free plan.</span>
             </div>
           </div>

@@ -66,7 +66,7 @@ export default function CatalogueBrowser({ projects, paths, areas }: { projects:
         <p>Try a tool name like wc, or an idea like hashing. Coding Challenges has 109 challenges, and you can build any of them on your own.</p>
         <div className="row">
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setQ(""); setArea("all"); }}>Show all projects</button>
-          <a className="btn btn-ghost btn-sm" href="https://codingchallenges.fyi/challenges/intro">Search Coding Challenges ↗</a>
+          <a className="btn btn-ghost btn-sm" href="https://codingchallenges.fyi/challenges/intro" target="_blank" rel="noopener noreferrer">Search Coding Challenges ↗</a>
         </div>
       </div>
     </>

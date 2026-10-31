@@ -40,7 +40,7 @@ export default async function Landing() {
           <div className="credit">
             <div className="src"><span className="label">Projects from</span><span className="who-cc">Coding Challenges by John Crickett</span></div>
             <p className="note">Real tools to build, each linked to its original challenge.</p>
-            <div className="links"><a href="https://codingchallenges.fyi/">codingchallenges.fyi ↗</a><a href="https://x.com/johncrickett">@johncrickett ↗</a></div>
+            <div className="links"><a href="https://codingchallenges.fyi/" target="_blank" rel="noopener noreferrer">codingchallenges.fyi ↗</a><a href="https://x.com/johncrickett" target="_blank" rel="noopener noreferrer">@johncrickett ↗</a></div>
           </div>
 
           <section className="band" id="why" aria-labelledby="why-title">
@@ -78,7 +78,7 @@ export default async function Landing() {
                 <figcaption>
                   <span className="avatar" aria-hidden="true">PG</span>
                   <span className="by"><b>Piyush Garg</b><span>@piyushgarg_dev · 28 Oct 2026</span></span>
-                  <a className="view" href="https://x.com/piyushgarg_dev/status/2115347356074045483">Read the post on X ↗</a>
+                  <a className="view" href="https://x.com/piyushgarg_dev/status/2115347356074045483" target="_blank" rel="noopener noreferrer">Read the post on X ↗</a>
                 </figcaption>
               </figure>
               <div>
@@ -156,7 +156,7 @@ export default async function Landing() {
           <div className="proj-grid">
             {featured.map((p) => <ProjectCard key={p.slug} p={p} />)}
           </div>
-          <p className="fine proj-note">From <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett. {cards.length} projects are ready, with more being written.</p>
+          <p className="fine proj-note">From <a href="https://codingchallenges.fyi/" target="_blank" rel="noopener noreferrer">Coding Challenges</a> by John Crickett. {cards.length} projects are ready, with more being written.</p>
         </section>
 
         <section className="band" id="faq" aria-labelledby="faq-title">
@@ -199,11 +199,11 @@ export default async function Landing() {
 
         <footer className="foot">
           <div>
-            <p>Projects come from <a href="https://codingchallenges.fyi/">Coding Challenges</a> by John Crickett (<a href="https://x.com/johncrickett">@johncrickett</a>). ThinkAloud writes its own short notes and links every project to its original challenge. Thank you, John.</p>
-            <p>Quote from <a href="https://x.com/piyushgarg_dev/status/2115347356074045483">Piyush Garg on X</a>.</p>
+            <p>Projects come from <a href="https://codingchallenges.fyi/" target="_blank" rel="noopener noreferrer">Coding Challenges</a> by John Crickett (<a href="https://x.com/johncrickett" target="_blank" rel="noopener noreferrer">@johncrickett</a>). ThinkAloud writes its own short notes and links every project to its original challenge. Thank you, John.</p>
+            <p>Quote from <a href="https://x.com/piyushgarg_dev/status/2115347356074045483" target="_blank" rel="noopener noreferrer">Piyush Garg on X</a>.</p>
           </div>
           <div>
-            <p>Voice input works with <a href="https://wisprflow.ai/r?MD13753" rel="sponsored noopener">Wispr Flow</a> (referral link).</p>
+            <p>Voice input works with <a href="https://wisprflow.ai/r?MD13753" target="_blank" rel="sponsored noopener noreferrer">Wispr Flow</a> (referral link).</p>
             <p>ThinkAloud · 2026</p>
           </div>
         </footer>

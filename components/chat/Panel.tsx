@@ -111,7 +111,7 @@ export function Panel({ slug, view, onJump }: { slug: string; view: ChatView; on
                     <ul className="reads">
                       {concept.resources.map((r) => (
                         <li key={r.url}>
-                          <a href={r.url} target="_blank" rel="noreferrer">
+                          <a href={r.url} target="_blank" rel="noopener noreferrer">
                             {r.title}
                           </a>
                         </li>
@@ -131,7 +131,7 @@ export function Panel({ slug, view, onJump }: { slug: string; view: ChatView; on
           {view.layer?.status === "building" && " · looking up notes"}
         </p>
         {repo.url && (
-          <a href={repo.url} target="_blank" rel="noreferrer" title={repo.run ? `Runs as: ${repo.run}` : undefined}>
+          <a href={repo.url} target="_blank" rel="noopener noreferrer" title={repo.run ? `Runs as: ${repo.run}` : undefined}>
             Your repo ↗
           </a>
         )}

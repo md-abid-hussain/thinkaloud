@@ -57,7 +57,7 @@ async function Overview({ params }: { params: PageProps<"/projects/[slug]">["par
             <p className="label crumb"><Link href="/projects">Projects</Link><span aria-hidden="true">/</span><b>{short}</b></p>
             <h1 id="page-title">{project.title}</h1>
             <p className="lede">{project.summary}</p>
-            <p className="src">From <a href={project.source_url}>{challenge} ↗</a> by <a href="https://x.com/johncrickett">John Crickett</a></p>
+            <p className="src">From <a href={project.source_url} target="_blank" rel="noopener noreferrer">{challenge} ↗</a> by <a href="https://x.com/johncrickett" target="_blank" rel="noopener noreferrer">John Crickett</a></p>
             <ul className="facts">{facts.map((f) => <li key={f}>{f}</li>)}</ul>
             <div className="go">
               <Link className="btn btn-primary" href={start}>Start {short}</Link>
@@ -83,7 +83,7 @@ async function Overview({ params }: { params: PageProps<"/projects/[slug]">["par
                     {c.covers.length > 0 && <p className="fine covers">Covers: {c.covers.join(" · ")}</p>}
                     <p className="fine reads">
                       {c.resources.map((r, k) => (
-                        <span key={r.url}>{k > 0 && " · "}<a href={r.url}>{r.title} ↗</a></span>
+                        <span key={r.url}>{k > 0 && " · "}<a href={r.url} target="_blank" rel="noopener noreferrer">{r.title} ↗</a></span>
                       ))}
                     </p>
                   </li>
@@ -127,7 +127,7 @@ async function Overview({ params }: { params: PageProps<"/projects/[slug]">["par
             <Link className="btn btn-primary" href={start}>Start {short}</Link>
           </section>
 
-          <Footer left={<>From <a href={project.source_url}>{challenge} ↗</a> by John Crickett. Notes written in our own words.</>} />
+          <Footer left={<>From <a href={project.source_url} target="_blank" rel="noopener noreferrer">{challenge} ↗</a> by John Crickett. Notes written in our own words.</>} />
         </div>
       </div>
     </div>

@@ -90,6 +90,10 @@ Set these in `.env.local` (see `.env.example`):
 The app is one long-running Next.js server with Postgres. Mentor replies and reviews keep running after the page
 closes, so it needs a real server, not serverless functions. Set the variables above with `SANDBOX` unset, and make
 sure the Daytona account has the snapshot named in `lib/sandbox/daytona.ts` (`npm run sandbox:snapshot` creates it).
+
+On [Zerops](https://zerops.io/), `zerops.yml` builds and runs the app as a service called `app`, next to a PostgreSQL
+service called `db` (Node.js 24 and PostgreSQL 17). Add the API keys as secret variables on `app`, then deploy with
+`zcli push app`.
 `GET /api/health` reports the number of projects and `"sandbox":{"backend":"daytona","daytonaKey":true}` when it's
 ready.
 

@@ -1,0 +1,36 @@
+# Zerops deploy for ThinkAloud: one Node.js service (app) beside a PostgreSQL service (db). Deploy with `zcli push app`.
+# Secrets are set in the Zerops app service, never here: ANTHROPIC_API_KEY, LINKUP_API_KEY, DAYTONA_API_KEY.
+zerops:
+  - setup: app
+    build:
+      base: nodejs@24
+      buildCommands:
+        - npm ci
+        - npm run build
+      deployFiles:
+        - .next
+        - node_modules
+        - package.json
+        - next.config.ts
+        # Read at run time: the projects, the migrations and the sandbox harness.
+        - content
+        - db
+        - sandbox
+      cache:
+        - node_modules
+        - .next/cache
+    deploy:
+      readinessCheck:
+        httpGet:
+          port: 3000
+          path: /api/health
+    run:
+      base: nodejs@24
+      ports:
+        - port: 3000
+          httpSupport: true
+      envVariables:
+        NODE_ENV: production
+        DATABASE_URL: ${db_connectionString}
+        DAYTONA_API_URL: https://app.daytona.io/api
+      start: npm start

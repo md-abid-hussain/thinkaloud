@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { TurnEvent } from "@/lib/agent/bus";
 import { LANGUAGES, stepLabel, type Language } from "@/lib/progress";
 import type { Intent, Message, ToolLine } from "@/lib/repo";
@@ -22,6 +22,26 @@ const PLACEHOLDER: Record<string, string> = {
   questions: "Ask, or say “ask me”…",
   complete: "Ask anything…",
 };
+
+/** Phones: the box is about 270px wide, so the Wispr Flow option gets a shorter line that still shows it. */
+const PLACEHOLDER_NARROW: Record<string, string> = {
+  answer: "Answer, or speak with Wispr Flow…",
+  build: "Ask, or explain with Wispr Flow…",
+};
+
+const NARROW = "(max-width: 640px)";
+
+function useNarrow(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(NARROW);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(NARROW).matches,
+    () => false,
+  );
+}
 
 /** A suggestion above the box: it sends a message, focuses the box with a start, or links. */
 type Suggestion = { label: string; send?: string; prefill?: string; href?: string };
@@ -100,6 +120,7 @@ export function ChatApp({ slug, title, sourceUrl }: { slug: string; title: strin
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [tab, setTab] = useState<"chat" | "progress">("chat");
+  const narrow = useNarrow();
   const [showEarlier, setShowEarlier] = useState(false);
   const following = useRef<EventSource | null>(null);
   const thread = useRef<HTMLDivElement>(null);
@@ -421,7 +442,7 @@ export function ChatApp({ slug, title, sourceUrl }: { slug: string; title: strin
                   rows={1}
                   value={draft}
                   maxLength={8000}
-                  placeholder={busy ? "The mentor is replying…" : PLACEHOLDER[next?.kind ?? "build"]}
+                  placeholder={busy ? "The mentor is replying…" : ((narrow && PLACEHOLDER_NARROW[next?.kind ?? "build"]) || PLACEHOLDER[next?.kind ?? "build"])}
                   onChange={(e) => {
                     setDraft(e.target.value);
                     e.target.style.height = "auto";

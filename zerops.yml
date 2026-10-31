@@ -5,8 +5,11 @@ zerops:
     build:
       base: nodejs@24
       buildCommands:
-        - npm ci
-        - npm run build
+        - |
+          # A .next restored from an earlier build's cache isn't writable here, so the build starts from a fresh one.
+          if [ -d .next ]; then mv .next .next-stale; fi
+          npm ci
+          npm run build
       deployFiles:
         - .next
         - node_modules
@@ -18,7 +21,6 @@ zerops:
         - sandbox
       cache:
         - node_modules
-        - .next/cache
     deploy:
       readinessCheck:
         httpGet:
